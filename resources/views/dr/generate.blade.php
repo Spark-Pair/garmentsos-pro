@@ -449,8 +449,6 @@
         }
 
         function deselectThisPayment(index) {
-            console.log(addedPaymentsArray[index].amount);
-
             totalAddedAmount -= addedPaymentsArray[index].amount;
             addedPaymentsArray.splice(index, 1);
             renderSecondList();

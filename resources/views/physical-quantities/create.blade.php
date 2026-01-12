@@ -129,7 +129,6 @@
         function generateArticlesModal() {
             let data = Object.values(@json($articles));
 
-            console.log(data);
             if (data.length > 0) {
                 cardData.push(...data.map(item => {
                     return {

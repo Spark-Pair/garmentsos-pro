@@ -284,8 +284,6 @@
 
         function selectInvoice(invoiceElem) {
             const invoiceData = JSON.parse(invoiceElem.dataset.json).data;
-            console.log(invoiceData);
-
             const index = selectedInvoicesArray.findIndex(invoice => invoice.id === invoiceData.id);
             if (index == -1) {
                 selectedInvoicesArray.push(invoiceData);
@@ -295,8 +293,6 @@
         }
 
         function deselectInvoice(invoiceElem) {
-            console.log('hello');
-
             const invoiceData = JSON.parse(invoiceElem.dataset.json).data;
 
             const index = selectedInvoicesArray.findIndex(invoice => invoice.id === invoiceData.id);

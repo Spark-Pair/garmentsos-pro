@@ -156,8 +156,6 @@
             if (categorySelectDom.value == 'Staff') {
                 const typeArray = allTypes.staff_type
 
-                console.log(typeArray);
-
                 if (typeArray.length > 0) {
                     clutter = `
                         <li data-for="type" data-value="" onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg transition hover:bg-[var(--h-bg-color)]">

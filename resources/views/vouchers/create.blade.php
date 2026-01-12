@@ -123,7 +123,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 @if ($voucherType == 'supplier')
                     {{-- supplier --}}
-                    <x-select class="col-span-2" label="Supplier" name="supplier_id" id="supplier_id" required showDefault
+                    <x-select class="col-span-2" label="Supplier" name="supplier_id" id="supplier_id" :options="$suppliers_options" required showDefault
                         onchange="trackSupplierState()" />
 
                     {{-- balance --}}
@@ -188,6 +188,7 @@
     </form>
 
     <script>
+        let payments_options = [];
         let supplierSelectDom = document.getElementById('supplier_id');
         let methodSelectDom = document.getElementById('method');
         let dateDom = document.getElementById('date');
@@ -206,65 +207,6 @@
         let selectedSupplier;
 
         const today = new Date().toISOString().split('T')[0];
-
-        @if ($voucherType == 'supplier')
-            let suppliersCache = null;
-
-            document.addEventListener('DOMContentLoaded', function() {
-                // Suppliers AJAX loading
-                const input = document.querySelector('input[name="supplier_id_name"]');
-                const dropdown = document.querySelector('ul[data-for="supplier_id"]');
-                supplierSelectDom.disabled = false;
-
-                if (input && dropdown) {
-                    input.addEventListener('focus', async function() {
-                        if (suppliersCache) return;
-
-                        dropdown.innerHTML = '<li class="py-2 px-3 text-center">Loading...</li>';
-
-                        try {
-                            const response = await fetch('{{ route("suppliers.index") }}', {
-                                headers: {
-                                    'X-Requested-With': 'XMLHttpRequest',
-                                    'Accept': 'application/json'
-                                }
-                            });
-
-                            suppliersCache = await response.json();
-
-                            // Build options HTML
-                            const optionsHTML = [`
-                                <li data-for="supplier_id" data-value="" onmousedown="selectThisOption(this)"
-                                    class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)] selected">
-                                    -- Select Supplier --
-                                </li>
-                            `];
-
-                            Object.entries(suppliersCache).forEach(([supplierId, supplier]) => {
-                                const dataOption = supplier.data_option ? `data-option='${JSON.stringify(supplier.data_option)}'` : '';
-
-                                optionsHTML.push(`
-                                    <li data-for="supplier_id"
-                                        data-value="${supplierId}"
-                                        ${dataOption}
-                                        onmousedown="selectThisOption(this)"
-                                        class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)] text-nowrap overflow-x-auto scrollbar-hidden">
-                                        ${supplier.text}
-                                    </li>
-                                `);
-                            });
-
-                            // Single DOM update
-                            dropdown.innerHTML = optionsHTML.join('');
-                            supplierSelectDom.placeholder = '-- Select Supplier --';
-                        } catch (error) {
-                            dropdown.innerHTML = '<li class="py-2 px-3 text-center text-red-400">Error loading suppliers</li>';
-                            console.error(error);
-                        }
-                    }, { once: true });
-                }
-            });
-        @endif
 
         function trackSupplierState() {
             dateDom.value = '';
@@ -301,21 +243,21 @@
         const enterDetailsBtn = document.getElementById("enterDetailsBtn");
         enterDetailsBtn.disabled = true;
 
-        function trackChequeState(elem) {
-            let selectedCheque = JSON.parse(elem.closest('.selectParent').querySelector('ul[data-for="cheque_id"] li.selected').dataset.option || '{}');
-            let amountInpDom = elem.closest('form').querySelector('input[name="amount"]');
+        // function trackChequeState(elem) {
+        //     let selectedCheque = JSON.parse(elem.closest('.selectParent').querySelector('ul[data-for="cheque_id"] li.selected').dataset.option || '{}');
+        //     let amountInpDom = elem.closest('form').querySelector('input[name="amount"]');
 
-            selectedDom.value = JSON.stringify(selectedCheque);
-            amountInpDom.value = selectedCheque.amount;
-        }
+        //     selectedDom.value = JSON.stringify(selectedCheque);
+        //     amountInpDom.value = selectedCheque.amount;
+        // }
 
-        function trackSlipState(elem) {
-            let selectedSlip = JSON.parse(elem.closest('.selectParent').querySelector('ul[data-for="slip_id"] li.selected').dataset.option || '{}');
-            let amountInpDom = elem.closest('form').querySelector('input[name="amount"]');
+        // function trackSlipState(elem) {
+        //     let selectedSlip = JSON.parse(elem.closest('.selectParent').querySelector('ul[data-for="slip_id"] li.selected').dataset.option || '{}');
+        //     let amountInpDom = elem.closest('form').querySelector('input[name="amount"]');
 
-            selectedDom.value = JSON.stringify(selectedSlip);
-            amountInpDom.value = selectedSlip.amount;
-        }
+        //     selectedDom.value = JSON.stringify(selectedSlip);
+        //     amountInpDom.value = selectedSlip.amount;
+        // }
 
         let selectedDom;
         let availableChequesArray = [];
@@ -357,12 +299,12 @@
             }
         }
 
-        function trackExpenseSelect(elem) {
-            let selectedOption = elem.nextElementSibling.querySelector('li.selected');
-            let selectedExpense = JSON.parse(selectedOption.getAttribute('data-option')) || ''
-            elem.closest('form').querySelector('input[name="selected"]').value = JSON.stringify(selectedExpense);
-            elem.closest('form').querySelector('input[name="reff_no"]').value = selectedExpense.reff_no;
-        }
+        // function trackExpenseSelect(elem) {
+        //     let selectedOption = elem.nextElementSibling.querySelector('li.selected');
+        //     let selectedExpense = JSON.parse(selectedOption.getAttribute('data-option')) || ''
+        //     elem.closest('form').querySelector('input[name="selected"]').value = JSON.stringify(selectedExpense);
+        //     elem.closest('form').querySelector('input[name="reff_no"]').value = selectedExpense.reff_no;
+        // }
 
         function updateSelectedAccount(elem) {
             let hiddenAccountInSelfAccount = elem.closest('form').querySelector(`ul[data-for="bank_account_id"]`);
@@ -432,7 +374,7 @@
                     {
                         category: 'explicitHtml',
                         html: `
-                            <x-select label="Cheque" name="cheque_id" id="cheque_id" required :options="$cheques_options" showDefault onchange="trackChequeState(this)" />
+                            <x-select label="Cheque" name="cheque_id" id="cheque_id" required showDefault />
                         `,
                         full: true,
                     },
@@ -466,7 +408,7 @@
                     {
                         category: 'explicitHtml',
                         html: `
-                            <x-select label="Slip" name="slip_id" id="slip_id" required :options="$slips_options" showDefault onchange="trackSlipState(this)" />
+                            <x-select label="Slip" name="slip_id" id="slip_id" required showDefault/>
                         `,
                         full: true,
                     },
@@ -533,7 +475,7 @@
                     {
                         category: 'explicitHtml',
                         html: `
-                            <x-select class="" label="Self Account" name="bank_account_id" id="bank_account_id" :options="$self_accounts_options" required onchange="setSelectedAccount(this)" showDefault />
+                            <x-select class="" label="Self Account" name="bank_account_id" id="self_cheque_id" required onchange="setSelectedAccount(this)" showDefault />
                         `,
                     },
                     {
@@ -573,7 +515,7 @@
                     {
                         category: 'explicitHtml',
                         html: `
-                            <x-select class="" label="Self Account" name="bank_account_id" id="bank_account_id" :options="$self_accounts_options" required onchange="setSelectedAccount(this)" showDefault />
+                            <x-select class="" label="Self Account" name="bank_account_id" id="atm_id" required onchange="setSelectedAccount(this)" showDefault />
                         `,
                     },
                     {
@@ -609,7 +551,7 @@
                     {
                         category: 'explicitHtml',
                         html: `
-                            <x-select class="" label="Expense" name="expense_id" id="expense_id" required showDefault onchange="trackExpenseSelect(this)" />
+                            <x-select class="" label="Expense" name="expense_id" id="purchase_return_id" required showDefault />
                         `,
                     },
                     {
@@ -688,114 +630,132 @@
                 let amountInpDom = document.getElementById('amount');
                 selectedDom = document.getElementById('selected');
 
-                let allSelfAccounts = @json($self_accounts);
+                let allSelfAccounts = [];
 
                 const filteredAccounts = allSelfAccounts.filter(account => {
                     return new Date(account.date) <= new Date(dateDom.value);
                 });
 
-                if (elem.value == 'program') {
-                    let paymentSelectDom = document.querySelector(`ul[data-for="program_id"]`);
-
-                    let allPayments = selectedSupplier.payments;
-
-                    const filteredPayments = allPayments.filter(payment => {
-                        return new Date(payment.date) <= new Date(dateDom.value);
-                    });
-
-                    paymentSelectDom.innerHTML = `
-                        <li data-for="program_id" data-value="" onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)] selected">-- Select program --</li>
-                    `;
-
-                    filteredPayments.forEach(payment => {
-                        paymentSelectDom.innerHTML += `
-                            <li data-for="program_id" data-value="${payment.id}" data-option='${JSON.stringify(payment)}' onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)]">${formatNumbersWithDigits(payment.amount, 1, 1)} | ${payment.program.customer.customer_name} | ${payment.program.customer.city.title} | ${payment.transaction_id} | ${formatDate(payment.date)}</li>
-                        `;
-                    })
-
-                    if (filteredPayments.length > 0) {
-                        document.querySelector('input[name="program_id_name"]').disabled = false;
-                        document.querySelector('input[name="program_id_name"]').placeholder = '-- Select program --';
-                    }
-
-                    document.querySelector('input[name="program_id"]').addEventListener('change', () => {
-                        let selectedOption = paymentSelectDom.querySelector('li.selected');
-                        let selectedPayment = JSON.parse(selectedOption.getAttribute('data-option')) || '';
-
-                        selectedDom.value = JSON.stringify(selectedPayment);
-                        document.getElementById('amount').value = selectedPayment.amount;
-                        document.getElementById('payment_id').value = selectedPayment.id;
-                    })
-                }
-
-                if (elem.value == 'purchase_return') {
-                    selectedDom = document.querySelector('input[name="selected"]');
-                    let expenseSelectDom = document.querySelector(`ul[data-for="expense_id"]`);
-
-                    let allExpenses = selectedSupplier.expenses;
-
-                    const filteredExpenses = allExpenses.filter(expense => {
-                        return new Date(expense.date) <= new Date(dateDom.value);
-                    });
-
-                    expenseSelectDom.innerHTML = `
-                        <li data-for="expense_id" data-value="" onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)] selected">-- Select expense --</li>
-                    `;
-
-                    filteredExpenses.forEach(expense => {
-                        expenseSelectDom.innerHTML += `
-                            <li data-for="expense_id" data-value="${expense.id}" data-option='${JSON.stringify(expense)}' onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)]">${formatNumbersWithDigits(expense.amount, 1, 1)} | ${expense.reff_no}</li>
-                        `;
-                    })
-
-                    if (filteredExpenses.length > 0) {
-                        document.querySelector('input[name="expense_id_name"]').disabled = false;
-                        document.querySelector('input[name="expense_id_name"]').placeholder = '-- Select program --';
-                    }
-
-                    document.querySelector('input[name="expense_id"]').addEventListener('change', () => {
-                        let selectedOption = expenseSelectDom.querySelector('li.selected');
-                        let selectedExpense = JSON.parse(selectedOption.getAttribute('data-option')) || '';
-
-                        selectedDom.value = JSON.stringify(selectedExpense);
-                        document.querySelector('input[name="amount"]').max = selectedExpense.amount;
-                    })
-                }
-
-                if (elem.value === 'slip' || elem.value === 'cheque' || elem.value === 'program') {
-                    const type = elem.value; // 'slip' or 'cheque'
-                    const key = type + '_id'; // slip_id or cheque_id
-                    const inputName = key + '_name'; // slip_id_name or cheque_id_name
-
-                    // Step 1: Get all slip_id / cheque_id from paymentDetailsArray
-                    const usedIds = paymentDetailsArray
-                        .map(item => item[key])
-                        .filter(id => id !== undefined && id !== null);
-
-                    // Step 2: Hide the corresponding <li> elements
-                    usedIds.forEach(id => {
-                        const listItem = document.querySelector(`ul[data-for="${key}"] li[data-value="${id}"]`);
-                        if (listItem) {
-                            listItem.style.display = 'none';
+                if (elem.value !== 'cash' && elem.value !== 'adjustment') {
+                    $.ajax({
+                        url: '/vouchers/create',
+                        type: 'GET',
+                        data: {
+                            supplier_id: selectedSupplier.id,
+                            payment_method: elem.value,
+                            date: dateDom.value,
+                        },
+                        headers: {
+                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                        },
+                        success: function(response) {
+                            payments_options = response.payments_options;
+                            renderOptions()
+                        },
+                        error: function(xhr, status, error) {
+                            console.error(error);
                         }
                     });
 
-                    // Step 3: Check remaining visible <li> items
-                    const allListItems = document.querySelectorAll(`ul[data-for="${key}"] li`);
-                    const visibleListItems = Array.from(allListItems).filter(li => li.style.display !== 'none');
+                    function renderOptions() {
+                        let ULDOM = document.querySelector(`ul[data-for="${elem.value}_id"]`);
+                        document.querySelector(`input[data-for="${elem.value}_id"]`).addEventListener('change', () => {
+                            let selectedOption = ULDOM.querySelector('li.selected');
+                            let selectedPayment = JSON.parse(selectedOption.getAttribute('data-option')) || '';
 
-                    // Step 4: If only one visible <li> and its data-value is '', disable input and update placeholder
-                    if (
-                        visibleListItems.length === 1 &&
-                        visibleListItems[0].getAttribute('data-value') === ''
-                    ) {
-                        const input = document.querySelector(`input[name="${inputName}"]`);
-                        if (input) {
-                            input.placeholder = '-- No options available --';
-                            input.disabled = true;
+                            selectedDom.value = JSON.stringify(selectedPayment);
+                            document.querySelector('input[name="amount"]').value = selectedPayment.amount;
+                        })
+
+                        if (payments_options.length > 0) {
+                            ULDOM.innerHTML = `
+                                <li data-for="${elem.value}_id" data-value="" onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)] selected">-- Select ${elem.value} --</li>
+                            `;
+
+                            payments_options.forEach(option => {
+                                if (paymentDetailsArray.some(pd => (pd.method == 'Slip' && pd.slip_id == option.id) || (pd.method == 'Cheque' && pd.cheque_id == option.id) || (pd.method == 'program' && pd.program_id == option.id) || (pd.method == 'p. return' && pd.expense_id == option.id))) {
+                                    return; // Skip already selected payments
+                                }
+                                ULDOM.innerHTML += `
+                                    <li data-for="${elem.value}_id" data-value="${option.id}" data-option='${JSON.stringify(option.dataset)}' onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)]">${option.text}</li>
+                                `;
+                            })
+                        }
+
+                        if (ULDOM.children.length > 1) {
+                            document.querySelector(`input[name="${elem.value}_id_name"]`).disabled = false;
+                            document.querySelector(`input[name="${elem.value}_id_name"]`).placeholder = `-- Select ${elem.value} --`;
                         }
                     }
                 }
+
+                // if (elem.value == 'program') {
+                //     let paymentSelectDom = document.querySelector(`ul[data-for="program_id"]`);
+
+                //     let allPayments = [];
+
+                //     const filteredPayments = allPayments.filter(payment => {
+                //         return new Date(payment.date) <= new Date(dateDom.value);
+                //     });
+
+                //     paymentSelectDom.innerHTML = `
+                //         <li data-for="program_id" data-value="" onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)] selected">-- Select program --</li>
+                //     `;
+
+                //     filteredPayments.forEach(payment => {
+                //         paymentSelectDom.innerHTML += `
+                //             <li data-for="program_id" data-value="${payment.id}" data-option='${JSON.stringify(payment)}' onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)]">${formatNumbersWithDigits(payment.amount, 1, 1)} | ${payment.program.customer.customer_name} | ${payment.program.customer.city.title} | ${payment.transaction_id} | ${formatDate(payment.date)}</li>
+                //         `;
+                //     })
+
+                //     if (filteredPayments.length > 0) {
+                //         document.querySelector('input[name="program_id_name"]').disabled = false;
+                //         document.querySelector('input[name="program_id_name"]').placeholder = '-- Select program --';
+                //     }
+
+                //     document.querySelector('input[name="program_id"]').addEventListener('change', () => {
+                //         let selectedOption = paymentSelectDom.querySelector('li.selected');
+                //         let selectedPayment = JSON.parse(selectedOption.getAttribute('data-option')) || '';
+
+                //         selectedDom.value = JSON.stringify(selectedPayment);
+                //         document.getElementById('amount').value = selectedPayment.amount;
+                //         document.getElementById('payment_id').value = selectedPayment.id;
+                //     })
+                // }
+
+                // if (elem.value == 'purchase_return') {
+                //     selectedDom = document.querySelector('input[name="selected"]');
+                //     let expenseSelectDom = document.querySelector(`ul[data-for="expense_id"]`);
+
+                //     let allExpenses = selectedSupplier.expenses;
+
+                //     const filteredExpenses = allExpenses.filter(expense => {
+                //         return new Date(expense.date) <= new Date(dateDom.value);
+                //     });
+
+                //     expenseSelectDom.innerHTML = `
+                //         <li data-for="expense_id" data-value="" onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)] selected">-- Select expense --</li>
+                //     `;
+
+                //     filteredExpenses.forEach(expense => {
+                //         expenseSelectDom.innerHTML += `
+                //             <li data-for="expense_id" data-value="${expense.id}" data-option='${JSON.stringify(expense)}' onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)]">${formatNumbersWithDigits(expense.amount, 1, 1)} | ${expense.reff_no}</li>
+                //         `;
+                //     })
+
+                //     if (filteredExpenses.length > 0) {
+                //         document.querySelector('input[name="expense_id_name"]').disabled = false;
+                //         document.querySelector('input[name="expense_id_name"]').placeholder = '-- Select program --';
+                //     }
+
+                //     document.querySelector('input[name="expense_id"]').addEventListener('change', () => {
+                //         let selectedOption = expenseSelectDom.querySelector('li.selected');
+                //         let selectedExpense = JSON.parse(selectedOption.getAttribute('data-option')) || '';
+
+                //         selectedDom.value = JSON.stringify(selectedExpense);
+                //         document.querySelector('input[name="amount"]').max = selectedExpense.amount;
+                //     })
+                // }
             }
         }
 
@@ -863,7 +823,6 @@
                 let clutter = "";
                 paymentDetailsArray.forEach((paymentDetail, index) => {
                     let selected = paymentDetail.selected ? JSON.parse(paymentDetail.selected) : null;
-                    console.log(paymentDetail);
 
                     clutter += `
                         <div class="flex justify-between items-center border-t border-gray-600 py-3 px-4">
@@ -982,8 +941,6 @@
                                     <div id="tbody" class="tbody w-full">
                                         ${paymentDetailsArray.map((payment, index) => {
                                             let selected = JSON.parse(payment.selected || '{}');
-                                            console.log(selected);
-
                                             const hrClass = index === 0 ? "mb-2.5" : "my-2.5";
                                             return `
                                                     <div>

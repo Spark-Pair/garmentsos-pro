@@ -120,8 +120,6 @@
                     date: date,
                 },
                 success: function(response) {
-                    // console.log(response);
-
                     renderPendingPayments(response);
                 },
                 error: function(xhr, status, error) {

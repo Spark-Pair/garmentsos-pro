@@ -196,9 +196,6 @@
             e.preventDefault();
             let item = e.target.closest('.item');
             let data = JSON.parse(item.dataset.json);
-            console.log(data);
-
-
             let contextMenuData = {
                 item: item,
                 data: data,

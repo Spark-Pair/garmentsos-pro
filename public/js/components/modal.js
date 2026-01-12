@@ -551,7 +551,7 @@ function createModal(data, animate = 'animate') {
 
             clutter += `
                     <div id="preview-container" class="h-auto mx-auto relative flex flex-col">`
-                    
+
             articlePages.forEach((articlesChunk, pageIndex) => {
                 invoiceTableHeader = `
                     <div class="th text-sm font-medium ">S.No</div>

@@ -46,8 +46,6 @@
                     'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                 },
                 success: function(response) {
-                    console.log(response);
-
                     const preview = document.getElementById("preview");
                     preview.innerHTML = ""; // clear old content
 
@@ -140,8 +138,6 @@
 
         function validateForNextStep() {
             if (!nameDom.value) return false;
-            console.log("ran");
-
             generateSlipPreview();
             return true;
         }

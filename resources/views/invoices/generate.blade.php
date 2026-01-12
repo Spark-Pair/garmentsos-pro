@@ -664,9 +664,6 @@
                 const customerRows = document.querySelectorAll('.customer-row');
 
                 const availableCottonCount = getAvailableCottonCount();
-                console.log(availableCottonCount);
-
-
                 customerRows.forEach((customerRow, index) => {
                     if (availableCottonCount > 0) {
                         customerRow.style.pointerEvents = 'all';
@@ -948,8 +945,6 @@
                         order_no: orderNoDom.value
                     },
                     success: function (response) {
-                        console.log(response);
-
                         if (!response.error) {
                             orderedArticles = response.articles;
                             discount = response.discount ?? 0;
@@ -983,7 +978,6 @@
             function renderList() {
 
                 if (orderedArticles && orderedArticles.length > 0) {
-                    console.log('hello');
                     totalAmount = 0;
                     totalQuantityPcs = 0;
 

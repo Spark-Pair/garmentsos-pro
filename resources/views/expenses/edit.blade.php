@@ -59,7 +59,6 @@
         function supplierSelected(supplier) {
             const expenseSelect = document.getElementById('expense');
             const selectedSupplierData = JSON.parse(supplier);
-            console.log(selectedSupplierData);
 
             const supplierCategories = selectedSupplierData.categories;
 

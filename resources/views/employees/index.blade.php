@@ -106,8 +106,6 @@
 
         const fetchedData = @json($employees);
         let allDataArray = fetchedData.map(item => {
-            console.log(item);
-
             return {
                 id: item.id,
                 uId: item.id,

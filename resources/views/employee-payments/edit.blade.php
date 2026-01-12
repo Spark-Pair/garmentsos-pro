@@ -119,7 +119,6 @@
                 dateDom.min = selectedCustomer?.date.toString().split('T')[0];
                 dateDom.max = today;
                 selectedCustomerData = selectedCustomer;
-                console.log(selectedCustomerData);
 
                 setOptionOnNthLi(typeSelectDom, 2, 'option', JSON.stringify(selectedCustomer?.payment_programs) ?? '');
             } else {

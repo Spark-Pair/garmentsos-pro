@@ -59,8 +59,6 @@
                     state: row[4]
                 }));
 
-                console.log(formattedData);
-
                 // put it in hidden input as JSON string
                 document.getElementById('attendancesInput').value = JSON.stringify(formattedData);
             };

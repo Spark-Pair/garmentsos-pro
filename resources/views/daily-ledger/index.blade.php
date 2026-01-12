@@ -125,8 +125,6 @@
         }
 
         const fetchedData = @json($dailyLedgers);
-        console.log(fetchedData);
-
         let allDataArray = fetchedData.map(item => {
             balance += item.deposit;
             balance -= item.use;

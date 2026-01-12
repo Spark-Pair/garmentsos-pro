@@ -167,7 +167,6 @@
             const tagNo = `${supplierCode}-${unitCode}-${colorTitle}-${fabricTitle}`;
 
             // Output or assign to input
-            console.log(tagNo);
             tagInput.value = tagNo;
         }
     </script>

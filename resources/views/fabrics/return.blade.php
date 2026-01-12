@@ -82,7 +82,6 @@
 
         function trackTagSelect(elem) {
             const selectedTag = JSON.parse(elem.closest('.selectParent').querySelector('li.selected').getAttribute('data-option') ?? '{}');
-            console.log(selectedTag);
 
             remainingStockInpDom.value = selectedTag.remaining;
         }

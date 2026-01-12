@@ -215,8 +215,6 @@
 
         const fetchedData = @json($payments);
         let allDataArray = fetchedData.map(item => {
-            console.log(item);
-
             totalAmount += parseFloat(item.amount);
             totalPayment += parseFloat(item.clear_amount);
             return {
@@ -330,12 +328,10 @@
                 <li data-for="bank_account_id" data-value=" " onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg transition hover:bg-[var(--h-bg-color)] text-nowrap overflow-x-auto scrollbar-hidden"">-- Select bank account --</li>
             `;
 
-            console.log(data);
-
             bankAccounts.forEach(bankAccount => {
 
                 bankAccountDom.innerHTML += `
-                    <li data-for="bank_account_id" data-value="${bankAccount.id}" onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg transition hover:bg-[var(--h-bg-color)] text-nowrap overflow-x-auto scrollbar-hidden">${bankAccount.account_title}</li>
+                    <li data-for="bank_account_id" data-value="${bankAccount.id}" onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg transition hover:bg-[var(--h-bg-color)] text-nowrap overflow-x-auto scrollbar-hidden">${bankAccount.account_title} | ${bankAccount.bank.short_title}</li>
                 `;
             });
             // bankAccountDom.innerHTML = options;

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\BankAccount;
 use App\Models\CustomerPayment;
+use App\Models\Expense;
 use App\Models\Supplier;
 use App\Models\SupplierPayment;
 use App\Models\Voucher;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Nette\Schema\Expect;
 
 class VoucherController extends Controller
 {
@@ -26,7 +28,7 @@ class VoucherController extends Controller
 
         // Eager load all relations needed
         $vouchers = Voucher::with([
-            'supplier',
+            'supplier:id,supplier_name',
             'payments.cheque.customer',
             'payments.slip.customer',
             'payments.program.customer',
@@ -61,58 +63,91 @@ class VoucherController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create()
+    public function create(Request $request)
     {
         if (!$this->checkRole(['developer', 'owner', 'admin', 'accountant'])) {
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         }
 
-        // --- Cheques ---
-        $cheques = CustomerPayment::whereNotNull('cheque_no')
-            ->with('customer.city')
-            ->whereDoesntHave('cheque')
-            ->whereNull('bank_account_id')
-            ->get();
+        if ($request->ajax()) {
+            $supplier_id = $request->supplier_id;
+            $paymentMethod = $request->payment_method;
+            $date = $request->date;
+            $payments_options = [];
 
-        $cheques_options = $cheques->mapWithKeys(function ($cheque) {
-            return [
-                (int)$cheque->id => [
-                    'text' => $cheque->amount . ' | ' . $cheque->customer->customer_name . ' | ' . $cheque->customer->city->title . ' | ' . $cheque->cheque_no . ' | ' . date('d-M-Y D', strtotime($cheque->cheque_date)),
-                    'data_option' => $cheque->makeHidden('creator'),
-                ]
-            ];
-        })->toArray();
+            if ($paymentMethod == 'cheque') {
+                $cheques = CustomerPayment::whereNotNull('cheque_no')
+                    ->with('customer.city')
+                    ->whereDoesntHave('cheque')
+                    ->whereNull('bank_account_id')
+                    ->get();
 
-        // --- Slips ---
-        $slips = CustomerPayment::whereNotNull('slip_no')
-            ->with('customer.city')
-            ->whereDoesntHave('slip')
-            ->whereNull('bank_account_id')
-            ->get();
+                $payments_options = $cheques->map(function ($cheque) {
+                    return [
+                        'id' => (int)$cheque->id,
+                        'text' => number_format($cheque->amount) . ' | ' . $cheque->customer->customer_name . ' | ' . $cheque->customer->city->title . ' | ' . $cheque->cheque_no . ' | ' . date('d-M-Y D', strtotime($cheque->cheque_date)),
+                        'dataset' => $cheque->makeHidden('creator'),
+                    ];
+                })->values()->toArray();
+            } else if ($paymentMethod == 'slip') {
+                $slips = CustomerPayment::whereNotNull('slip_no')
+                    ->with('customer.city')
+                    ->whereDoesntHave('slip')
+                    ->whereNull('bank_account_id')
+                    ->get();
 
-        $slips_options = $slips->mapWithKeys(function ($slip) {
-            return [
-                (int)$slip->id => [
-                    'text' => $slip->amount . ' | ' . $slip->customer->customer_name . ' | ' . $slip->customer->city->title . ' | ' . $slip->slip_no . ' | ' . date('d-M-Y D', strtotime($slip->slip_date)),
-                    'data_option' => $slip->makeHidden('creator'),
-                ]
-            ];
-        })->toArray();
+                $payments_options = $slips->map(function ($slip) {
+                    return [
+                        'id' => (int)$slip->id,
+                        'text' => number_format($slip->amount) . ' | ' . $slip->customer->customer_name . ' | ' . $slip->customer->city->title . ' | ' . $slip->slip_no . ' | ' . date('d-M-Y D', strtotime($slip->slip_date)),
+                        'dataset' => $slip->makeHidden('creator'),
+                    ];
+                })->values()->toArray();
+            } else if ($paymentMethod == 'purchase_return') {
+                $expenses = Expense::where('supplier_id', $supplier_id)
+                    ->where('date', '>=', $date)
+                    ->with('expenseSetups')
+                    ->get();
 
-        // --- Self Accounts ---
-        $self_accounts = BankAccount::where('category', 'self')
-            ->with('bank')
-            ->get()
-            ->makeHidden('creator');
+                $payments_options = $expenses->map(function ($expense) {
+                    return [
+                        'id' => (int)$expense->id,
+                        'text' => number_format($expense->amount) . ' | ' . $expense->reff_no . ' | ' . date('d-M-Y D', strtotime($expense->date)),
+                        'dataset' => $expense,
+                    ];
+                })->values()->toArray();
+            } else if ($paymentMethod == 'program') {
+                $payments = SupplierPayment::where('supplier_id', $supplier_id)
+                    ->where('method', 'program')
+                    ->whereNull('voucher_id')
+                    ->get();
 
-        $self_accounts_options = $self_accounts->mapWithKeys(function ($account) {
-            return [
-                (int)$account->id => [
-                    'text' => $account->account_title . ' - ' . $account->bank->short_title,
-                    'data_option' => $account,
-                ]
-            ];
-        })->toArray();
+                $payments_options = $payments->map(function ($payment) {
+                    return [
+                        'id' => (int)$payment->id,
+                        'text' => number_format($payment->amount) . ' | ' . $payment->transaction_id . ' | ' . date('d-M-Y D', strtotime($payment->date)),
+                        'dataset' => $payment,
+                    ];
+                })->values()->toArray();
+            } else if ($paymentMethod == 'self_cheque' || $paymentMethod == 'atm') {
+                $self_accounts = BankAccount::where('category', 'self')
+                    ->with('bank')
+                    ->get()
+                    ->makeHidden('creator');
+
+                $payments_options = $self_accounts->map(function ($account) {
+                    return [
+                        'id' => (int)$account->id,
+                        'text' => $account->account_title . ' | ' . $account->bank->short_title,
+                        'dataset' => $account,
+                    ];
+                })->values()->toArray();
+            }
+
+            return response()->json(['payments_options' => $payments_options]);
+        }
+
+        $voucherType = auth()->user()->voucher_type;
 
         // --- Last voucher ---
         $last_voucher = Voucher::orderByDesc('id')->first();
@@ -120,13 +155,38 @@ class VoucherController extends Controller
             $last_voucher = (object)['voucher_no' => '00/149'];
         }
 
-        return view("vouchers.create", compact(
-            'cheques_options',
-            'slips_options',
-            'self_accounts',
-            'self_accounts_options',
-            'last_voucher'
-        ));
+        if ($voucherType == 'supplier') {
+            // --- Suppliers ---
+            $suppliers = Supplier::whereHas('user', fn($q) => $q->where('status', 'active'))->select('id', 'supplier_name', 'date')->get();
+
+            $suppliers_options = $suppliers->mapWithKeys(function ($supplier) {
+                return [
+                    (int)$supplier->id => [
+                        'text' => $supplier->supplier_name,
+                        'data_option' => $supplier,
+                    ]
+                ];
+            })->toArray();
+
+            return view("vouchers.create", compact("suppliers_options", 'last_voucher'));
+        } else {
+            // --- Self Accounts ---
+            $self_accounts = BankAccount::where('category', 'self')
+                ->with('bank')
+                ->get()
+                ->makeHidden('creator');
+
+            $self_accounts_options = $self_accounts->mapWithKeys(function ($account) {
+                return [
+                    (int)$account->id => [
+                        'text' => $account->account_title . ' - ' . $account->bank->short_title,
+                        'data_option' => $account,
+                    ]
+                ];
+            })->toArray();
+
+            return view("vouchers.create", compact("self_accounts_options", 'last_voucher'));
+        }
     }
 
     /**
@@ -308,6 +368,21 @@ class VoucherController extends Controller
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         };
 
+        // $voucher->load([
+        //     'supplier' => fn ($q) => $q->with([
+        //         'payments' => fn ($q) =>
+        //             $q->where('method', 'program')
+        //             ->whereNull('voucher_id')
+        //             ->with('program.customer.city:id,title'),
+        //         'expenses',
+        //     ]),
+        //     'payments.cheque.customer.city',
+        //     'payments.slip.customer.city',
+        //     'payments.program.customer.city',
+        //     'payments.bankAccount.bank',
+        //     'payments.selfAccount.bank',
+        // ]);
+
         $voucher->load([
             'supplier' => fn ($q) => $q->with([
                 'payments' => fn ($q) =>
@@ -316,7 +391,9 @@ class VoucherController extends Controller
                     ->with('program.customer.city:id,title'),
                 'expenses',
             ]),
+            'payments.cheque' => fn($q) => $q->whereDoesntHave('paymentClearRecord'),
             'payments.cheque.customer.city',
+            'payments.slip' => fn($q) => $q->whereDoesntHave('paymentClearRecord'),
             'payments.slip.customer.city',
             'payments.program.customer.city',
             'payments.bankAccount.bank',

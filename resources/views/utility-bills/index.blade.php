@@ -156,8 +156,6 @@
                 onlyThisActions: true,
             };
 
-            console.log(data);
-
             if (!data.is_paid) {
                 contextMenuData.actions.push({id: 'mark-paid', text: 'Mark Paid', onclick: `markThisPaid(${data.id})`})
                 createContextMenu(contextMenuData);

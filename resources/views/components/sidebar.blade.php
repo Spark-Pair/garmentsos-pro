@@ -991,8 +991,6 @@
                 _token: $('meta[name="csrf-token"]').attr('content') // CSRF token
             },
             success: function(response) {
-                console.log('AJAX Response:', response); // Console pe response dekhein
-
                 // Check if messageBox exists
                 if (messageBox) {
                     if (response.success) {

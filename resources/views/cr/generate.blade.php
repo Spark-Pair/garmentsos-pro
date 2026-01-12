@@ -366,8 +366,7 @@
 
         function addPayment() {
             let currentValue = amountDOM.value.replace(/[^0-9.]/g, ''); // input ko format karke number return karega
-            console.log(currentValue);
-
+            
             if (currentValue > 0) {
                 addedPaymentsArray.push({
                     'bank_account_id': JSON.parse(document.querySelector('ul[data-for="payment"] li.selected').dataset.option || '{}').id,

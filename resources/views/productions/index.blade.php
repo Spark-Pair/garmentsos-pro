@@ -88,7 +88,6 @@
         }
 
         const fetchedData = @json($productions);
-        console.log(fetchedData);
         let allDataArray = fetchedData.map(item => {
             return {
                 id: item.id,

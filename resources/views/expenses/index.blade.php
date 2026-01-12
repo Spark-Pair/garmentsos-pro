@@ -107,7 +107,6 @@
         }
 
         const fetchedData = @json($expenses);
-        console.log(fetchedData);
         let allDataArray = fetchedData.map(item => {
             return {
                 id: item.id,

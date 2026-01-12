@@ -103,8 +103,6 @@
                         _token: '{{ csrf_token() }}'
                     },
                     success: function(response) {
-                        console.log(response);
-
                         const invoiceSelect = document.getElementById('invoice');
                         invoiceSelect.disabled = false;
 

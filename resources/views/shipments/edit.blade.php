@@ -135,7 +135,6 @@
             let data = articles;
             let cardData = [];
 
-            console.log(data);
             if (data.length > 0) {
                 cardData.push(...data.map(item => {
                     return {
@@ -377,8 +376,6 @@
         }
 
         function generateDescription() {
-            console.log(selectedArticles);
-
             selectedArticles.forEach(selectedArticle => {
                 selectedArticle.description =
                     `${selectedArticle.size} | ${selectedArticle.category.replace(/_/g, ' ')} | ${selectedArticle.season}`;

@@ -617,8 +617,6 @@
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    console.log(e);
-
                     uploadText.textContent = `Selected: ${file.name}`;
                 }
                 reader.readAsDataURL(file);
@@ -1157,22 +1155,22 @@
             });
         }
 
-        const scroller = search_container.parentElement;
-        const batchSize = 50;
-        let startIndex = 0;
-        let isFetching = false;
+        // const scroller = search_container.parentElement;
+        // const batchSize = 50;
+        // let startIndex = 0;
+        // let isFetching = false;
 
-        function renderNextBatch() {
-            if (startIndex >= allDataArray.length) return;
+        // function renderNextBatch() {
+        //     if (startIndex >= allDataArray.length) return;
 
-            const nextChunk = allDataArray;
-            const html = nextChunk
-                .filter(item => item.visible === true)
-                .map(item => authLayout === 'grid' ? createCard(item) : createRow(item))
-                .join('');
-            search_container.insertAdjacentHTML('beforeend', html);
-            startIndex += batchSize;
-        }
+        //     const nextChunk = allDataArray;
+        //     const html = nextChunk
+        //         .filter(item => item.visible === true)
+        //         .map(item => authLayout === 'grid' ? createCard(item) : createRow(item))
+        //         .join('');
+        //     search_container.insertAdjacentHTML('beforeend', html);
+        //     startIndex += batchSize;
+        // }
 
         // scroller?.addEventListener('scroll', () => {
         //     const scrollTop = scroller.scrollTop;
@@ -1201,8 +1199,16 @@
             }
             search_container.innerHTML = "";
             startIndex = 0;
-            console.log("Render First Batch");
-            renderNextBatch();
+            // renderNextBatch();
+            allDataArray.forEach(item => {
+                if (item.visible === true) {
+                    if (authLayout == "grid") {
+                        search_container.insertAdjacentHTML('beforeend', createCard(item));
+                    } else {
+                        search_container.insertAdjacentHTML('beforeend', createRow(item));
+                    }
+                }
+            });
         }
 
         renderData(); // initial load
@@ -1424,8 +1430,6 @@
                 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
             },
             success: function(response) {
-                console.log(response);
-
                 if (response.status === 'success') {
                     console.log("Menu shortcuts updated successfully.");
                 }

@@ -139,7 +139,5 @@
             };
         });
 
-        console.log(allDataArray);
-
     </script>
 @endsection

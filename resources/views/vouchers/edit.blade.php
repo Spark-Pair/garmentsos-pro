@@ -127,7 +127,6 @@
         const paymentDetailsArrayDom = document.getElementById("payment_details_array");
 
         let voucher = @json($voucher);
-        console.log(voucher);
 
         let companyData = @json($client_company);
         const previewDom = document.getElementById('preview');
@@ -686,8 +685,6 @@
             const inputs = document.querySelectorAll('#modalForm input:not([disabled])');
 
             inputs.forEach(input => {
-                console.log(input);
-
                 const name = input.getAttribute('name');
                 if (name != null) {
                     const value = input.value;
@@ -746,7 +743,6 @@
                 let clutter = "";
                 paymentDetailsArray.forEach((paymentDetail, index) => {
                     let selected = paymentDetail.selected ? JSON.parse(paymentDetail.selected) : null;
-                    console.log(paymentDetail);
 
                     clutter += `
                         <div class="flex justify-between items-center border-t border-gray-600 py-3 px-4">
@@ -839,7 +835,6 @@
                                     </div>
                                     <div id="tbody" class="tbody w-full">
                                         ${paymentDetailsArray.map((payment, index) => {
-                                            console.log(payment);
 
                                             let selected = JSON.parse(payment.selected || '{}');
 

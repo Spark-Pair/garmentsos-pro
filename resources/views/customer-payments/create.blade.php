@@ -166,7 +166,6 @@
 
             if (customerSelectDom.value != '') {
                 selectedCustomer = JSON.parse(customerSelectDom.closest(".selectParent")?.querySelector('ul li.selected')?.dataset.option || 'null');
-                console.log(selectedCustomer);
 
                 dateDom.disabled = false;
                 methodSelectDom.disabled = false;

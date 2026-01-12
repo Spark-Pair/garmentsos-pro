@@ -114,7 +114,6 @@
 
 
         const fetchedData = @json($physicalQuantities);
-        console.log(fetchedData);
         let allDataArray = fetchedData.map(item => {
             return {
                 id: item.id,
