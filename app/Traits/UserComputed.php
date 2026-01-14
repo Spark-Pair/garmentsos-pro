@@ -19,6 +19,7 @@ trait UserComputed
             ],
             'status' => $this->status,
             'image' => $this->profile_picture,
+            'profile' => true,
             'oncontextmenu' => "generateContextMenu(event)",
             'onclick' => "generateModal(this)",
         ];
