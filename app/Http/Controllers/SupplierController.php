@@ -22,40 +22,68 @@ class SupplierController extends Controller
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         };
 
-        // AJAX request for suppliers options
+        $authLayout = $this->getAuthLayout($request->route()->getName());
+
         if ($request->ajax()) {
-            $suppliers_options = Supplier::with([
-                'payments' => fn($q) => $q
-                    ->where('method', 'program')
-                    ->whereNull('voucher_id')
-                    ->with([
-                        'program.customer.city'
-                    ]),
-                'expenses:id,supplier_id,amount,date'
-            ])
-            ->whereHas('user', fn($q) => $q->where('status', 'active'))
-            ->select('id', 'supplier_name', 'date')
-            ->get()
-            ->map(function($supplier) {
-                // Convert to plain array to reduce JSON size
+            $suppliers = Supplier::with('user')->applyFilters($request)->get()->mapWithKeys(function ($item) {
                 return [
-                    'id' => $supplier->id,
-                    'text' => $supplier->supplier_name,
-                    'data_option' => [
-                        'id' => $supplier->id,
-                        'supplier_name' => $supplier->supplier_name,
-                        'date' => $supplier->date,
-                        'balance' => $supplier->balance,
-                        'payments' => $supplier->payments,
-                        'expenses' => $supplier->expenses,
+                    $item->id => [
+                        'id' => $item->id,
+                        'image' => $item->user->profile_picture,
+                        'name' => $item->supplier_name,
+                        'details' => [
+                            'Urdu Title' => $item->urdu_title,
+                            'Phone' => $item->phone_number,
+                            'Balance' => $item->balance,
+                        ],
+                        'user' => $item->user,
+                        'oncontextmenu' => 'generateContextMenu(event)',
+                        'onclick' => 'generateModal(this)',
+                        'date' => $item->date,
+                        'data' => $item,
+                        'categories' => $item->Categories,
+                        'profile' => true,
+                        'visible' => true,
                     ]
                 ];
-            })
-            ->keyBy('id')
-            ->toArray();
-
-            return response()->json($suppliers_options);
+            })->values();
+            return response()->json(['data' => $suppliers, 'authLayout' => $authLayout]);
         }
+
+        // AJAX request for suppliers options
+        // if ($request->ajax()) {
+        //     $suppliers_options = Supplier::with([
+        //         'payments' => fn($q) => $q
+        //             ->where('method', 'program')
+        //             ->whereNull('voucher_id')
+        //             ->with([
+        //                 'program.customer.city'
+        //             ]),
+        //         'expenses:id,supplier_id,amount,date'
+        //     ])
+        //     ->whereHas('user', fn($q) => $q->where('status', 'active'))
+        //     ->select('id', 'supplier_name', 'date')
+        //     ->get()
+        //     ->map(function($supplier) {
+        //         // Convert to plain array to reduce JSON size
+        //         return [
+        //             'id' => $supplier->id,
+        //             'text' => $supplier->supplier_name,
+        //             'data_option' => [
+        //                 'id' => $supplier->id,
+        //                 'supplier_name' => $supplier->supplier_name,
+        //                 'date' => $supplier->date,
+        //                 'balance' => $supplier->balance,
+        //                 'payments' => $supplier->payments,
+        //                 'expenses' => $supplier->expenses,
+        //             ]
+        //         ];
+        //     })
+        //     ->keyBy('id')
+        //     ->toArray();
+
+        //     return response()->json($suppliers_options);
+        // }
 
         $suppliers = Supplier::with('user')->orderBy('id', 'desc')->get();
 
@@ -65,8 +93,6 @@ class SupplierController extends Controller
         foreach ($supplier_categories as $supplier_category) {
             $categories_options[(int)$supplier_category->id] = ['text' => $supplier_category->title];
         }
-
-        $authLayout = $this->getAuthLayout($request->route()->getName());
 
         return view("suppliers.index", compact('suppliers', 'categories_options', 'authLayout'));
     }

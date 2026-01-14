@@ -8,35 +8,30 @@
             "type" => "date",
             "id2" => "date_range_end",
             "type2" => "date",
-            "oninput" => "runDynamicFilter()",
             "dataFilterPath" => "date",
         ],
         "Customer Name" => [
             "type" => "text",
             "id" => "customer_name",
             "placeholder" => "Enter customer name",
-            "oninput" => "runDynamicFilter()",
             "dataFilterPath" => "name",
         ],
         "City" => [
             "type" => "text",
             "id" => "city",
             "placeholder" => "Enter city",
-            "oninput" => "runDynamicFilter()",
             "dataFilterPath" => "data.customer.city.title",
         ],
         "Beneficiary" => [
             "type" => "text",
             "id" => "beneficiary",
             "placeholder" => "Enter beneficiary",
-            "oninput" => "runDynamicFilter()",
             "dataFilterPath" => "beneficiary",
         ],
         "Supplier Name" => [
             "type" => "text",
             "id" => "supplier_name",
             "placeholder" => "Enter supplier name",
-            "oninput" => "runDynamicFilter()",
             "dataFilterPath" => "supplier_name",
         ],
         "Method" => [
@@ -49,7 +44,6 @@
                         'program' => ['text' => 'Program'],
                         'adjustment' => ['text' => 'Adjustment'],
                     ],
-            "onchange" => "runDynamicFilter()",
             "dataFilterPath" => "details.Method",
         ],
         "Category" => [
@@ -59,7 +53,6 @@
                         'cash' => ['text' => 'Cash'],
                         'non-cash' => ['text' => 'Non Cash'],
                     ],
-            "onchange" => "runDynamicFilter()",
             "dataFilterPath" => "category",
         ],
         "Type" => [
@@ -67,10 +60,9 @@
             "id" => "type",
             "options" => [
                         'normal' => ['text' => 'Normal'],
-                        'payment program' => ['text' => 'Payment Program'],
+                        'payment_program' => ['text' => 'Payment Program'],
                         'recovery' => ['text' => 'Recovery'],
                     ],
-            "onchange" => "runDynamicFilter()",
             "dataFilterPath" => "details.Type",
         ],
         "Issued" => [
@@ -82,7 +74,6 @@
                         'DR' => ['text' => 'DR'],
                         'Not Issued' => ['text' => 'Not Issued'],
                     ],
-            "onchange" => "runDynamicFilter()",
             "dataFilterPath" => "issued",
         ],
         "Status" => [
@@ -92,28 +83,24 @@
                         'Cleared' => ['text' => 'Cleared'],
                         'Pending' => ['text' => 'Pending'],
                     ],
-            "onchange" => "runDynamicFilter()",
-            "dataFilterPath" => "clearStatus",
+            "dataFilterPath" => "status",
         ],
         "Reff. No." => [
             "id" => "reff_no",
             "type" => "text",
             "placeholder" => "Enter reff. no.",
-            "oninput" => "runDynamicFilter()",
             "dataFilterPath" => "reff_no",
         ],
         "Voucher No." => [
             "type" => "text",
             "id" => "voucher_no",
             "placeholder" => "Enter voucher no.",
-            "oninput" => "runDynamicFilter()",
             "dataFilterPath" => "voucher_no",
         ],
         "Amount" => [
             "type" => "text",
-            "id" => "voucher_no",
+            "id" => "amount",
             "placeholder" => "Enter Amount",
-            "oninput" => "runDynamicFilter()",
             "dataFilterPath" => "details.Amount",
         ],
     ];
@@ -128,61 +115,52 @@
             class="show-box mx-auto w-[80%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
             <x-form-title-bar printBtn title="Show Customer Payments" changeLayoutBtn layout="{{ $authLayout }}" resetSortBtn />
 
-            @if (count($payments) > 0)
-                <div class="absolute bottom-14 right-0 flex items-center justify-between gap-2 w-fll z-50 p-3 w-full pointer-events-none">
-                    <x-section-navigation-button direction="right" id="info" icon="fa-info" />
-                    <x-section-navigation-button link="{{ route('customer-payments.create') }}" title="Add New Payment" icon="fa-plus" />
-                </div>
+            <div class="absolute bottom-14 right-0 flex items-center justify-between gap-2 w-fll z-50 p-3 w-full pointer-events-none">
+                <x-section-navigation-button direction="right" id="info" icon="fa-info" />
+                <x-section-navigation-button link="{{ route('customer-payments.create') }}" title="Add New Payment" icon="fa-plus" />
+            </div>
 
-                <div class="details h-full z-40">
-                    <div class="container-parent h-full">
-                        <div class="card_container px-3 pb-3 h-full flex flex-col">
-                            <div id="table-head" class="flex justify-between bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4 mx-2">
-                                <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">Date</div>
-                                <div class="text-center w-1/7 cursor-pointer" onclick="sortByThis(this)">Customer</div>
-                                <div class="text-center w-1/7 cursor-pointer" onclick="sortByThis(this)">Supplier Name</div>
-                                <div class="text-center w-1/7 cursor-pointer" onclick="sortByThis(this)">Beneficiary</div>
-                                <div class="text-center w-1/11 cursor-pointer" onclick="sortByThis(this)">Method</div>
-                                <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">Amount</div>
-                                <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">Reff. No.</div>
-                                <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">Clear Date</div>
-                                <div class="text-center w-1/9 cursor-pointer" onclick="sortByThis(this)">Cleared Amount</div>
-                                <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">Voucher No.</div>
-                                <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">DR No.</div>
+            <div class="details h-full z-40">
+                <div class="container-parent h-full">
+                    <div class="card_container px-3 pb-3 h-full flex flex-col">
+                        <div id="table-head" class="flex justify-between bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4">
+                            <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">Date</div>
+                            <div class="text-center w-1/7 cursor-pointer" onclick="sortByThis(this)">Customer</div>
+                            <div class="text-center w-1/7 cursor-pointer" onclick="sortByThis(this)">Supplier Name</div>
+                            <div class="text-center w-1/7 cursor-pointer" onclick="sortByThis(this)">Beneficiary</div>
+                            <div class="text-center w-1/11 cursor-pointer" onclick="sortByThis(this)">Method</div>
+                            <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">Amount</div>
+                            <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">Reff. No.</div>
+                            <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">Clear Date</div>
+                            <div class="text-center w-1/9 cursor-pointer" onclick="sortByThis(this)">Cleared Amount</div>
+                            <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">Voucher No.</div>
+                            <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">DR No.</div>
+                        </div>
+                        <p id="noItemsError" style="display: none" class="text-sm text-[var(--border-error)] mt-3">No items found</p>
+                        <div class="overflow-y-auto grow my-scrollbar-2">
+                            <div class="search_container grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 grow">
                             </div>
-                            <p id="noItemsError" style="display: none" class="text-sm text-[var(--border-error)] mt-3">No items found</p>
-                            <div class="overflow-y-auto grow my-scrollbar-2">
-                                <div class="search_container grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 grow">
-                                </div>
+                        </div>
+                        <div id="calc-bottom" class="flex w-full gap-4 text-sm bg-[var(--secondary-bg-color)] py-2 rounded-lg">
+                            <div
+                                class="total-Amount flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full cursor-not-allowed">
+                                <div>Total Amount - Rs.</div>
+                                <div class="text-right">0.00</div>
                             </div>
-                            <div id="calc-bottom" class="flex w-full gap-4 text-sm bg-[var(--secondary-bg-color)] py-2 rounded-lg">
-                                <div
-                                    class="total-Amount flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full cursor-not-allowed">
-                                    <div>Total Amount - Rs.</div>
-                                    <div class="text-right">0.00</div>
-                                </div>
-                                <div
-                                    class="total-Payment flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full cursor-not-allowed">
-                                    <div>Total Payment - Rs.</div>
-                                    <div class="text-right">0.00</div>
-                                </div>
-                                <div
-                                    class="balance flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full cursor-not-allowed">
-                                    <div>Balance - Rs.</div>
-                                    <div class="text-right">0.00</div>
-                                </div>
+                            <div
+                                class="total-Payment flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full cursor-not-allowed">
+                                <div>Total Payment - Rs.</div>
+                                <div class="text-right">0.00</div>
+                            </div>
+                            <div
+                                class="balance flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full cursor-not-allowed">
+                                <div>Balance - Rs.</div>
+                                <div class="text-right">0.00</div>
                             </div>
                         </div>
                     </div>
                 </div>
-            @else
-                <div class="no-records-message w-full h-full flex flex-col items-center justify-center gap-2">
-                    <h1 class="text-sm text-[var(--secondary-text)] capitalize">No Payment Found</h1>
-                    <a href="{{ route('customer-payments.create') }}"
-                        class="text-sm bg-[var(--primary-color)] text-[var(--text-color)] px-4 py-2 rounded-md hover:bg-[var(--h-primary-color)] hover:scale-105 hover:mb-2 transition-all duration-300 ease-in-out font-semibold">Add
-                        New</a>
-                </div>
-            @endif
+            </div>
         </div>
     </section>
 
@@ -205,7 +183,7 @@
                     <span class="text-center w-1/11 capitalize">${data.details["Method"]}</span>
                     <span class="text-center w-1/10">${data.details['Amount']}</span>
                     <span class="text-center w-1/10">${data.reff_no}</span>
-                    <span class="text-center w-1/10">${data.clear_date}</span>
+                    <span class="text-center w-1/10">${data.clear_date ?? '-'}</span>
                     <span class="text-center w-1/9">${data.cleared_amount}</span>
                     <span class="text-center w-1/10">${data.voucher_no}</span>
                     <span class="text-center w-1/10">${data.d_r_no}</span>
@@ -213,36 +191,36 @@
             `;
         }
 
-        const fetchedData = @json($payments);
-        let allDataArray = fetchedData.map(item => {
-            totalAmount += parseFloat(item.amount);
-            totalPayment += parseFloat(item.clear_amount);
-            return {
-                id: item.id,
-                name: item.customer.customer_name + ' | ' + item.customer.city.short_title,
-                details: {
-                    'Type': item.type.replace('_', ' '),
-                    'Method': item.method,
-                    'Date': formatDate(item.slip_date || item.cheque_date || item.date),
-                    'Amount': formatNumbersWithDigits(item.amount, 1, 1),
-                },
-                voucher_no: item.cheque?.voucher?.voucher_no || item.slip?.voucher?.voucher_no || item.voucher?.voucher_no || item.cheque?.cr?.c_r_no || item.slip?.cr?.c_r_no || '-',
-                beneficiary: item.cheque?.supplier?.supplier_name || item.slip?.supplier?.supplier_name || item.bank_account?.account_title || item.cheque?.voucher?.supplier?.supplier_name || item.slip?.voucher?.supplier?.supplier_name ||'-',
-                supplier_name: item.cheque?.supplier?.supplier_name || item.slip?.supplier?.supplier_name || item.cheque?.voucher?.supplier?.supplier_name || item.slip?.voucher?.supplier?.supplier_name ||item.bank_account?.sub_category?.supplier_name ||'-',
-                reff_no: item.cheque_no || item.slip_no || item.transaction_id || item.reff_no || '-',
-                data: item,
-                date: item.slip_date || item.cheque_date || item.date,
-                category: item.customer.category == 'cash' ? 'cash' : 'non-cash',
-                clear_date: item.clear_date ? formatDate(item.clear_date) : (item.method == 'cheque' || item.method == 'slip') ? 'Pending' : '-',
-                cleared_amount: item.clear_amount ? formatNumbersWithDigits(item.clear_amount, 1, 1) : (item.method == 'cheque' || item.method == 'slip') ? '0' : '-',
-                ...((item.method == 'cheque' || item.method == 'slip') && { issued: item.issued }),
-                ...((item.method == 'cheque' || item.method == 'slip') && (item.clear_date ? { clearStatus: 'Cleared'} : { clearStatus: 'Pending'} )),
-                d_r_no: item.dr?.d_r_no || '-',
-                oncontextmenu: "generateContextMenu(event)",
-                onclick: "generateModal(this)",
-                visible: true,
-            };
-        });
+        // const fetchedData = [];
+        // let allDataArray = fetchedData.map(item => {
+        //     totalAmount += parseFloat(item.amount);
+        //     totalPayment += parseFloat(item.clear_amount);
+        //     return {
+        //         id: item.id,
+        //         name: item.customer.customer_name + ' | ' + item.customer.city.short_title,
+        //         details: {
+        //             'Type': item.type.replace('_', ' '),
+        //             'Method': item.method,
+        //             'Date': formatDate(item.slip_date || item.cheque_date || item.date),
+        //             'Amount': formatNumbersWithDigits(item.amount, 1, 1),
+        //         },
+        //         voucher_no: item.cheque?.voucher?.voucher_no || item.slip?.voucher?.voucher_no || item.voucher?.voucher_no || item.cheque?.cr?.c_r_no || item.slip?.cr?.c_r_no || '-',
+        //         beneficiary: item.cheque?.supplier?.supplier_name || item.slip?.supplier?.supplier_name || item.bank_account?.account_title || item.cheque?.voucher?.supplier?.supplier_name || item.slip?.voucher?.supplier?.supplier_name ||'-',
+        //         supplier_name: item.cheque?.supplier?.supplier_name || item.slip?.supplier?.supplier_name || item.cheque?.voucher?.supplier?.supplier_name || item.slip?.voucher?.supplier?.supplier_name ||item.bank_account?.sub_category?.supplier_name ||'-',
+        //         reff_no: item.cheque_no || item.slip_no || item.transaction_id || item.reff_no || '-',
+        //         data: item,
+        //         date: item.slip_date || item.cheque_date || item.date,
+        //         category: item.customer.category == 'cash' ? 'cash' : 'non-cash',
+        //         clear_date: item.clear_date ? formatDate(item.clear_date) : (item.method == 'cheque' || item.method == 'slip') ? 'Pending' : '-',
+        //         cleared_amount: item.clear_amount ? formatNumbersWithDigits(item.clear_amount, 1, 1) : (item.method == 'cheque' || item.method == 'slip') ? '0' : '-',
+        //         ...((item.method == 'cheque' || item.method == 'slip') && { issued: item.issued }),
+        //         ...((item.method == 'cheque' || item.method == 'slip') && (item.clear_date ? { clearStatus: 'Cleared'} : { clearStatus: 'Pending'} )),
+        //         d_r_no: item.dr?.d_r_no || '-',
+        //         oncontextmenu: "generateContextMenu(event)",
+        //         onclick: "generateModal(this)",
+        //         visible: true,
+        //     };
+        // });
 
         function generateClearModal(data) {
             let modalData = {
@@ -397,7 +375,7 @@
                     // ...(data.data.clear_date && { 'Clear Date': formatDate(data.data.clear_date) }),
                     ...(data.data.clear_amount && { 'Clear Amount': formatNumbersWithDigits(data.data.clear_amount, 1, 1) }),
                     ...((data.data.method == 'cheque' || data.data.method == 'slip') && (data.data.clear_date ? { 'Clear Date': formatDate(data.data.clear_date)} : { 'Clear Date': 'Pending'} )),
-                    ...((data.data.method == 'cheque' || data.data.method == 'slip') && { 'Issued': data.data.issued }),
+                    ...((data.data.method == 'cheque' || data.data.method == 'slip') && { 'Issued': data.issued }),
                     'Remarks': data.data.remarks || 'No Remarks',
                 },
                 bottomActions: [

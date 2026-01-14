@@ -25,116 +25,175 @@ class CustomerPaymentController extends Controller
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         }
 
-        // Eager load only necessary relations
-        $payments = CustomerPayment::with([
-            'customer.city',
-            'cheque.voucher.supplier.bankAccounts.bank',
-            'slip.voucher.supplier.bankAccounts.bank',
-            'cheque.cr',
-            'slip.cr',
-            'bankAccount.subCategory',
-            'paymentClearRecord',
-            'dr'
-        ])
-        ->whereNotNull('customer_id')
-        ->where('type', '!=', 'DR')
-        ->orderByDesc('id')
-        ->get();
-
-        // Preload all reference numbers by type to reduce memory
-        $allChequeRefs = CustomerPayment::whereNotNull('cheque_no')->pluck('cheque_no');
-        $allSlipRefs   = CustomerPayment::whereNotNull('slip_no')->pluck('slip_no');
-        $allProgramRefs= CustomerPayment::whereNotNull('transaction_id')->pluck('transaction_id');
-        $allReffRefs   = CustomerPayment::whereNotNull('reff_no')->pluck('reff_no');
-
-        // Preload SupplierPayments for all program payments in batch
-        $programPaymentIds = $payments->filter(fn($p) => $p->method === 'program' && $p->program_id)->pluck('program_id')->unique();
-        $programVouchers = SupplierPayment::with('voucher')
-            ->whereIn('program_id', $programPaymentIds)
-            ->get()
-            ->keyBy(fn($sp) => $sp->program_id . '_' . ($sp->transaction_id ?? 'null') . '_' . ($sp->supplier_id ?? 'null'));
-
-        foreach ($payments as $payment) {
-
-            /* ================= Issued / Return / Not Issued ================= */
-            if ((($payment->cheque || $payment->slip) || in_array($payment->method, ['cheque','slip']) && $payment->bank_account_id) && !$payment->is_return) {
-                $payment->issued = 'Issued';
-            } elseif ($payment->is_return && $payment->d_r_id === null) {
-                $payment->issued = 'Return';
-            } else {
-                $payment->issued = 'Not Issued';
-            }
-
-            if ($payment->d_r_id !== null) {
-                $payment->issued = 'DR';
-            }
-
-            /* ================= Clear Amount Logic ================= */
-            if ($payment->clear_date && $payment->clear_date !== 'Pending') {
-                $payment->clear_amount = $payment->amount;
-            } else {
-                $payment->clear_amount = $payment->paymentClearRecord->sum('amount');
-                if ($payment->clear_amount >= $payment->amount) {
-                    $payment->clear_date = $payment->paymentClearRecord->last()?->clear_date;
-                }
-            }
-
-            if (!$payment->clear_date && in_array($payment->type, ['cheque','slip'])) {
-                $payment->clear_date = 'Pending';
-            }
-
-            /* ================= City Title ================= */
-            if ($payment->customer?->city) {
-                $payment->customer->city->title .= ' | ' . $payment->customer->city->short_title;
-            }
-
-            /* ================= Remarks Fallback ================= */
-            $payment->remarks ??= 'No Remarks';
-
-            /* ================= Program Voucher ================= */
-            if ($payment->method === 'program' && $payment->program_id) {
-                $key = $payment->program_id . '_' . ($payment->transaction_id ?? 'null') . '_' . ($payment->bankAccount->sub_category_id ?? 'null');
-                $payment->voucher = $programVouchers->get($key)?->voucher;
-            }
-
-            /* ================= Reference Numbers ================= */
-            $raw = match ($payment->method) {
-                'cheque'  => $payment->cheque_no,
-                'slip'    => $payment->slip_no,
-                'program' => $payment->transaction_id,
-                default   => $payment->reff_no,
-            };
-
-            $baseRef = trim(explode('|', $raw)[0]);
-            $payment->has_pipe = str_contains($raw, '|');
-            $payment->existing_reff_nos = [];
-            $payment->max_reff_suffix = 0;
-
-            if ($baseRef) {
-                $refs = match ($payment->method) {
-                    'cheque'  => $allChequeRefs,
-                    'slip'    => $allSlipRefs,
-                    'program' => $allProgramRefs,
-                    default   => $allReffRefs,
-                };
-
-                $refs = $refs->filter(fn($v) => $v && str_starts_with($v, $baseRef))->values()->toArray();
-                $payment->existing_reff_nos = $refs;
-
-                foreach ($refs as $ref) {
-                    if (str_contains($ref, '|')) {
-                        [, $n] = array_map('trim', explode('|',$ref));
-                        if (is_numeric($n)) {
-                            $payment->max_reff_suffix = max($payment->max_reff_suffix, (int)$n);
-                        }
-                    }
-                }
-            }
-        }
-
         $authLayout = $this->getAuthLayout($request->route()->getName());
 
-        return view("customer-payments.index", compact("payments", "authLayout"));
+        if ($request->ajax()) {
+            $payments = CustomerPayment::whereNotNull('customer_id')
+                ->where('type', '!=', 'DR')
+                ->orderByDesc('id')
+                ->applyFilters($request);
+
+            return response()->json(['data' => $payments, 'authLayout' => $authLayout]);
+        }
+
+        // Eager load only necessary relations
+        // $payments = CustomerPayment::with([
+        //     'customer.city',
+        //     'cheque.voucher.supplier.bankAccounts.bank',
+        //     'slip.voucher.supplier.bankAccounts.bank',
+        //     'cheque.cr',
+        //     'slip.cr',
+        //     'bankAccount.subCategory',
+        //     'paymentClearRecord',
+        //     'dr',
+        // ])
+        // ->whereNotNull('program_id')
+        // ->whereNotNull('customer_id')
+        // ->where('type', '!=', 'DR')
+        // ->orderByDesc('id')
+        // ->get();
+
+
+        // $payments = CustomerPayment::with([
+        //     'customer.city',
+        //     'cheque.voucher.supplier.bankAccounts.bank',
+        //     'slip.voucher.supplier.bankAccounts.bank',
+        //     'cheque.cr',
+        //     'slip.cr',
+        //     'bankAccount.subCategory',
+        //     'paymentClearRecord',
+        //     'dr'
+        // ])
+        // ->whereNotNull('customer_id')
+        // ->where('type', '!=', 'DR')
+        // ->orderByDesc('id')
+        // ->applyFilters($request)->get()->mapWithKeys(function ($item) {
+        //     return [
+        //         $item->id => [
+        //             'id' => $item->id,
+        //             'name' => $item->customer->customer_name . ' | ' . $item->customer->city->title,
+        //             'details' => [
+        //                 'Type' => $item->type,
+        //                 'Method' => $item->method,
+        //                 'Date' => $item->slip_date ? $item->slip_date->format('d-M-Y, D') : ($item->cheque_date ? $item->cheque_date->format('d-M-Y, D') : $item->date->format('d-M-Y, D')),
+        //                 'Amount' => $item->amount,
+        //             ],
+        //             'data' => $item,
+        //             'date' => $item->slip_date ? $item->slip_date->format('d-M-Y, D') : ($item->cheque_date ? $item->cheque_date->format('d-M-Y, D') : $item->date->format('d-M-Y, D')),
+        //             'voucher_no' => $item->voucher_no,
+        //             'supplier_name' => $item->supplier_name,
+        //             'reff_no' => $item->reff_no,
+        //             'beneficiary' => $item->beneficiary,
+        //             'clear_date' => $item->clear_date ? $item->clear_date->format('d-M-Y, D') : $item->paymentClearRecord->last()?->clear_date,
+        //             'cleared_amount' => $item->cleared_amount,
+        //             'oncontextmenu' => "generateContextMenu(event)",
+        //             'onclick' => "generateModal(this)",
+        //         ]
+        //     ];
+        // })->values();
+
+        // return $payments[1];
+
+        // $payments = CustomerPayment::
+        // whereNotNull('customer_id')
+        // ->whereHas('cheque')
+        // ->orderByDesc('id')
+        // ->get();
+
+        // // return $payments[0]->getvoucherNo();
+
+        // // Preload all reference numbers by type to reduce memory
+        // $allChequeRefs = CustomerPayment::whereNotNull('cheque_no')->pluck('cheque_no');
+        // $allSlipRefs   = CustomerPayment::whereNotNull('slip_no')->pluck('slip_no');
+        // $allProgramRefs= CustomerPayment::whereNotNull('transaction_id')->pluck('transaction_id');
+        // $allReffRefs   = CustomerPayment::whereNotNull('reff_no')->pluck('reff_no');
+
+        // // Preload SupplierPayments for all program payments in batch
+        // $programPaymentIds = $payments->filter(fn($p) => $p->method === 'program' && $p->program_id)->pluck('program_id')->unique();
+        // $programVouchers = SupplierPayment::with('voucher')
+        //     ->whereIn('program_id', $programPaymentIds)
+        //     ->get()
+        //     ->keyBy(fn($sp) => $sp->program_id . '_' . ($sp->transaction_id ?? 'null') . '_' . ($sp->supplier_id ?? 'null'));
+
+        // foreach ($payments as $payment) {
+
+        //     /* ================= Issued / Return / Not Issued ================= */
+        //     if ((($payment->cheque || $payment->slip) || in_array($payment->method, ['cheque','slip']) && $payment->bank_account_id) && !$payment->is_return) {
+        //         $payment->issued = 'Issued';
+        //     } elseif ($payment->is_return && $payment->d_r_id === null) {
+        //         $payment->issued = 'Return';
+        //     } else {
+        //         $payment->issued = 'Not Issued';
+        //     }
+
+        //     if ($payment->d_r_id !== null) {
+        //         $payment->issued = 'DR';
+        //     }
+
+        //     /* ================= Clear Amount Logic ================= */
+        //     if ($payment->clear_date && $payment->clear_date !== 'Pending') {
+        //         $payment->clear_amount = $payment->amount;
+        //     } else {
+        //         $payment->clear_amount = $payment->paymentClearRecord->sum('amount');
+        //         if ($payment->clear_amount >= $payment->amount) {
+        //             $payment->clear_date = $payment->paymentClearRecord->last()?->clear_date;
+        //         }
+        //     }
+
+        //     if (!$payment->clear_date && in_array($payment->type, ['cheque','slip'])) {
+        //         $payment->clear_date = 'Pending';
+        //     }
+
+        //     /* ================= City Title ================= */
+        //     if ($payment->customer?->city) {
+        //         $payment->customer->city->title .= ' | ' . $payment->customer->city->short_title;
+        //     }
+
+        //     /* ================= Remarks Fallback ================= */
+        //     $payment->remarks ??= 'No Remarks';
+
+        //     /* ================= Program Voucher ================= */
+        //     if ($payment->method === 'program' && $payment->program_id) {
+        //         $key = $payment->program_id . '_' . ($payment->transaction_id ?? 'null') . '_' . ($payment->bankAccount->sub_category_id ?? 'null');
+        //         $payment->voucher = $programVouchers->get($key)?->voucher;
+        //     }
+
+        //     /* ================= Reference Numbers ================= */
+        //     $raw = match ($payment->method) {
+        //         'cheque'  => $payment->cheque_no,
+        //         'slip'    => $payment->slip_no,
+        //         'program' => $payment->transaction_id,
+        //         default   => $payment->reff_no,
+        //     };
+
+        //     $baseRef = trim(explode('|', $raw)[0]);
+        //     $payment->has_pipe = str_contains($raw, '|');
+        //     $payment->existing_reff_nos = [];
+        //     $payment->max_reff_suffix = 0;
+
+        //     if ($baseRef) {
+        //         $refs = match ($payment->method) {
+        //             'cheque'  => $allChequeRefs,
+        //             'slip'    => $allSlipRefs,
+        //             'program' => $allProgramRefs,
+        //             default   => $allReffRefs,
+        //         };
+
+        //         $refs = $refs->filter(fn($v) => $v && str_starts_with($v, $baseRef))->values()->toArray();
+        //         $payment->existing_reff_nos = $refs;
+
+        //         foreach ($refs as $ref) {
+        //             if (str_contains($ref, '|')) {
+        //                 [, $n] = array_map('trim', explode('|',$ref));
+        //                 if (is_numeric($n)) {
+        //                     $payment->max_reff_suffix = max($payment->max_reff_suffix, (int)$n);
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+
+        return view("customer-payments.index", compact( "authLayout"));
     }
 
     /**

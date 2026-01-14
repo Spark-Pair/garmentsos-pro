@@ -41,7 +41,7 @@
             <div class="details h-full z-40">
                 <div class="container-parent h-full">
                     <div class="card_container px-3 h-full flex flex-col">
-                        <div id="table-head" class="grid grid-cols-4 bg-[var(--h-bg-color)] rounded-lg font-medium py-2 mt-4 mx-2">
+                        <div id="table-head" class="grid grid-cols-4 bg-[var(--h-bg-color)] rounded-lg font-medium py-2 mt-4">
                             <div class="cursor-pointer" onclick="sortByThis(this)">Name</div>
                             <div class="cursor-pointer" onclick="sortByThis(this)">Total Amount</div>
                             <div class="cursor-pointer" onclick="sortByThis(this)">Total Payment</div>

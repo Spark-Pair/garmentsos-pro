@@ -108,7 +108,8 @@ class DRController extends Controller
         $data['new_payments'] = [];
 
         $dr = new DR($data);
-        $dr->d_r_no = 'DR' . $dr->id;
+        $dr->save(); // 👈 pehle save karenge taake $dr->id mil jaye
+        $dr->d_r_no = 'DR-' . $dr->id;
         $dr->save(); // 👈 pehle save karenge taake $dr->id mil jaye
 
         foreach($data['return_payments'] as $paymentId) {

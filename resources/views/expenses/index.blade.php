@@ -59,7 +59,7 @@
                 <div class="details h-full z-40">
                     <div class="container-parent h-full">
                         <div class="card_container px-3 h-full flex flex-col">
-                            <div id="table-head" class="grid grid-cols-8 bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4 mx-2">
+                            <div id="table-head" class="grid grid-cols-8 bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4">
                                 <div class="cursor-pointer" onclick="sortByThis(this)">Date</div>
                                 <div class="cursor-pointer col-span-2" onclick="sortByThis(this)">Supplier Name</div>
                                 <div class="cursor-pointer" onclick="sortByThis(this)">Reff. No.</div>

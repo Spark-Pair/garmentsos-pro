@@ -24,8 +24,17 @@ class UserController extends Controller
 
         $authLayout = $this->getAuthLayout($request->route()->getName());
 
-        $users = User::whereNotIn('role', ['supplier', 'customer', 'developer'])->get();
-        return view("user.index", compact('users', 'authLayout'));
+        if ($request->ajax()) {
+            $users = User::whereNotIn('role', ['supplier', 'customer', 'developer'])
+                ->orderByDesc('id')
+                ->applyFilters($request);
+
+            return response()->json(['data' => $users, 'authLayout' => $authLayout]);
+        }
+
+        // $users = User::whereNotIn('role', ['supplier', 'customer', 'developer'])->limit(1)->get();
+        // return view("user.index", compact('users', 'authLayout'));
+        return view("user.index", compact( 'authLayout'));
     }
 
     /**

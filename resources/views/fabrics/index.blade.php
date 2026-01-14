@@ -68,7 +68,7 @@
                     <div class="details h-full z-40">
                         <div class="container-parent h-full">
                             <div class="card_container px-3 h-full flex flex-col">
-                                <div id="table-head" class="flex items-center bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4 mx-2">
+                                <div id="table-head" class="flex items-center bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4">
                                     <div class="cursor-pointer text-center w-[10%]" onclick="sortByThis(this)">Date</div>
                                     <div class="cursor-pointer text-center w-[15%]" onclick="sortByThis(this)">Supplier / Worker</div>
                                     <div class="cursor-pointer text-center w-[10%]" onclick="sortByThis(this)">Type</div>

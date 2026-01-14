@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\CustomerPaymentComputed;
+use App\Traits\Filterable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
@@ -10,6 +12,8 @@ use Illuminate\Support\Facades\Auth;
 class CustomerPayment extends Model
 {
     use HasFactory;
+
+    use Filterable, CustomerPaymentComputed;
 
     protected $hidden = [
         'created_at',

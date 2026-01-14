@@ -63,7 +63,7 @@
                     <div class="details h-full z-40">
                         <div class="container-parent h-full">
                             <div class="card_container px-3 h-full flex flex-col">
-                                <div id="table-head" class="grid grid-cols-5 bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4 mx-2">
+                                <div id="table-head" class="grid grid-cols-5 bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4">
                                     <div class="cursor-pointer text-left pl-5" onclick="sortByThis(this)">Supplier</div>
                                     <div class="cursor-pointer text-center" onclick="sortByThis(this)">Urdu Title</div>
                                     <div class="cursor-pointer text-center" onclick="sortByThis(this)">Phone</div>
@@ -110,41 +110,41 @@
             </div>`;
         }
 
-        const fetchedData = @json($suppliers);
-        let allDataArray = fetchedData.map(item => {
-            return {
-                id: item.id,
-                image: item.user.profile_picture === 'default_avatar.png'
-                    ? '/images/default_avatar.png'
-                    : `/storage/uploads/images/${item.user.profile_picture}`,
-                name: item.supplier_name,
-                details: {
-                    'Urdu Title': item.urdu_title,
-                    'Phone': item.phone_number,
-                    'Balance': formatNumbersWithDigits(item.balance, 1, 1),
-                },
-                user: {
-                    id: item.user.id,
-                    username: item.user.username,
-                    status: item.user.status,
-                },
-                oncontextmenu: "generateContextMenu(event)",
-                onclick: "generateModal(this)",
-                date: item.date,
-                data: item,
-                categories: item.categories?.map(cat => ({
-                    ...cat,
-                    short_title: cat.short_title?.toLowerCase() || ""
-                })) || [],
-                profile: true,
-                visible: true,
-            };
-        });
+        // const fetchedData = [];
+        // let allDataArray = fetchedData.map(item => {
+        //     return {
+        //         id: item.id,
+        //         image: item.user.profile_picture === 'default_avatar.png'
+        //             ? '/images/default_avatar.png'
+        //             : `/storage/uploads/images/${item.user.profile_picture}`,
+        //         name: item.supplier_name,
+        //         details: {
+        //             'Urdu Title': item.urdu_title,
+        //             'Phone': item.phone_number,
+        //             'Balance': formatNumbersWithDigits(item.balance, 1, 1),
+        //         },
+        //         user: {
+        //             id: item.user.id,
+        //             username: item.user.username,
+        //             status: item.user.status,
+        //         },
+        //         oncontextmenu: "generateContextMenu(event)",
+        //         onclick: "generateModal(this)",
+        //         date: item.date,
+        //         data: item,
+        //         categories: item.categories?.map(cat => ({
+        //             ...cat,
+        //             short_title: cat.short_title?.toLowerCase() || ""
+        //         })) || [],
+        //         profile: true,
+        //         visible: true,
+        //     };
+        // });
 
-        const activeSuppliers = allDataArray.filter(supplier => supplier.user.status === 'active');
+        // const activeSuppliers = allDataArray.filter(supplier => supplier.user.status === 'active');
 
-        let infoDom = document.getElementById('info').querySelector('span');
-        infoDom.textContent = `Total Supplier: ${allDataArray.length} | Active: ${activeSuppliers.length}`;
+        // let infoDom = document.getElementById('info').querySelector('span');
+        // infoDom.textContent = `Total Supplier: ${allDataArray.length} | Active: ${activeSuppliers.length}`;
 
         function generateContextMenu(e) {
             let item = e.target.closest('.item');
