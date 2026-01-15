@@ -35,7 +35,7 @@ function createCard(data) {
     if (data.image) {
         clutter += `
             <div class="${data.classImg ?? ''} img aspect-square h-full ${!data.profile ? 'rounded-[0.4rem]' : 'rounded-[41.5%]'} ${data.image && data.image == '/images/no_image_icon.png' ? 'p-1' : 'scale-[1.16]'} overflow-hidden relative">
-                <img src="${data.image}" loading="lazy" alt="" class="w-full h-full object-cover">
+                <img src="/storage/uploads/images/${data.image}" loading="lazy" alt="" class="w-full h-full object-cover">
             </div>
         `;
     } else if (data.svgIcon) {

@@ -24,43 +24,50 @@ class PaymentProgramController extends Controller
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         };
 
-        // Fetch and sort orders by date and created_at
-        $orders = Order::with(['customer.city', 'paymentPrograms.subCategory'])
-            ->whereHas('customer', function ($q) {
-                $q->where('category', 'cash');
-            })
-            ->orderBy('date', 'asc')
-            ->orderBy('created_at', 'asc')
-            ->get();
+        if ($request->ajax()) {
+            $payment_programs = PaymentProgram::with('customer.city', 'subCategory')->orderByDesc('id')
+                ->applyFilters($request);
 
-        $ordersArray = [];
-
-        foreach($orders as $order) {
-            $order['paymentPrograms']['customer'] = $order['customer'];
-            $ordersArray[] = $order['paymentPrograms'];
+            return response()->json(['data' => $payment_programs, 'authLayout' => 'table']);
         }
 
-        // Fetch and sort payment programs by date and created_at
-        $paymentPrograms = PaymentProgram::with('customer.city', 'subCategory')
-            ->where('order_no', null)
-            ->orderBy('date', 'asc')
-            ->orderBy('created_at', 'asc')
-            ->withPaymentDetails()
-            ->get();
+        // // Fetch and sort orders by date and created_at
+        // $orders = Order::with(['customer.city', 'paymentPrograms.subCategory'])
+        //     ->whereHas('customer', function ($q) {
+        //         $q->where('category', 'cash');
+        //     })
+        //     ->orderBy('date', 'asc')
+        //     ->orderBy('created_at', 'asc')
+        //     ->get();
 
-        $paymentProgramsArray = $paymentPrograms->toArray();
+        // $ordersArray = [];
 
-        // Combine both arrays manually
-        $finalData = array_merge($ordersArray, $paymentProgramsArray);
+        // foreach($orders as $order) {
+        //     $order['paymentPrograms']['customer'] = $order['customer'];
+        //     $ordersArray[] = $order['paymentPrograms'];
+        // }
 
-        usort($finalData, function ($a, $b) {
-            if ($a['date'] == $b['date']) {
-                return strtotime($b['created_at']) - strtotime($a['created_at']); // time DESC
-            }
-            return strtotime($b['date']) - strtotime($a['date']); // date DESC
-        });
+        // // Fetch and sort payment programs by date and created_at
+        // $paymentPrograms = PaymentProgram::with('customer.city', 'subCategory')
+        //     ->where('order_no', null)
+        //     ->orderBy('date', 'asc')
+        //     ->orderBy('created_at', 'asc')
+        //     ->withPaymentDetails()
+        //     ->get();
 
-        return view("payment-programs.index", compact('finalData'));
+        // $paymentProgramsArray = $paymentPrograms->toArray();
+
+        // // Combine both arrays manually
+        // $finalData = array_merge($ordersArray, $paymentProgramsArray);
+
+        // usort($finalData, function ($a, $b) {
+        //     if ($a['date'] == $b['date']) {
+        //         return strtotime($b['created_at']) - strtotime($a['created_at']); // time DESC
+        //     }
+        //     return strtotime($b['date']) - strtotime($a['date']); // date DESC
+        // });
+
+        return view("payment-programs.index");
     }
     /**
      * Show the form for creating a new resource.

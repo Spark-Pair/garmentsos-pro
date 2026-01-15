@@ -75,7 +75,7 @@ function createModal(data, animate = 'animate') {
     if (data.image) {
         clutter += `
                 <div class="${!data.profile ? 'rounded-lg' : 'rounded-[41.5%]'} ${data.image && data.image == '/images/no_image_icon.png' ? 'scale-75' : ''} h-full aspect-square overflow-hidden">
-                    <img id="imageInModal" src="${data.image}" alt=""
+                    <img id="imageInModal" src="/storage/uploads/images/${data.image}" alt=""
                         class="w-full h-full object-cover aspect-square">
                 </div>
         `;
@@ -270,7 +270,7 @@ function createModal(data, animate = 'animate') {
                             class="image_upload opacity-0 absolute inset-0 cursor-pointer"
                             onchange="previewImage(event)" />
                         <div id="image_preview_${data.imagePicker.id}" class="flex flex-col items-center max-w-[50%]">
-                            <img src="${data.imagePicker.placeholder}" alt="Upload Icon"
+                            <img src="/storage/uploads/images/${data.imagePicker.placeholder}" alt="Upload Icon"
                                 class="placeholder_icon w-auto h-full mb-2 rounded-md" id="placeholder_icon_${data.imagePicker.id}" />
                             <p id="upload_text_${data.imagePicker.id}" class="upload_text text-md text-gray-500">${data.imagePicker.uploadText}</p>
                         </div>

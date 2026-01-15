@@ -22,19 +22,24 @@ class CustomerController extends Controller
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         }
 
-        $customers = Customer::with('user', 'orders', 'payments', 'city')->get();
-
         $authLayout = $this->getAuthLayout($request->route()->getName());
+
+        if ($request->ajax()) {
+            $customers = Customer::orderByDesc('id')
+                ->applyFilters($request);
+
+            return response()->json(['data' => $customers, 'authLayout' => $authLayout]);
+        }
 
         $cities_options = [];
         $allCities = Setup::where('type', 'city')->get();
 
         foreach ($allCities as $city) {
-            $cities_options[$city->title] = ['text' => $city->title];
+            $cities_options[(int)$city->id] = ['text' => $city->title];
         }
 
         // return $customers[0];
-        return view("customers.index", compact('customers', 'authLayout', 'cities_options'));
+        return view("customers.index", compact( 'authLayout', 'cities_options'));
     }
 
     /**

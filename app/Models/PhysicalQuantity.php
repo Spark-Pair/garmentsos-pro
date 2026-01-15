@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\Filterable;
+use App\Traits\PhysicalQuantityComputed;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
@@ -11,11 +13,13 @@ class PhysicalQuantity extends Model
 {
     use HasFactory;
 
+    use Filterable, PhysicalQuantityComputed;
+
     protected $hidden = [
         'created_at',
         'updated_at',
     ];
-    
+
     protected $fillable = [
         "date",
         "article_id",
@@ -42,8 +46,8 @@ class PhysicalQuantity extends Model
     {
         return $this->belongsTo(User::class, 'creator_id', 'id');
     }
-    
-    public function article() 
+
+    public function article()
     {
         return $this->belongsTo(Article::class, 'article_id');
     }

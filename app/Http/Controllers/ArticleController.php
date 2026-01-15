@@ -23,21 +23,28 @@ class ArticleController extends Controller
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         };
 
-        $articles = Article::with('creator')->get();
+        // $articles = Article::with('creator')->get();
 
-        foreach ($articles as $article) {
-            $orders = Order::all();
+        // foreach ($articles as $article) {
+        //     $orders = Order::all();
 
-            if ($orders) {
-                foreach ($orders as $order) {
-                    $articlesArray = json_decode($order->ordered_articles, true);
-                }
-            }
-        }
+        //     if ($orders) {
+        //         foreach ($orders as $order) {
+        //             $articlesArray = json_decode($order->ordered_articles, true);
+        //         }
+        //     }
+        // }
 
         $authLayout = $this->getAuthLayout($request->route()->getName());
 
-        return view('articles.index', compact('articles', 'authLayout'));
+        if ($request->ajax()) {
+            $articles = Article::orderByDesc('id')
+                ->applyFilters($request);
+
+            return response()->json(['data' => $articles, 'authLayout' => $authLayout]);
+        }
+
+        return view('articles.index', compact( 'authLayout'));
     }
 
     /**

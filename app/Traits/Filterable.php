@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 
 trait Filterable
 {
-    public function scopeApplyFilters($query, Request $request)
+    public function scopeApplyFilters($query, Request $request, $returnCollection = true)
     {
         $filters = $request->except(['_token', 'limit', 'page']);
 
@@ -35,6 +35,10 @@ trait Filterable
             $query->limit($limit);
         }
 
-        return $query->get()->map->toFormattedArray();
+        if ($returnCollection) {
+            return $query->get()->map->toFormattedArray();
+        }
+
+        return $query;
     }
 }

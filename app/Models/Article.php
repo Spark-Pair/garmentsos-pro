@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\ArticleComputed;
+use App\Traits\Filterable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,6 +12,8 @@ use Illuminate\Database\Eloquent\Model;
 class Article extends Model
 {
     use HasFactory;
+
+    use Filterable, ArticleComputed;
 
     protected $hidden = [
         'created_at',
@@ -65,5 +69,15 @@ class Article extends Model
     public function production()
     {
         return $this->hasMany(Production::class, 'article_id');
+    }
+
+    public function shipmentArticles()
+    {
+        return $this->hasMany(ShipmentArticles::class, 'article_id');
+    }
+
+    public function orderArticles()
+    {
+        return $this->hasMany(OrderArticles::class, 'article_id');
     }
 }

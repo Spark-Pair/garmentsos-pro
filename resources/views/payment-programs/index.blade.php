@@ -75,42 +75,33 @@
             class="show-box mx-auto w-[80%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
             <x-form-title-bar printBtn layout="table" title="Show Payment Programs" resetSortBtn />
 
-            @if (count($finalData) > 0)
-                <div class="absolute bottom-3 right-3 flex items-center gap-2 w-fll z-50">
-                    <x-section-navigation-button link="{{ route('payment-programs.create') }}" title="Add New Program"
-                        icon="fa-plus" />
-                </div>
+            <div class="absolute bottom-3 right-3 flex items-center gap-2 w-fll z-50">
+                <x-section-navigation-button link="{{ route('payment-programs.create') }}" title="Add New Program"
+                    icon="fa-plus" />
+            </div>
 
-                <div class="details h-full z-40">
-                    <div class="container-parent h-full">
-                        <div class="card_container px-3 h-full flex flex-col">
-                            <div id="table-head" class="flex items-center bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4">
-                                <div class="w-[10%] cursor-pointer" onclick="sortByThis(this)">Date</div>
-                                <div class="w-[8%] cursor-pointer" onclick="sortByThis(this)">O/P No.</div>
-                                <div class="w-[19%] cursor-pointer" onclick="sortByThis(this)">Customer</div>
-                                <div class="w-[9%] cursor-pointer" onclick="sortByThis(this)">Category</div>
-                                <div class="w-[15%] cursor-pointer" onclick="sortByThis(this)">Beneficiary</div>
-                                <div class="w-[10%] cursor-pointer" onclick="sortByThis(this)">Amount</div>
-                                <div class="w-[10%] cursor-pointer" onclick="sortByThis(this)">Payment</div>
-                                <div class="w-[10%] cursor-pointer" onclick="sortByThis(this)">Balance</div>
-                                <div class="w-[10%] cursor-pointer" onclick="sortByThis(this)">Status</div>
-                            </div>
-                            <p id="noItemsError" style="display: none" class="text-sm text-[var(--border-error)] mt-3 cursor-pointer" onclick="sortByThis(this)">No items found</p>
-                            <div class="overflow-y-auto grow my-scrollbar-2">
-                                <div class="search_container grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 grow">
-                                </div>
+            <div class="details h-full z-40">
+                <div class="container-parent h-full">
+                    <div class="card_container px-3 h-full flex flex-col">
+                        <div id="table-head" class="flex items-center bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4">
+                            <div class="w-[10%] cursor-pointer" onclick="sortByThis(this)">Date</div>
+                            <div class="w-[8%] cursor-pointer" onclick="sortByThis(this)">O/P No.</div>
+                            <div class="w-[19%] cursor-pointer" onclick="sortByThis(this)">Customer</div>
+                            <div class="w-[9%] cursor-pointer" onclick="sortByThis(this)">Category</div>
+                            <div class="w-[15%] cursor-pointer" onclick="sortByThis(this)">Beneficiary</div>
+                            <div class="w-[10%] cursor-pointer" onclick="sortByThis(this)">Amount</div>
+                            <div class="w-[10%] cursor-pointer" onclick="sortByThis(this)">Payment</div>
+                            <div class="w-[10%] cursor-pointer" onclick="sortByThis(this)">Balance</div>
+                            <div class="w-[10%] cursor-pointer" onclick="sortByThis(this)">Status</div>
+                        </div>
+                        <p id="noItemsError" style="display: none" class="text-sm text-[var(--border-error)] mt-3 cursor-pointer" onclick="sortByThis(this)">No items found</p>
+                        <div class="overflow-y-auto grow my-scrollbar-2">
+                            <div class="search_container grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 grow">
                             </div>
                         </div>
                     </div>
                 </div>
-            @else
-                <div class="no-records-message w-full h-full flex flex-col items-center justify-center gap-2">
-                    <h1 class="text-md text-[var(--secondary-text)] capitalize">No Payment Programs yet</h1>
-                    <a href="{{ route('payment-programs.create') }}"
-                        class="text-sm bg-[var(--primary-color)] text-[var(--text-color)] px-4 py-2 rounded-md hover:bg-[var(--h-primary-color)] hover:scale-105 hover:mb-2 transition-all duration-300 ease-in-out font-semibold">Add
-                        New</a>
-                </div>
-            @endif
+            </div>
         </div>
     </section>
 
@@ -135,54 +126,54 @@
             </div>`;
         }
 
-        const fetchedData = @json($finalData);
+        const fetchedData = [];
 
-        let allDataArray = fetchedData.map(item => {
-            const category = item.category || item.payment_programs?.category;
-            let beneficiary = null;
+        // let allDataArray = fetchedData.map(item => {
+        //     const category = item.category || item.payment_programs?.category;
+        //     let beneficiary = null;
 
-            if (item?.category) {
-                if (item.category === 'supplier' && item.sub_category?.supplier_name) {
-                    beneficiary = item.sub_category.supplier_name;
-                } else if (item.category === 'customer' && item.sub_category?.customer_name) {
-                    beneficiary = item.sub_category.customer_name;
-                } else if (item.category === 'waiting' && item.remarks) {
-                    beneficiary = item.remarks;
-                } else if (item.category === 'self_account' && item.sub_category?.account_title) {
-                    beneficiary = item.sub_category.account_title;
-                }
-            } else if (item?.payment_programs?.category) {
-                const p = item.payment_programs;
-                const sub = p.sub_category;
-                if (p.category === 'supplier' && sub?.supplier_name) {
-                    beneficiary = sub.supplier_name;
-                } else if (p.category === 'customer' && sub?.customer_name) {
-                    beneficiary = sub.customer_name;
-                } else if (p.category === 'waiting' && p.remarks) {
-                    beneficiary = p.remarks;
-                } else if (p.category === 'self_account' && sub?.account_title) {
-                    beneficiary = sub.account_title;
-                }
-            }
+        //     if (item?.category) {
+        //         if (item.category === 'supplier' && item.sub_category?.supplier_name) {
+        //             beneficiary = item.sub_category.supplier_name;
+        //         } else if (item.category === 'customer' && item.sub_category?.customer_name) {
+        //             beneficiary = item.sub_category.customer_name;
+        //         } else if (item.category === 'waiting' && item.remarks) {
+        //             beneficiary = item.remarks;
+        //         } else if (item.category === 'self_account' && item.sub_category?.account_title) {
+        //             beneficiary = item.sub_category.account_title;
+        //         }
+        //     } else if (item?.payment_programs?.category) {
+        //         const p = item.payment_programs;
+        //         const sub = p.sub_category;
+        //         if (p.category === 'supplier' && sub?.supplier_name) {
+        //             beneficiary = sub.supplier_name;
+        //         } else if (p.category === 'customer' && sub?.customer_name) {
+        //             beneficiary = sub.customer_name;
+        //         } else if (p.category === 'waiting' && p.remarks) {
+        //             beneficiary = p.remarks;
+        //         } else if (p.category === 'self_account' && sub?.account_title) {
+        //             beneficiary = sub.account_title;
+        //         }
+        //     }
 
-            return {
-                id: item.id,
-                date: formatDate(item.date, true),
-                customer_name: item.customer?.customer_name + ' | ' + item.customer?.city?.title || '',
-                o_p_no: item.order_no ? item.order_no + ' | O' : item.program_no ? item.program_no + ' | P' : '-',
-                category: category,
-                beneficiary: beneficiary || '-',
-                amount: item.amount || item.netAmount,
-                payment: item.payment || 0,
-                balance: item.balance || 0,
-                status: item.status || item.payment_programs.status || '-',
-                type: item.order_no ? 'order' : item.program_no ? 'program' : '-',
-                data: item,
-                oncontextmenu: "generateContextMenu(event)",
-                onclick: "generateModal(this)",
-                visible: true,
-            };
-        });
+        //     return {
+        //         id: item.id,
+        //         date: formatDate(item.date, true),
+        //         customer_name: item.customer?.customer_name + ' | ' + item.customer?.city?.title || '',
+        //         o_p_no: item.order_no ? item.order_no + ' | O' : item.program_no ? item.program_no + ' | P' : '-',
+        //         category: category,
+        //         beneficiary: beneficiary || '-',
+        //         amount: item.amount || item.netAmount,
+        //         payment: item.payment || 0,
+        //         balance: item.balance || 0,
+        //         status: item.status || item.payment_programs.status || '-',
+        //         type: item.order_no ? 'order' : item.program_no ? 'program' : '-',
+        //         data: item,
+        //         oncontextmenu: "generateContextMenu(event)",
+        //         onclick: "generateModal(this)",
+        //         visible: true,
+        //     };
+        // });
 
         let subCategoryDom;
         let remarksInputDom;

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\CustomerComputed;
+use App\Traits\Filterable;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +13,8 @@ use Illuminate\Support\Facades\Auth;
 class Customer extends Model
 {
     use HasFactory;
+
+    use Filterable, CustomerComputed;
 
     protected $fillable = [
         'user_id',

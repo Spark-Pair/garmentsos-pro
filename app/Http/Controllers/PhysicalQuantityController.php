@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Article;
 use App\Models\PhysicalQuantity;
 use App\Models\Shipment;
+use App\Models\ShipmentArticles;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -14,84 +15,143 @@ class PhysicalQuantityController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         if (!$this->checkRole(['developer', 'owner', 'manager', 'admin', 'accountant', 'guest', 'store_keeper'])) {
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         }
 
-        $allQuantities = PhysicalQuantity::with('article')->get();
-        $allShipments = Shipment::with('invoices.customer')->get();
+        if ($request->ajax()) {
+            $rows = PhysicalQuantity::with('article')
+                ->orderByDesc('id')
+                ->applyFilters($request, false) // 👈 important
+                ->get();
 
-        // 🔹 Group by article_id (not id)
-        $grouped = $allQuantities->groupBy('article_id')->map(function ($group) {
-            $first = $group->first();
-            $article = $first->article;
+            $grouped = $rows
+                ->groupBy('article_id')
+                ->map(function ($items) {
 
-            // Category-wise packets
-            $categoryA = $group->where('category', 'a')->sum('packets');
-            $categoryB = $group->where('category', 'b')->sum('packets');
-            $categoryC = $group->where('category', 'c')->sum('packets');
-            $total = $categoryA + $categoryB + $categoryC;
+                    $model = $items->first();
+                    $packets = $items->sum('packets');
 
-            $latestDate = $group->max('date');
+                    // 🔹 Shipment cities
+                    $cities = ShipmentArticles::where('article_id', $model->article_id)
+                        ->whereHas('shipment')
+                        ->with('shipment:id,city')
+                        ->get()
+                        ->pluck('shipment.city')
+                        ->filter()
+                        ->unique()
+                        ->values();
 
-            return (object)[
-                'article_id' => $article->id,
-                'article' => $article,
-                'a_category' => $categoryA,
-                'b_category' => $categoryB,
-                'c_category' => $categoryC,
-                'total_packets' => $total,
-                'current_stock' => $total - ($article->sold_quantity / $article->pcs_per_packet),
-                'latest_date' => $latestDate,
-                'date' => date('d-M-y, D', strtotime($latestDate)),
-            ];
-        })->values();
+                    $shipment = null;
+                    if ($cities->isNotEmpty()) {
+                        $hasKarachi = $cities->contains(fn($city) => strtolower($city) === 'karachi');
 
-        // 🔹 Attach shipment info
-        foreach ($allShipments as $shipment) {
-            $shipment['articles'] = $shipment->getArticles();
-
-            foreach ($shipment['articles'] as $article) {
-                foreach ($grouped as $group) {
-                    if ($article['article']['id'] == $group->article_id) {
-                        $cityTitle = strtolower($shipment->city);
-
-                        if (!isset($group->city)) {
-                            $group->city = [];
-                        }
-
-                        if (!in_array($cityTitle, $group->city)) {
-                            $group->city[] = $cityTitle;
+                        if ($hasKarachi && $cities->count() === 1) {
+                            $shipment = 'karachi';
+                        } elseif ($hasKarachi && $cities->count() > 1) {
+                            $shipment = 'all';
+                        } else {
+                            $shipment = 'other';
                         }
                     }
-                }
-            }
+
+                    return [
+                        'article_id'        => $model->article_id,
+                        'article_no'        => $model->article->article_no,
+                        'processed_by'      => $model->article->processed_by,
+                        'unit'              => $model->article->pcs_per_packet,
+                        'total_quantity'    => floor($packets * $model->article->pcs_per_packet / 12) . ' - Dz. | ' . $packets . ' - Pkts.',
+                        'received_quantity' => $packets . ' - Pkts.',
+                        'current_stock'     => ($packets - ($model->article->sold_quantity / $model->article->pcs_per_packet)) . ' - Pkts.',
+                        'a_category'        => $items->where('category', 'a')->sum('packets') . ' - Pkts.',
+                        'b_category'        => $items->where('category', 'b')->sum('packets') . ' - Pkts.',
+                        'c_category'        => ($model->article->quantity / $model->article->pcs_per_packet - $packets) . ' - Pkts.',
+                        'remaining_quantity'=> $items->where('category', 'c')->sum('packets') . ' - Pkts.',
+                        'shipment'          => ucfirst($shipment) ?? '-',
+                        'onclick'           => "generateModal(this)",
+                        'oncontextmenu'     => "generateContextMenu(event)",
+                    ];
+                })
+                ->values();
+
+            return response()->json([
+                'data' => $grouped,
+                'authLayout' => 'table'
+            ]);
         }
 
-        // 🔹 Determine shipment type per article
-        foreach ($grouped as $group) {
-            $cities = $group->city ?? [];
+        // $allQuantities = PhysicalQuantity::with('article')->get();
+        // $allShipments = Shipment::with('invoices.customer')->get();
 
-            $hasKarachi = in_array('karachi', $cities);
-            $hasOther = count(array_filter($cities, fn($c) => $c !== 'karachi' && $c !== 'all')) > 0;
-            $hasAll = in_array('all', $cities);
+        // // 🔹 Group by article_id (not id)
+        // $grouped = $allQuantities->groupBy('article_id')->map(function ($group) {
+        //     $first = $group->first();
+        //     $article = $first->article;
 
-            if ($hasAll || ($hasKarachi && $hasOther)) {
-                $group->shipment = 'All';
-            } elseif ($hasKarachi) {
-                $group->shipment = 'Karachi';
-            } elseif ($hasOther) {
-                $group->shipment = 'Other';
-            } else {
-                $group->shipment = null;
-            }
-        }
+        //     // Category-wise packets
+        //     $categoryA = $group->where('category', 'a')->sum('packets');
+        //     $categoryB = $group->where('category', 'b')->sum('packets');
+        //     $categoryC = $group->where('category', 'c')->sum('packets');
+        //     $total = $categoryA + $categoryB + $categoryC;
 
-        return view('physical-quantities.index', [
-            'physicalQuantities' => $grouped
-        ]);
+        //     $latestDate = $group->max('date');
+
+        //     return (object)[
+        //         'article_id' => $article->id,
+        //         'article' => $article,
+        //         'a_category' => $categoryA,
+        //         'b_category' => $categoryB,
+        //         'c_category' => $categoryC,
+        //         'total_packets' => $total,
+        //         'current_stock' => $total - ($article->sold_quantity / $article->pcs_per_packet),
+        //         'latest_date' => $latestDate,
+        //         'date' => date('d-M-y, D', strtotime($latestDate)),
+        //     ];
+        // })->values();
+
+        // // 🔹 Attach shipment info
+        // foreach ($allShipments as $shipment) {
+        //     $shipment['articles'] = $shipment->getArticles();
+
+        //     foreach ($shipment['articles'] as $article) {
+        //         foreach ($grouped as $group) {
+        //             if ($article['article']['id'] == $group->article_id) {
+        //                 $cityTitle = strtolower($shipment->city);
+
+        //                 if (!isset($group->city)) {
+        //                     $group->city = [];
+        //                 }
+
+        //                 if (!in_array($cityTitle, $group->city)) {
+        //                     $group->city[] = $cityTitle;
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+
+        // // 🔹 Determine shipment type per article
+        // foreach ($grouped as $group) {
+        //     $cities = $group->city ?? [];
+
+        //     $hasKarachi = in_array('karachi', $cities);
+        //     $hasOther = count(array_filter($cities, fn($c) => $c !== 'karachi' && $c !== 'all')) > 0;
+        //     $hasAll = in_array('all', $cities);
+
+        //     if ($hasAll || ($hasKarachi && $hasOther)) {
+        //         $group->shipment = 'All';
+        //     } elseif ($hasKarachi) {
+        //         $group->shipment = 'Karachi';
+        //     } elseif ($hasOther) {
+        //         $group->shipment = 'Other';
+        //     } else {
+        //         $group->shipment = null;
+        //     }
+        // }
+
+        return view('physical-quantities.index');
     }
 
     /**

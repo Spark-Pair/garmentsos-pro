@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\Filterable;
+use App\Traits\PaymentProgramComputed;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
@@ -11,11 +13,17 @@ class PaymentProgram extends Model
 {
     use HasFactory;
 
+    use Filterable, PaymentProgramComputed;
+
     protected $hidden = [
         'updated_at',
     ];
 
     protected $fillable = ['program_no', 'order_no', 'date', 'customer_id', 'category', 'sub_category', 'amount', 'remarks'];
+
+    protected $casts = [
+        'date' => 'date'
+    ];
 
     protected $appends = ['payments', 'balance', 'payment'];
 
@@ -44,7 +52,8 @@ class PaymentProgram extends Model
         return $this->belongsTo(Customer::class, 'customer_id', 'id');
     }
 
-    public function order() {
+    public function order()
+    {
         return $this->belongsTo(Order::class, 'order_no', 'order_no');
     }
 
@@ -64,7 +73,7 @@ class PaymentProgram extends Model
     public function getBalanceAttribute()
     {
         $totalpayment = 0;
-        foreach($this['payments'] as $payment) {
+        foreach ($this['payments'] as $payment) {
             $totalpayment += $payment->amount;
         }
         return $this['amount'] - $totalpayment;
@@ -72,7 +81,7 @@ class PaymentProgram extends Model
     public function getPaymentAttribute()
     {
         $totalpayment = 0;
-        foreach($this['payments'] as $payment) {
+        foreach ($this['payments'] as $payment) {
             $totalpayment += $payment->amount;
         }
         return $totalpayment;

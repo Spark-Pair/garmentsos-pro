@@ -26,38 +26,52 @@ class VoucherController extends Controller
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         }
 
-        // Eager load all relations needed
-        $vouchers = Voucher::with([
-            'supplier:id,supplier_name',
-            'payments.cheque.customer',
-            'payments.slip.customer',
-            'payments.program.customer',
-            'payments.bankAccount.bank',
-            'payments.selfAccount.bank'
-        ])
-        ->orderByDesc('id')
-        ->get();
-
-        // Preload supplier balances in batch to reduce queries (optional if calculateBalance is query-heavy)
-        $supplierIds = $vouchers->pluck('supplier.id')->filter()->unique();
-        $supplierBalances = [];
-        foreach ($supplierIds as $id) {
-            $supplierBalances[$id] = Supplier::find($id)->calculateBalance(null, now(), false, false);
-        }
-
-        foreach ($vouchers as $voucher) {
-            // Calculate previous balance only if supplier exists
-            if ($voucher->supplier) {
-                $voucher->previous_balance = $supplierBalances[$voucher->supplier->id] ?? 0;
-            }
-
-            // Sum of all payments
-            $voucher->total_payment = $voucher->payments->sum('amount');
-        }
-
         $authLayout = $this->getAuthLayout($request->route()->getName());
 
-        return view("vouchers.index", compact("vouchers", "authLayout"));
+        if ($request->ajax()) {
+            $vouchers = Voucher::with([
+                    'supplier:id,supplier_name',
+                    'payments.cheque.customer',
+                    'payments.slip.customer',
+                    'payments.program.customer',
+                    'payments.bankAccount.bank',
+                    'payments.selfAccount.bank'
+                ])->orderByDesc('id')
+                ->applyFilters($request);
+
+            return response()->json(['data' => $vouchers, 'authLayout' => $authLayout]);
+        }
+
+        // // Eager load all relations needed
+        // $vouchers = Voucher::with([
+        //     'supplier:id,supplier_name',
+        //     'payments.cheque.customer',
+        //     'payments.slip.customer',
+        //     'payments.program.customer',
+        //     'payments.bankAccount.bank',
+        //     'payments.selfAccount.bank'
+        // ])
+        // ->orderByDesc('id')
+        // ->get();
+
+        // // Preload supplier balances in batch to reduce queries (optional if calculateBalance is query-heavy)
+        // $supplierIds = $vouchers->pluck('supplier.id')->filter()->unique();
+        // $supplierBalances = [];
+        // foreach ($supplierIds as $id) {
+        //     $supplierBalances[$id] = Supplier::find($id)->calculateBalance(null, now(), false, false);
+        // }
+
+        // foreach ($vouchers as $voucher) {
+        //     // Calculate previous balance only if supplier exists
+        //     if ($voucher->supplier) {
+        //         $voucher->previous_balance = $supplierBalances[$voucher->supplier->id] ?? 0;
+        //     }
+
+        //     // Sum of all payments
+        //     $voucher->total_payment = $voucher->payments->sum('amount');
+        // }
+
+        return view("vouchers.index", compact( "authLayout"));
     }
 
     /**

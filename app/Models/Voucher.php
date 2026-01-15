@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Traits\Filterable;
+use App\Traits\VoucherComputed;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Voucher extends Model
 {
     use HasFactory;
+
+    use Filterable, VoucherComputed;
 
     protected $hidden = [
         'created_at',
