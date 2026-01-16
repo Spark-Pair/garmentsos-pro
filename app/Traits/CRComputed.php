@@ -5,22 +5,17 @@ namespace App\Traits;
 use App\Models\SupplierPayment;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 
-trait VoucherComputed
+trait CRComputed
 {
     public function toFormattedArray()
     {
         return [
             'id' => $this->id,
-            'name' => $this->voucher_no,
-            'details' => [
-                'Supplier' => $this->supplier ? $this->supplier->supplier_name : app('client_company')->name,
-                'Date' => $this->date->format('d-M-Y, D'),
-                'Amount' => $this->payments->sum('amount'),
-            ],
-            'total_payment' => $this->payments->sum('amount'),
-            'data' => $this,
-            'oncontextmenu' => "generateContextMenu(event)",
-            'onclick' => "generateModal(this)",
+            'date' => $this->date->format('d-M-Y, D'),
+            'amount' => collect($this->new_payments)->sum('amount'),
+            'c_r_no' => $this->c_r_no,
+            'voucher_no' => $this->voucher->voucher_no,
+            'supplier_name' => $this->voucher->supplier->supplier_name ?? app('client_company')->name,
         ];
     }
 
@@ -31,16 +26,21 @@ trait VoucherComputed
                 return $query->where(function ($query) use ($value) {
 
                     // Case 1: supplier exists → supplier_name
-                    $query->whereHas('supplier', function ($q) use ($value) {
+                    $query->whereHas('voucher.supplier', function ($q) use ($value) {
                         $q->where('supplier_name', 'like', "%{$value}%");
                     })
 
                     // Case 2: supplier does NOT exist → fallback to client_company name
                     ->orWhere(function ($q) use ($value) {
-                        $q->whereDoesntHave('supplier')
+                        $q->whereDoesntHave('voucher.supplier')
                         ->where(app('client_company')->name, 'like', "%{$value}%");
                     });
 
+                });
+
+            case 'voucher_no':
+                return $query->whereHas('voucher', function ($q) use ($value) {
+                    $q->where('voucher_no', 'like', "%{$value}%");
                 });
 
             case 'date':

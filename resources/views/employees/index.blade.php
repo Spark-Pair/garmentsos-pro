@@ -8,10 +8,10 @@
                 "type" => "text",
                 "placeholder" => "Enter employee name",
                 "oninput" => "runDynamicFilter()",
-                "dataFilterPath" => "name",
+                "dataFilterPath" => "employee_name",
             ],
             "Phone" => [
-                "id" => "phone",
+                "id" => "phone_number",
                 "type" => "text",
                 "placeholder" => "Enter phone number",
                 "oninput" => "runDynamicFilter()",
@@ -25,13 +25,13 @@
                             'worker' => ['text' => 'Worker'],
                         ],
                 "onchange" => "runDynamicFilter()",
-                "dataFilterPath" => "details.Category",
+                "dataFilterPath" => "category",
             ],
             "Type" => [
                 "id" => "type",
-                "type" => "text",
-                "placeholder" => "Enter type",
-                "oninput" => "runDynamicFilter()",
+                "type" => "select",
+                "options" => $all_types,
+                "onchange" => "runDynamicFilter()",
                 "dataFilterPath" => "type",
             ]
         ];
@@ -46,39 +46,29 @@
             <div class="show-box mx-auto w-[80%] h-[70vh] bg-[var(--secondary-bg-color)] rounded-xl shadow pt-8.5 pr-2 relative">
                 <x-form-title-bar printBtn title="Show Employees" changeLayoutBtn layout="{{ $authLayout }}" resetSortBtn />
 
-                @if (count($employees) > 0)
-                    <div class="absolute bottom-3 right-3 flex items-center gap-2 w-fll z-50">
-                        <x-section-navigation-button link="{{ route('employees.create') }}" title="Add New Employee" icon="fa-plus" />
-                    </div>
+                <div class="absolute bottom-3 right-3 flex items-center gap-2 w-fll z-50">
+                    <x-section-navigation-button link="{{ route('employees.create') }}" title="Add New Employee" icon="fa-plus" />
+                </div>
 
-                    <div class="details h-full z-40">
-                        <div class="container-parent h-full">
-                            <div class="card_container px-3 h-full flex flex-col">
-                                <div id="table-head"class="grid grid-cols-6 bg-[var(--h-bg-color)] rounded-lg font-medium py-2 mt-4">
-                                    <div onclick="sortByThis(this)" class="cursor-pointer text-left pl-5">Employee Name</div>
-                                    <div onclick="sortByThis(this)" class="cursor-pointer text-left pl-5">Urdu Title</div>
-                                    <div onclick="sortByThis(this)" class="cursor-pointer text-left pl-5">Category</div>
-                                    <div onclick="sortByThis(this)" class="cursor-pointer text-center">Type</div>
-                                    <div onclick="sortByThis(this)" class="cursor-pointer text-center">Balance</div>
-                                    <div onclick="sortByThis(this)" class="cursor-pointer text-right pr-5">Status</div>
-                                </div>
-                                <p id="noItemsError" style="display: none" class="text-sm text-[var(--border-error)] mt-3">No items found</p>
-                                <div class="overflow-y-auto grow my-scrollbar-2">
-                                    <div class="search_container grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 grow">
-                                    </div>
+                <div class="details h-full z-40">
+                    <div class="container-parent h-full">
+                        <div class="card_container px-3 h-full flex flex-col">
+                            <div id="table-head"class="grid grid-cols-6 bg-[var(--h-bg-color)] rounded-lg font-medium py-2 mt-4">
+                                <div onclick="sortByThis(this)" class="cursor-pointer text-left pl-5">Employee Name</div>
+                                <div onclick="sortByThis(this)" class="cursor-pointer text-left pl-5">Urdu Title</div>
+                                <div onclick="sortByThis(this)" class="cursor-pointer text-left pl-5">Category</div>
+                                <div onclick="sortByThis(this)" class="cursor-pointer text-center">Type</div>
+                                <div onclick="sortByThis(this)" class="cursor-pointer text-center">Balance</div>
+                                <div onclick="sortByThis(this)" class="cursor-pointer text-right pr-5">Status</div>
+                            </div>
+                            <p id="noItemsError" style="display: none" class="text-sm text-[var(--border-error)] mt-3">No items found</p>
+                            <div class="overflow-y-auto grow my-scrollbar-2">
+                                <div class="search_container grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 grow">
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <p id="noItemsError" style="display: none" class="text-sm text-[var(--border-error)] mt-3">No items found</p>
-                @else
-                    <div class="no-records-message w-full h-full flex flex-col items-center justify-center gap-2">
-                        <h1 class="text-md text-[var(--secondary-text)] capitalize">No Employee yet</h1>
-                        <a href="{{ route('employees.create') }}"
-                        class="text-sm bg-[var(--primary-color)] text-[var(--text-color)] px-4 py-2 rounded-md hover:bg-[var(--h-primary-color)] hover:scale-105 hover:mb-2 transition-all duration-300 ease-in-out font-semibold">Add
-                            New</a>
-                    </div>
-                @endif
+                </div>
             </div>
         </section>
     </div>
@@ -104,31 +94,31 @@
             </div>`;
         }
 
-        const fetchedData = @json($employees);
-        let allDataArray = fetchedData.map(item => {
-            return {
-                id: item.id,
-                uId: item.id,
-                status: item.status,
-                image: item.profile_picture == 'default_avatar.png' ? '/images/default_avatar.png' : `/storage/uploads/images/${item.profile_picture}`,
-                name: item.employee_name,
-                urdu_title: item.urdu_title,
-                phone_number: item.phone_number,
-                details: {
-                    'Category': item.category,
-                    'Type': item.type.title.split('|')[0].trim(),
-                    'Balance': formatNumbersWithDigits(item.balance ?? 0, 1, 1),
-                },
-                type: item.type.title,
-                joining_date: item.joining_date,
-                cnic_no: item.cnic_no,
-                salary: item.salary,
-                oncontextmenu: "generateContextMenu(event)",
-                onclick: "generateModal(this)",
-                profile: true,
-                visible: true,
-            };
-        });
+        // const fetchedData = [];
+        // let allDataArray = fetchedData.map(item => {
+        //     return {
+        //         id: item.id,
+        //         uId: item.id,
+        //         status: item.status,
+        //         image: item.profile_picture == 'default_avatar.png' ? '/images/default_avatar.png' : `/storage/uploads/images/${item.profile_picture}`,
+        //         name: item.employee_name,
+        //         urdu_title: item.urdu_title,
+        //         phone_number: item.phone_number,
+        //         details: {
+        //             'Category': item.category,
+        //             'Type': item.type.title.split('|')[0].trim(),
+        //             'Balance': formatNumbersWithDigits(item.balance ?? 0, 1, 1),
+        //         },
+        //         type: item.type.title,
+        //         joining_date: item.joining_date,
+        //         cnic_no: item.cnic_no,
+        //         salary: item.salary,
+        //         oncontextmenu: "generateContextMenu(event)",
+        //         onclick: "generateModal(this)",
+        //         profile: true,
+        //         visible: true,
+        //     };
+        // });
 
         function generateContextMenu(e) {
             e.preventDefault();
@@ -168,7 +158,7 @@
                     'Category': data.details.Category,
                     'Type': data.details.Type,
                     'Phone Number': data.phone_number,
-                    'Joining Date': formatDate(data.joining_date),
+                    'Joining Date': data.joining_date,
                     'C.N.I.C No.': data.cnic_no,
                     'Balance': data.details.Balance,
                     ...(data.salary > 0 && { 'Salary': formatNumbersWithDigits(data.salary, 1, 1) }),
@@ -190,7 +180,7 @@
                 {"label": "Name", "text": data.name},
                 {"label": "Category", "text": data.details.Category},
                 {"label": "Type", "text": data.details.Type},
-                {"label": "Joining Date", "text": formatDate(data.joining_date),},
+                {"label": "Joining Date", "text": data.joining_date,},
                 {"label": "Phone Number", "text": data.phone_number},
                 {"label": "C.N.I.C No.", "text": data.cnic_no},
             ]

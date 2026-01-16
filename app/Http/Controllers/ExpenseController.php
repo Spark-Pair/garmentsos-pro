@@ -20,16 +20,23 @@ class ExpenseController extends Controller
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         }
 
-        $expenses = Expense::with('supplier', 'expenseSetups')->get();
+        if ($request->ajax()) {
+            $shipments = Expense::orderByDesc('id')
+                ->applyFilters($request);
 
-        $authLayout = $this->getAuthLayout($request->route()->getName());
+            return response()->json(['data' => $shipments, 'authLayout' => 'table']);
+        }
+
+        // $expenses = Expense::with('supplier', 'expenseSetups')->get();
 
         $expenseOptions = Setup::where('type', 'supplier_category')
-            ->pluck('title')
-            ->mapWithKeys(fn($title) => [$title => ['text' => $title]])
+            ->get()
+            ->mapWithKeys(fn ($item) => [
+                $item->id => ['text' => $item->title]
+            ])
             ->toArray();
 
-        return view('expenses.index', compact('expenses', 'authLayout', 'expenseOptions'));
+        return view('expenses.index', compact('expenseOptions'));
     }
 
     /**

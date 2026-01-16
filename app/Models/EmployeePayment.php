@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Traits\EmployeePaymentComputed;
+use App\Traits\Filterable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class EmployeePayment extends Model
 {
     use HasFactory;
+
+    use Filterable, EmployeePaymentComputed;
 
     protected $fillable = [
         'employee_id',

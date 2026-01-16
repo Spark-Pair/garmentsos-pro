@@ -8,7 +8,7 @@
                 "type" => "text",
                 "placeholder" => "Enter account title",
                 "oninput" => "runDynamicFilter()",
-                "dataFilterPath" => "name",
+                "dataFilterPath" => "account_title",
             ],
             "Category" => [
                 "id" => "category",
@@ -19,27 +19,27 @@
                             'supplier' => ['text' => 'Supplier'],
                         ],
                 "onchange" => "runDynamicFilter()",
-                "dataFilterPath" => "details.Category",
+                "dataFilterPath" => "category",
             ],
             "Name" => [
                 "id" => "name",
                 "type" => "text",
                 "placeholder" => "Enter name",
                 "oninput" => "runDynamicFilter()",
-                "dataFilterPath" => "details.Name",
+                "dataFilterPath" => "name",
             ],
             "Account No" => [
                 "id" => "account_no",
                 "type" => "text",
                 "placeholder" => "Enter account no",
                 "oninput" => "runDynamicFilter()",
-                "dataFilterPath" => "accountNo",
+                "dataFilterPath" => "account_no",
             ],
             "Bank" => [
                 "id" => "bank",
-                "type" => "text",
-                "placeholder" => "Enter bank",
-                "oninput" => "runDynamicFilter()",
+                "type" => "select",
+                "options" => $bank_options,
+                "onchange" => "runDynamicFilter()",
                 "dataFilterPath" => "bank",
             ],
             'Status' => [
@@ -72,40 +72,31 @@
                 class="show-box mx-auto w-[80%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
                 <x-form-title-bar printBtn title="Show Bank Accounts" changeLayoutBtn layout="{{ $authLayout }}" resetSortBtn />
 
-                @if (count($bankAccounts) > 0)
-                    <div class="absolute bottom-0 right-0 flex items-center justify-between gap-2 w-fll z-50 p-3 w-full pointer-events-none">
-                        <x-section-navigation-button direction="right" id="info" icon="fa-info" />
-                        <x-section-navigation-button link="{{ route('bank-accounts.create') }}" title="Add New Account" icon="fa-plus" />
-                    </div>
+                <div class="absolute bottom-0 right-0 flex items-center justify-between gap-2 w-fll z-50 p-3 w-full pointer-events-none">
+                    <x-section-navigation-button direction="right" id="info" icon="fa-info" />
+                    <x-section-navigation-button link="{{ route('bank-accounts.create') }}" title="Add New Account" icon="fa-plus" />
+                </div>
 
-                    <div class="details h-full z-40">
-                        <div class="container-parent h-full">
-                            <div class="card_container px-3 h-full flex flex-col">
-                                <div id="table-head" class="grid grid-cols-9 bg-[var(--h-bg-color)] rounded-lg text-center font-medium py-2 hidden mt-4">
-                                    <div class="cursor-pointer" onclick="sortByThis(this)">Date</div>
-                                    <div class="cursor-pointer col-span-2" onclick="sortByThis(this)">Account Title</div>
-                                    <div class="cursor-pointer col-span-2" onclick="sortByThis(this)">Name</div>
-                                    <div class="cursor-pointer" onclick="sortByThis(this)">Bank</div>
-                                    <div class="cursor-pointer" onclick="sortByThis(this)">Category</div>
-                                    <div class="cursor-pointer" onclick="sortByThis(this)">Balance</div>
-                                    <div class="cursor-pointer" onclick="sortByThis(this)">Status</div>
-                                </div>
-                                <p id="noItemsError" style="display: none" class="text-sm text-[var(--border-error)] mt-3">No items found</p>
-                                <div class="overflow-y-auto grow my-scrollbar-2">
-                                    <div class="search_container grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                                    </div>
+                <div class="details h-full z-40">
+                    <div class="container-parent h-full">
+                        <div class="card_container px-3 h-full flex flex-col">
+                            <div id="table-head" class="grid grid-cols-9 bg-[var(--h-bg-color)] rounded-lg text-center font-medium py-2 hidden mt-4">
+                                <div class="cursor-pointer" onclick="sortByThis(this)">Date</div>
+                                <div class="cursor-pointer col-span-2" onclick="sortByThis(this)">Account Title</div>
+                                <div class="cursor-pointer col-span-2" onclick="sortByThis(this)">Name</div>
+                                <div class="cursor-pointer" onclick="sortByThis(this)">Bank</div>
+                                <div class="cursor-pointer" onclick="sortByThis(this)">Category</div>
+                                <div class="cursor-pointer" onclick="sortByThis(this)">Balance</div>
+                                <div class="cursor-pointer" onclick="sortByThis(this)">Status</div>
+                            </div>
+                            <p id="noItemsError" style="display: none" class="text-sm text-[var(--border-error)] mt-3">No items found</p>
+                            <div class="overflow-y-auto grow my-scrollbar-2">
+                                <div class="search_container grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                                 </div>
                             </div>
                         </div>
                     </div>
-                @else
-                    <div class="no-records-message w-full h-full flex flex-col items-center justify-center gap-2">
-                        <h1 class="text-md text-[var(--secondary-text)] capitalize">No Bank Account yet</h1>
-                        <a href="{{ route('bank-accounts.create') }}"
-                        class="text-sm bg-[var(--primary-color)] text-[var(--text-color)] px-4 py-2 rounded-md hover:bg-[var(--h-primary-color)] hover:scale-105 hover:mb-2 transition-all duration-300 ease-in-out font-semibold">Add
-                            New</a>
-                    </div>
-                @endif
+                </div>
             </div>
         </section>
     </div>
@@ -121,39 +112,39 @@
                 class="item row relative group grid grid-cols-9 border-b border-[var(--h-bg-color)] items-center text-center py-2 cursor-pointer hover:bg-[var(--h-secondary-bg-color)] transition-all fade-in ease-in-out"
                 data-json='${JSON.stringify(data)}'>
 
-                <span>${formatDate(data.date)}</span>
+                <span>${data.date}</span>
                 <span class="col-span-2">${data.name}</span>
                 <span class="capitalize col-span-2">${data.details["Name"]}</span>
-                <span class="capitalize">${data.bank.split('|')[0]}</span>
+                <span class="capitalize">${data.bank}</span>
                 <span class="capitalize">${data.details["Category"]}</span>
                 <span>${data.details["Balance"]}</span>
                 <span class="capitalize">${data.status}</span>
             </div>`;
         }
 
-        const fetchedData = @json($bankAccounts);
-        let allDataArray = fetchedData.map(item => {
-            return {
-                id: item.id,
-                uId: item.id,
-                status: item.status,
-                name: item.account_title,
-                details: {
-                    'Name': item.sub_category?.customer_name ?? item.sub_category?.supplier_name ?? item.account_title,
-                    'Category': item.category,
-                    'Balance': formatNumbersWithDigits(item.balance, 1, 1) ?? 0,
-                },
-                accountNo: item.account_no ?? 0,
-                bank: item.bank.title + " | " + item.bank.short_title,
-                date: item.date,
-                chqbkSerialStart: item.chqbk_serial_start ?? 0,
-                chqbkSerialEnd: item.chqbk_serial_end ?? 0,
-                available_cheques: item.available_cheques ?? [],
-                oncontextmenu: "generateContextMenu(event)",
-                onclick: "generateModal(this)",
-                visible: true,
-            };
-        });
+        // const fetchedData = [];
+        // let allDataArray = fetchedData.map(item => {
+        //     return {
+        //         id: item.id,
+        //         uId: item.id,
+        //         status: item.status,
+        //         name: item.account_title,
+        //         details: {
+        //             'Name': item.sub_category?.customer_name ?? item.sub_category?.supplier_name ?? item.account_title,
+        //             'Category': item.category,
+        //             'Balance': formatNumbersWithDigits(item.balance, 1, 1) ?? 0,
+        //         },
+        //         accountNo: item.account_no ?? 0,
+        //         bank: item.bank.title + " | " + item.bank.short_title,
+        //         date: item.date,
+        //         chqbkSerialStart: item.chqbk_serial_start ?? 0,
+        //         chqbkSerialEnd: item.chqbk_serial_end ?? 0,
+        //         available_cheques: item.available_cheques ?? [],
+        //         oncontextmenu: "generateContextMenu(event)",
+        //         onclick: "generateModal(this)",
+        //         visible: true,
+        //     };
+        // });
 
         const activeAccounts = allDataArray.filter(account => account.status === 'active');
 
@@ -172,7 +163,7 @@
                 y: e.pageY,
             };
 
-            if (data.available_cheques.length == 0 && (currentUserRole == 'admin' || currentUserRole == 'developer' || currentUserRole == 'owner') && data.details['Category'] === 'self') {
+            if (data.details['Category'] === 'self') {
                 contextMenuData.actions = [
                     {id: 'update-cheque-book-serial', text: 'Update Serial', onclick: `generateUpdateChequeBookSerialModel(${JSON.stringify(data)})`},
                 ];
@@ -194,23 +185,14 @@
                     'Name': data.details['Name'],
                     'Category': data.details['Category'],
                     'Bank': data.bank,
-                    'Date': formatDate(data.date),
+                    'Date': data.date,
                     'Balance': data.details['Balance'],
                 },
             }
 
             if (data.details['Category'] === 'self') {
-                modalData.details['Account No'] = data.accountNo;
+                modalData.details['Account No'] = data.account_no;
                 modalData.details['Cheque Book Serial'] = data.chqbkSerialStart + ' - ' + data.chqbkSerialEnd;
-            }
-
-            // if (data.available_cheques.length == 0 && (currentUserRole == 'admin' || currentUserRole == 'developer' || currentUserRole == 'owner')) {
-            //     modalData.bottomActions = [
-            //         {id: 'update-cheque-book-serial', text: 'Update Serial', onclick: `generateUpdateChequeBookSerialModel(${JSON.stringify(data)})`},
-            //     ];
-            // }
-
-            if ((currentUserRole == 'admin' || currentUserRole == 'developer' || currentUserRole == 'owner')) {
                 modalData.bottomActions = [
                     {id: 'update-cheque-book-serial', text: 'Update Serial', onclick: `generateUpdateChequeBookSerialModel(${JSON.stringify(data)})`},
                 ];

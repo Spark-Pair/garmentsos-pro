@@ -18,34 +18,44 @@ class EmployeeController extends Controller
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         }
 
-        $employees = Employee::with('type')
-            ->whereHas('type', function ($query) {
-                $query->where('title', 'not like', '% | E%');
-            })
-            ->get();
-
         $authLayout = $this->getAuthLayout($request->route()->getName());
 
-        $all_types = collect()
-        ->merge(
-            Setup::where('type', 'staff_type')->get()->mapWithKeys(fn($type) => [
+        if ($request->ajax()) {
+            $employees = Employee::whereHas('type', function ($query) {
+                    $query->where('title', 'not like', '% | E%');
+                })->orderByDesc('id')
+                ->applyFilters($request);
+
+            return response()->json(['data' => $employees, 'authLayout' => $authLayout]);
+        }
+
+        // $employees = Employee::with('type')
+        //     ->whereHas('type', function ($query) {
+        //         $query->where('title', 'not like', '% | E%');
+        //     })
+        //     ->get();
+
+        $staff = Setup::where('type', 'staff_type')->get()
+            ->mapWithKeys(fn ($type) => [
                 $type->id => [
                     'text' => $type->title,
                     'category' => 'staff',
-                ]
+                ],
             ])
-        )
-        ->merge(
-            Setup::where('type', 'worker_type')->get()->mapWithKeys(fn($type) => [
+            ->all();
+
+        $worker = Setup::where('type', 'worker_type')->get()
+            ->mapWithKeys(fn ($type) => [
                 $type->id => [
                     'text' => $type->title,
                     'category' => 'worker',
-                ]
+                ],
             ])
-        )
-        ->toArray();
+            ->all();
 
-        return view("employees.index", compact('employees', 'authLayout', 'all_types'));
+        $all_types = $staff + $worker;
+
+        return view("employees.index", compact('authLayout', 'all_types'));
     }
 
     /**

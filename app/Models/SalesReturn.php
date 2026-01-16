@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Traits\Filterable;
+use App\Traits\SalesReturnComputed;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class SalesReturn extends Model
 {
     use HasFactory;
+
+    use Filterable, SalesReturnComputed;
 
     protected $fillable = [
         'article_id',

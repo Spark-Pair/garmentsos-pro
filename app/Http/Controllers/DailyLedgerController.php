@@ -13,40 +13,40 @@ class DailyLedgerController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $totalDeposit = DailyLedgerDeposit::all()->map(fn($d) => [
-                'date' => $d->date ?? null,
-                'description' => ucfirst($d->method) . ' | ' . ($d->reff_no ?? '-'),
-                'deposit' => $d->amount,
-                'use' => 0,
-                'created_at' => $d->created_at ?? null,
-            ]);
+        if ($request->ajax()) {
+            $totalDeposit = DailyLedgerDeposit::orderByDesc('date')->applyFilters($request, false)->get()->map->toFormattedArray();
+            $totalUse = DailyLedgerUse::orderByDesc('date')->applyFilters($request, false)->get()->map->toFormattedArray();
 
-        $totalUse = DailyLedgerUse::all()->map(fn($u) => [
-                'date' => $u->date ?? null,
-                'description' => ucfirst($u->case) . ' | ' . ($u->remarks ?? '-'),
-                'deposit' => 0,
-                'use' => $u->amount,
-                'created_at' => $u->created_at ?? null,
-            ]);
+            $dailyLedgers = $totalDeposit
+                ->merge($totalUse)
+                ->sort(function ($a, $b) {
 
-        $dailyLedgers = $totalDeposit->merge($totalUse)
-            ->sort(function ($a, $b) {
-                $aDate = $a['date'] ?? '1970-01-01';
-                $bDate = $b['date'] ?? '1970-01-01';
-                $dateCompare = strcmp($aDate, $bDate); // ascending (oldest first)
+                    $aDate = $a['date'] ?? '1970-01-01';
+                    $bDate = $b['date'] ?? '1970-01-01';
 
-                if ($dateCompare === 0) {
-                    $aCreated = $a['created_at'] ?? '1970-01-01 00:00:00';
-                    $bCreated = $b['created_at'] ?? '1970-01-01 00:00:00';
-                    return strtotime($aCreated) <=> strtotime($bCreated); // oldest created_at first
-                }
+                    if ($aDate === $bDate) {
+                        return strtotime($a['created_at']) <=> strtotime($b['created_at']);
+                    }
 
-                return $dateCompare;
-            })->values();
+                    return strcmp($aDate, $bDate);
+                })
+                ->values();
 
-        return view('daily-ledger.index', compact('dailyLedgers'));
+            $balance = 0;
+
+            $dailyLedgers = $dailyLedgers->reverse()->map(function ($row) use (&$balance) {
+                $balance += $row['deposit'];
+                $balance -= $row['use'];
+                $row['balance'] = $balance;
+                return $row;
+            })->reverse()->values(); // reverse again to restore original order
+
+            return response()->json(['data' => $dailyLedgers, 'authLayout' => 'table']);
+        }
+
+        return view('daily-ledger.index');
     }
 
     /**

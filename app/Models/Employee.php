@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Traits\EmployeeComputed;
+use App\Traits\Filterable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Employee extends Model
 {
     use HasFactory;
+
+    use Filterable, EmployeeComputed;
 
     protected $hidden = [
         'created_at',

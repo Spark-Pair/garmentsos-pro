@@ -16,11 +16,18 @@ class CRController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $crs = CR::with('voucher.supplier')->orderBy('id', 'desc')->get()->makeHidden('creator');
+        // $crs = CR::with('voucher.supplier')->orderBy('id', 'desc')->get()->makeHidden('creator');
 
-        return view('cr.index', compact('crs'));
+        if ($request->ajax()) {
+            $crs = CR::orderByDesc('id')
+                ->applyFilters($request);
+
+            return response()->json(['data' => $crs, 'authLayout' => 'table']);
+        }
+
+        return view('cr.index');
     }
 
     /**

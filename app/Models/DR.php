@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Traits\DRComputed;
+use App\Traits\Filterable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class DR extends Model
 {
     use HasFactory;
+
+    use Filterable, DRComputed;
 
     protected $fillable = [
         'd_r_no',

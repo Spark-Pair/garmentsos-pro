@@ -17,11 +17,18 @@ class DRController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $drs = DR::with('customer.city')->orderBy('id', 'desc')->get();
+        // $drs = DR::with('customer.city')->orderBy('id', 'desc')->get();
 
-        return view('dr.index', compact('drs'));
+        if ($request->ajax()) {
+            $drs = DR::orderByDesc('id')
+                ->applyFilters($request);
+
+            return response()->json(['data' => $drs, 'authLayout' => 'table']);
+        }
+
+        return view('dr.index');
     }
 
     /**

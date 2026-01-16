@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Traits\Filterable;
+use App\Traits\UtilityAccountComputed;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class UtilityAccount extends Model
 {
     use HasFactory;
+
+    use Filterable, UtilityAccountComputed;
 
     protected $fillable = [
         'bill_type_id',

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\Filterable;
+use App\Traits\OrderComputed;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
@@ -10,6 +12,8 @@ use Illuminate\Support\Facades\Auth;
 class Order extends Model
 {
     use HasFactory;
+
+    use Filterable, OrderComputed;
 
     protected $hidden = [
         'created_at',
@@ -23,6 +27,10 @@ class Order extends Model
         'netAmount',
         'order_no',
         'status',
+    ];
+
+    protected $casts = [
+        'date' => 'date'
     ];
 
     protected static function booted()

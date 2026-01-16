@@ -19,15 +19,22 @@ class ProductionController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         if (!$this->checkRole(['developer', 'owner', 'manager', 'admin', 'accountant', 'guest', 'store_keeper'])) {
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         }
 
-        $productions = Production::with('article', 'work', 'worker')->orderby('id', 'desc')->get();
+        // $productions = Production::with('article', 'work', 'worker')->orderby('id', 'desc')->get();
 
-        return view('productions.index', compact('productions'));
+        if ($request->ajax()) {
+            $productions = Production::orderByDesc('id')
+                ->applyFilters($request);
+
+            return response()->json(['data' => $productions, 'authLayout' => 'table']);
+        }
+
+        return view('productions.index');
     }
 
     /**

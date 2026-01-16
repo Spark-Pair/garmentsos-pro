@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\Filterable;
+use App\Traits\ShipmentComputed;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
@@ -10,6 +12,8 @@ use Illuminate\Support\Facades\Auth;
 class Shipment extends Model
 {
     use HasFactory;
+
+    use Filterable, ShipmentComputed;
 
     protected $hidden = [
         'created_at',

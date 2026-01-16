@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\CargoComputed;
+use App\Traits\Filterable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
@@ -11,11 +13,13 @@ class Cargo extends Model
 {
     use HasFactory;
 
+    use Filterable, CargoComputed;
+
     protected $hidden = [
         'created_at',
         'updated_at',
     ];
-    
+
     protected $fillable = [
         "cargo_no",
         "date",
@@ -46,19 +50,19 @@ class Cargo extends Model
     {
         return $this->belongsTo(User::class, 'creator_id', 'id');
     }
-    
+
     protected $appends = ['invoices'];
     public function getInvoicesAttribute()
     {
         $RawInvoices = json_decode($this->invoices_array, true);
 
         if (!is_array($RawInvoices)) return [];
-    
+
         $invoices = [];
 
         foreach ($RawInvoices as $RawInvoice) {
             $invoice = Invoice::with('customer.city')->where('id', $RawInvoice['id'])->first();
-    
+
             if ($invoice) {
                 $invoices[] = $invoice;
             }

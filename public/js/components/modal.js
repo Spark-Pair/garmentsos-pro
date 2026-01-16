@@ -17,7 +17,7 @@ function createModal(data, animate = 'animate') {
     let modalWrapper = ''
     modalWrapper = document.createElement('div');
     modalWrapper.id = `${data.id}-wrapper`;
-    modalWrapper.className = `fixed inset-0 z-50 text-sm flex items-center justify-center bg-[var(--overlay-color)] ${animate == 'animate' ? 'fade-in' : ''} `;
+    modalWrapper.className = `fixed inset-0 z-[999] text-sm flex items-center justify-center bg-[var(--overlay-color)] ${animate == 'animate' ? 'fade-in' : ''} `;
 
     let clutter = `
         <form id="${data.id}" method="${data.method ?? 'POST'}" action="${data.action}" enctype="multipart/form-data" class="w-full h-full flex flex-col space-y-4 relative items-center justify-center ${animate == 'animate' ? 'scale-in' : ''} ${data.class}">
@@ -591,7 +591,7 @@ function createModal(data, animate = 'animate') {
                                     <div class="td text-sm font-semibold ">
                                         ${article.article_no}
                                     </div>
-                                    <div class="td text-sm font-semibold col-span-2 text-nowrap overflow-hidden mr-3">
+                                    <div class="td text-sm font-semibold col-span-2 text-nowrap overflow-hidden mr-3 capitalize">
                                         ${orderedArticle.description}
                                     </div>
                                     ${data.preview.type == 'invoice'

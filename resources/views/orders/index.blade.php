@@ -8,14 +8,14 @@
                 "type" => "text",
                 "placeholder" => "Enter order no",
                 "oninput" => "runDynamicFilter()",
-                "dataFilterPath" => "name",
+                "dataFilterPath" => "order_no",
             ],
             "Customer Name" => [
                 "id" => "customer_name",
                 "type" => "text",
                 "placeholder" => "Enter customer name",
                 "oninput" => "runDynamicFilter()",
-                "dataFilterPath" => "details.Customer",
+                "dataFilterPath" => "customer_name",
             ],
             'Status' => [
                 'id' => 'status',
@@ -33,7 +33,7 @@
                 "id2" => "date_range_end",
                 "type2" => "date",
                 "oninput" => "runDynamicFilter()",
-                "dataFilterPath" => "data.date",
+                "dataFilterPath" => "date",
             ]
         ];
     @endphp
@@ -48,36 +48,27 @@
             class="show-box mx-auto w-[80%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
             <x-form-title-bar printBtn title="Show Orders" changeLayoutBtn layout="{{ $authLayout }}" resetSortBtn />
 
-            @if (count($orders) > 0)
-                <div class="absolute bottom-3 right-3 flex items-center gap-2 w-fll z-50">
-                    <x-section-navigation-button link="{{ route('orders.create') }}" title="Add New Order" icon="fa-plus" />
-                </div>
+            <div class="absolute bottom-3 right-3 flex items-center gap-2 w-fll z-50">
+                <x-section-navigation-button link="{{ route('orders.create') }}" title="Add New Order" icon="fa-plus" />
+            </div>
 
-                <div class="details h-full z-40">
-                    <div class="container-parent h-full">
-                        <div class="card_container px-3 h-full flex flex-col">
-                            <div id="table-head" class="grid grid-cols-4 bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4">
-                                <div class="text-center cursor-pointer" onclick="sortByThis(this)">Order No.</div>
-                                <div class="text-center cursor-pointer" onclick="sortByThis(this)">Customer</div>
-                                <div class="text-center cursor-pointer" onclick="sortByThis(this)">Date</div>
-                                <div class="text-center cursor-pointer" onclick="sortByThis(this)">Status</div>
-                            </div>
-                            <p id="noItemsError" style="display: none" class="text-sm text-[var(--border-error)] mt-3">No items found</p>
-                            <div class="overflow-y-auto grow my-scrollbar-2">
-                                <div class="search_container grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 grow">
-                                </div>
+            <div class="details h-full z-40">
+                <div class="container-parent h-full">
+                    <div class="card_container px-3 h-full flex flex-col">
+                        <div id="table-head" class="grid grid-cols-4 bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4">
+                            <div class="text-center cursor-pointer" onclick="sortByThis(this)">Order No.</div>
+                            <div class="text-center cursor-pointer" onclick="sortByThis(this)">Customer</div>
+                            <div class="text-center cursor-pointer" onclick="sortByThis(this)">Date</div>
+                            <div class="text-center cursor-pointer" onclick="sortByThis(this)">Status</div>
+                        </div>
+                        <p id="noItemsError" style="display: none" class="text-sm text-[var(--border-error)] mt-3">No items found</p>
+                        <div class="overflow-y-auto grow my-scrollbar-2">
+                            <div class="search_container grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 grow">
                             </div>
                         </div>
                     </div>
                 </div>
-            @else
-                <div class="no-records-message w-full h-full flex flex-col items-center justify-center gap-2">
-                    <h1 class="text-sm text-[var(--secondary-text)] capitalize">No Order Found</h1>
-                    <a href="{{ route('orders.create') }}"
-                        class="text-sm bg-[var(--primary-color)] text-[var(--text-color)] px-4 py-2 rounded-md hover:bg-[var(--h-primary-color)] hover:scale-105 hover:mb-2 transition-all duration-300 ease-in-out font-semibold">Add
-                        New</a>
-                </div>
-            @endif
+            </div>
         </div>
     </section>
 
@@ -94,26 +85,26 @@
                 <span class="text-center">${data.name}</span>
                 <span class="text-center">${data.details["Customer"]}</span>
                 <span class="text-center">${data.details['Date']}</span>
-                <span class="text-center capitalize">${data.status.replace('_', ' ')}</span>
+                <span class="text-center capitalize">${data.status}</span>
             </div>`;
         }
 
-        const fetchedData = @json($orders);
-        let allDataArray = fetchedData.map(item => {
-            return {
-                id: item.id,
-                name: item.order_no,
-                details: {
-                    'Customer': item.customer.customer_name + ' | ' + item.customer.city.title,
-                    'Date': formatDate(item.date),
-                },
-                status: item.status,
-                data: item,
-                oncontextmenu: "generateContextMenu(event)",
-                onclick: "generateModal(this)",
-                visible: true,
-            };
-        });
+        // const fetchedData = [];
+        // let allDataArray = fetchedData.map(item => {
+        //     return {
+        //         id: item.id,
+        //         name: item.order_no,
+        //         details: {
+        //             'Customer': item.customer.customer_name + ' | ' + item.customer.city.title,
+        //             'Date': formatDate(item.date),
+        //         },
+        //         status: item.status,
+        //         data: item,
+        //         oncontextmenu: "generateContextMenu(event)",
+        //         onclick: "generateModal(this)",
+        //         visible: true,
+        //     };
+        // });
 
         function printOrder(elem) {
             closeAllDropdowns();

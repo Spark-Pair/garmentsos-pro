@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\BankAccountComputed;
+use App\Traits\Filterable;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +13,8 @@ use Illuminate\Support\Facades\Auth;
 class BankAccount extends Model
 {
     use HasFactory;
+
+    use Filterable, BankAccountComputed;
 
     protected $fillable = ['category', 'sub_category', 'bank_id', 'account_title', 'date', 'remarks', 'account_no', 'chqbk_serial_start', 'chqbk_serial_end', 'status'];
 

@@ -2,22 +2,22 @@
 
 namespace App\Traits;
 
+use App\Models\Invoice;
 use App\Models\SupplierPayment;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 
-trait VoucherComputed
+trait ShipmentComputed
 {
     public function toFormattedArray()
     {
         return [
             'id' => $this->id,
-            'name' => $this->voucher_no,
+            'name' => $this->shipment_no,
             'details' => [
-                'Supplier' => $this->supplier ? $this->supplier->supplier_name : app('client_company')->name,
+                'Amount' => $this->netAmount,
                 'Date' => $this->date->format('d-M-Y, D'),
-                'Amount' => $this->payments->sum('amount'),
             ],
-            'total_payment' => $this->payments->sum('amount'),
+            'isInvoiceHas' => $this->invoices()->exists(),
             'data' => $this,
             'oncontextmenu' => "generateContextMenu(event)",
             'onclick' => "generateModal(this)",
@@ -27,20 +27,10 @@ trait VoucherComputed
     public function scopeApplyModelFilters($query, $key, $value)
     {
         switch ($key) {
-            case 'supplier_name':
-                return $query->where(function ($query) use ($value) {
-
-                    // Case 1: supplier exists → supplier_name
-                    $query->whereHas('supplier', function ($q) use ($value) {
-                        $q->where('supplier_name', 'like', "%{$value}%");
-                    })
-
-                    // Case 2: supplier does NOT exist → fallback to client_company name
-                    ->orWhere(function ($q) use ($value) {
-                        $q->whereDoesntHave('supplier')
-                        ->where(app('client_company')->name, 'like', "%{$value}%");
-                    });
-
+            case 'customer_name':
+                return $query->whereHas('customer', function ($q) use ($value) {
+                    $q->where('customer_name', 'like', "%$value%")
+                    ->orWhereHas('city', fn($sq) => $sq->where('title', 'like', "%$value%"));
                 });
 
             case 'date':

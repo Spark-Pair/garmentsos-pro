@@ -71,6 +71,8 @@ trait PaymentProgramComputed
                     });
                 });
 
+            case 'status':
+                return $query->where('status', $value);
 
             case 'date':
                 $start = $value['start'] ?? null;

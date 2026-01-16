@@ -5,20 +5,21 @@ namespace App\Traits;
 use App\Models\SupplierPayment;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 
-trait VoucherComputed
+trait EmployeePaymentComputed
 {
     public function toFormattedArray()
     {
         return [
             'id' => $this->id,
-            'name' => $this->voucher_no,
+            'name' => ucwords($this->employee->employee_name) . ' | ' . explode('|', $this->employee->type->title)[0],
             'details' => [
-                'Supplier' => $this->supplier ? $this->supplier->supplier_name : app('client_company')->name,
+                'Category'=> ucwords($this->employee->category),
+                'Method'=> $this->method,
                 'Date' => $this->date->format('d-M-Y, D'),
-                'Amount' => $this->payments->sum('amount'),
+                'Amount'=> number_format($this->amount),
             ],
-            'total_payment' => $this->payments->sum('amount'),
-            'data' => $this,
+            'date' => $this->date->format('d-M-Y, D'),
+            'type' => $this->employee->type->title,
             'oncontextmenu' => "generateContextMenu(event)",
             'onclick' => "generateModal(this)",
         ];
@@ -27,20 +28,19 @@ trait VoucherComputed
     public function scopeApplyModelFilters($query, $key, $value)
     {
         switch ($key) {
-            case 'supplier_name':
-                return $query->where(function ($query) use ($value) {
+            case 'employee_name':
+                return $query->whereHas('employee', function ($q) use ($value) {
+                    $q->where('employee_name', 'like', "%$value%");
+                });
 
-                    // Case 1: supplier exists → supplier_name
-                    $query->whereHas('supplier', function ($q) use ($value) {
-                        $q->where('supplier_name', 'like', "%{$value}%");
-                    })
+            case 'category':
+                return $query->whereHas('employee', function ($q) use ($value) {
+                    $q->where('category', $value);
+                });
 
-                    // Case 2: supplier does NOT exist → fallback to client_company name
-                    ->orWhere(function ($q) use ($value) {
-                        $q->whereDoesntHave('supplier')
-                        ->where(app('client_company')->name, 'like', "%{$value}%");
-                    });
-
+            case 'type':
+                return $query->whereHas('employee', function ($q) use ($value) {
+                    $q->where('type_id', $value);
                 });
 
             case 'date':

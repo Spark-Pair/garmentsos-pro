@@ -48,9 +48,9 @@
                 'id' => 'status',
                 'type' => 'select',
                 'options' => [
-                    'paid' => ['text' => 'Paid'],
-                    'unpaid' => ['text' => 'Unpaid', 'selected' => true],
-                    'overpaid' => ['text' => 'Overpaid'],
+                    'Paid' => ['text' => 'Paid'],
+                    'Unpaid' => ['text' => 'Unpaid', 'selected' => true],
+                    'Overpaid' => ['text' => 'Overpaid'],
                 ],
                 'onchange' => 'runDynamicFilter()',
                 'dataFilterPath' => 'status',
@@ -313,7 +313,7 @@
                         category: 'input',
                         label: 'Date',
                         id: 'date',
-                        value: formatDate(item.date),
+                        value: item.date,
                         disabled: true,
                     },
                     {

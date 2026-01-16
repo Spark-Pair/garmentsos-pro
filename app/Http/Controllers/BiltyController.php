@@ -11,11 +11,18 @@ class BiltyController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $bilties = Bilty::with('invoice.customer.city')->get();
+        // $bilties = Bilty::with('invoice.customer.city')->get();
 
-        return view('bilties.show', compact('bilties'));
+        if ($request->ajax()) {
+            $orders = Bilty::with('invoice.customer.city')->orderByDesc('id')
+                ->applyFilters($request);
+
+            return response()->json(['data' => $orders, 'authLayout' => 'table']);
+        }
+
+        return view('bilties.show');
     }
 
     /**
@@ -36,9 +43,9 @@ class BiltyController extends Controller
     public function store(Request $request)
     {
         $data = $request->all();
-        
+
         $invoicesArray = json_decode($data['invoices_array'], true);
-        
+
         // Validate that all invoices have biltyNo
         foreach ($invoicesArray as $invoice) {
             if (!isset($invoice['biltyNo'])) {

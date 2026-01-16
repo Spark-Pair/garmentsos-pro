@@ -25,18 +25,25 @@ class ShipmentController extends Controller
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         }
 
-        $shipments = Shipment::with('articles.article')->get();
-
-        if ($shipments->isNotEmpty()) {
-            foreach ($shipments as $shipment) {
-                // Invoice exist check
-                $shipment->isInvoiceHas = Invoice::where('shipment_no', $shipment->shipment_no)->exists();
-            }
-        }
-
         $authLayout = $this->getAuthLayout($request->route()->getName());
 
-        return view('shipments.index', compact('shipments', 'authLayout'));
+        if ($request->ajax()) {
+            $shipments = Shipment::with( 'articles.article')->orderByDesc('id')
+                ->applyFilters($request);
+
+            return response()->json(['data' => $shipments, 'authLayout' => $authLayout]);
+        }
+
+        // $shipments = Shipment::with('articles.article')->get();
+
+        // if ($shipments->isNotEmpty()) {
+        //     foreach ($shipments as $shipment) {
+        //         // Invoice exist check
+        //         $shipment->isInvoiceHas = Invoice::where('shipment_no', $shipment->shipment_no)->exists();
+        //     }
+        // }
+
+        return view('shipments.index', compact( 'authLayout'));
     }
 
     /**

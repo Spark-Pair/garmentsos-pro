@@ -367,7 +367,7 @@ class Controller extends BaseController
             ->whereHas('user', function ($query) {
                 $query->where('status', 'active');
             })
-            ->when(strtolower($shipment->city) === 'karachi', function ($query) {
+            ->when(strtolower(string: $shipment->city) === 'karachi', function ($query) {
                 $query->whereHas('city', function ($q) {
                     $q->where('title', 'Karachi');
                 });

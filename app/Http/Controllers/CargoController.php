@@ -14,10 +14,17 @@ class CargoController extends Controller
      */
     public function index(Request $request)
     {
-        $cargos = Cargo::all();
-
         $authLayout = $this->getAuthLayout($request->route()->getName());
-        return view('cargos.index', compact('authLayout', 'cargos'));
+
+        if ($request->ajax()) {
+            $orders = Cargo::orderByDesc('id')
+                ->applyFilters($request);
+
+            return response()->json(['data' => $orders, 'authLayout' => $authLayout]);
+        }
+
+        // $cargos = Cargo::all();
+        return view('cargos.index', compact('authLayout'));
     }
 
     /**
@@ -34,7 +41,7 @@ class CargoController extends Controller
             $last_cargo = new Cargo();
             $last_cargo->cargo_no = '0000';
         }
-        
+
         return view('cargos.generate', compact('invoices', 'last_cargo'));
     }
 

@@ -11,16 +11,23 @@ class UtilityBillController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         if(!$this->checkRole(['developer', 'owner', 'admin', 'accountant', 'store_keeper']))
         {
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         };
 
-        $utilityBills = UtilityBill::with('account.billType', 'account.location')->get();
+        // $utilityBills = UtilityBill::with('account.billType', 'account.location')->get();
 
-        return view('utility-bills.index', compact('utilityBills'));
+        if ($request->ajax()) {
+            $utilityBills = UtilityBill::orderByDesc('id')
+                ->applyFilters($request);
+
+            return response()->json(['data' => $utilityBills, 'authLayout' => 'table']);
+        }
+
+        return view('utility-bills.index');
     }
 
     /**

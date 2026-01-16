@@ -383,6 +383,7 @@
 
             function generateModal(data, animate='animate', fieldsHtml=null) {
                 let tableBody = [];
+                console.log(data);
 
                 tableBody = generateTableBody(data);
 
@@ -426,7 +427,7 @@
                 }
 
                 createModal(modalData, animate);
-                setSearchDebounce();
+                // setSearchDebounce();
             }
 
             function generateTableBody(data) {

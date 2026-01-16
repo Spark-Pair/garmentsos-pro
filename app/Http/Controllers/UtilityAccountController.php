@@ -11,16 +11,23 @@ class UtilityAccountController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         if(!$this->checkRole(['developer', 'owner', 'admin', 'accountant', 'store_keeper']))
         {
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         };
 
-        $utilityAccounts = UtilityAccount::with('billType', 'location')->get();
+        // $utilityAccounts = UtilityAccount::with('billType', 'location')->get();
 
-        return view('utility-accounts.index', compact('utilityAccounts'));
+        if ($request->ajax()) {
+            $utilityAccounts = UtilityAccount::orderByDesc('id')
+                ->applyFilters($request);
+
+            return response()->json(['data' => $utilityAccounts, 'authLayout' => 'table']);
+        }
+
+        return view('utility-accounts.index');
     }
 
     /**

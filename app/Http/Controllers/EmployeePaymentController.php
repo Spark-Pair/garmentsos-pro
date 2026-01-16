@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\EmployeePayment;
+use App\Models\Setup;
 use Illuminate\Http\Request;
 
 class EmployeePaymentController extends Controller
@@ -16,11 +17,38 @@ class EmployeePaymentController extends Controller
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         }
 
-        $payments = EmployeePayment::with('employee.type')->get();
+        // $payments = EmployeePayment::with('employee.type')->get();
 
         $authLayout = $this->getAuthLayout($request->route()->getName());
 
-        return view('employee-payments.index', compact('payments', 'authLayout'));
+        if ($request->ajax()) {
+            $payments = EmployeePayment::orderByDesc('id')
+                ->applyFilters($request);
+
+            return response()->json(['data' => $payments, 'authLayout' => $authLayout]);
+        }
+
+        $staff = Setup::where('type', 'staff_type')->get()
+            ->mapWithKeys(fn ($type) => [
+                $type->id => [
+                    'text' => $type->title,
+                    'category' => 'staff',
+                ],
+            ])
+            ->all();
+
+        $worker = Setup::where('type', 'worker_type')->get()
+            ->mapWithKeys(fn ($type) => [
+                $type->id => [
+                    'text' => $type->title,
+                    'category' => 'worker',
+                ],
+            ])
+            ->all();
+
+        $all_types = $staff + $worker;
+
+        return view('employee-payments.index', compact('all_types', 'authLayout'));
     }
 
     /**

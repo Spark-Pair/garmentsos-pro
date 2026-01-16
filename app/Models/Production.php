@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\Filterable;
+use App\Traits\ProductionComputed;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
@@ -9,6 +11,8 @@ use Illuminate\Support\Facades\Auth;
 class Production extends Model
 {
     use HasFactory;
+
+    use Filterable, ProductionComputed;
 
     protected $fillable = [
         'issue_date',

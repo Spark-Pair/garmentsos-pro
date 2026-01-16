@@ -24,52 +24,59 @@ class OrderController extends Controller
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         };
 
-        $orders = Order::with('customer.city', 'articles.article')->get();
-
-        // Collect all article IDs from ordered articles
-        $articleIds = $orders->flatMap(function ($order) {
-            return collect(json_decode($order->articles, true))->pluck('id');
-        })->unique();
-
-        // Fetch all required articles in a single query
-        $articles = Article::whereIn('id', $articleIds)->get()->keyBy('id');
-
-        $orders = $orders->transform(function ($order) use ($articles) {
-            // Step 1: Decode and normalize articles to indexed array
-            $orderedArticlesRaw = json_decode($order->articles, true) ?? [];
-            $orderedArticlesArray = array_values($orderedArticlesRaw); // Normalize to indexed array
-
-            // Step 2: Map through each ordered article
-            $orderedArticles = collect($orderedArticlesArray)->map(function ($orderedArticle) use ($articles) {
-                if (isset($articles[$orderedArticle['id']])) {
-                    $orderedArticle['article'] = $articles[$orderedArticle['id']];
-                }
-
-                $orderedArticle['ordered_pcs'] = max(0, $orderedArticle['ordered_pcs'] - ($orderedArticle['invoice_quantity'] ?? 0));
-
-                return $orderedArticle;
-            })->filter(function ($orderedArticle) {
-                return $orderedArticle['ordered_pcs'] > 0;
-            })->values(); // 👈 ensures final collection is indexed (not associative)
-
-            // Step 3: Put it back into the order
-            $order['articles'] = $orderedArticles;
-
-            return $order;
-        })
-        ->filter(function ($order) {
-            return $order['articles']->isNotEmpty();
-        })
-        ->values();
-
-        foreach ($orders as $key => $order) {
-            $order['previous_balance'] = $order->customer->calculateBalance(null, $order->date, false, false);
-            $order['current_balance'] = $order['previous_balance'] + $order['netAmount'];
-        }
-
         $authLayout = $this->getAuthLayout($request->route()->getName());
 
-        return view('orders.index', compact('orders', 'authLayout'));
+        if ($request->ajax()) {
+            $orders = Order::with('customer.city', 'articles.article')->orderByDesc('id')
+                ->applyFilters($request);
+
+            return response()->json(['data' => $orders, 'authLayout' => $authLayout]);
+        }
+
+        // $orders = Order::with('customer.city', 'articles.article')->get();
+
+        // // Collect all article IDs from ordered articles
+        // $articleIds = $orders->flatMap(function ($order) {
+        //     return collect(json_decode($order->articles, true))->pluck('id');
+        // })->unique();
+
+        // // Fetch all required articles in a single query
+        // $articles = Article::whereIn('id', $articleIds)->get()->keyBy('id');
+
+        // $orders = $orders->transform(function ($order) use ($articles) {
+        //     // Step 1: Decode and normalize articles to indexed array
+        //     $orderedArticlesRaw = json_decode($order->articles, true) ?? [];
+        //     $orderedArticlesArray = array_values($orderedArticlesRaw); // Normalize to indexed array
+
+        //     // Step 2: Map through each ordered article
+        //     $orderedArticles = collect($orderedArticlesArray)->map(function ($orderedArticle) use ($articles) {
+        //         if (isset($articles[$orderedArticle['id']])) {
+        //             $orderedArticle['article'] = $articles[$orderedArticle['id']];
+        //         }
+
+        //         $orderedArticle['ordered_pcs'] = max(0, $orderedArticle['ordered_pcs'] - ($orderedArticle['invoice_quantity'] ?? 0));
+
+        //         return $orderedArticle;
+        //     })->filter(function ($orderedArticle) {
+        //         return $orderedArticle['ordered_pcs'] > 0;
+        //     })->values(); // 👈 ensures final collection is indexed (not associative)
+
+        //     // Step 3: Put it back into the order
+        //     $order['articles'] = $orderedArticles;
+
+        //     return $order;
+        // })
+        // ->filter(function ($order) {
+        //     return $order['articles']->isNotEmpty();
+        // })
+        // ->values();
+
+        // foreach ($orders as $key => $order) {
+        //     $order['previous_balance'] = $order->customer->calculateBalance(null, $order->date, false, false);
+        //     $order['current_balance'] = $order['previous_balance'] + $order['netAmount'];
+        // }
+
+        return view('orders.index', compact( 'authLayout'));
         // return $orders;
     }
 

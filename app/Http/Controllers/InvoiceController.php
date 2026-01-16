@@ -26,7 +26,16 @@ class InvoiceController extends Controller
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         };
 
-        $invoices = Invoice::with(['order.articles.article', 'shipment.articles.article', 'customer.city'])->orderBy('id', 'desc')->get();
+        $authLayout = $this->getAuthLayout($request->route()->getName());
+
+        if ($request->ajax()) {
+            $invoices = Invoice::with(['order.articles.article', 'shipment.articles.article', 'customer.city'])->orderByDesc('id')
+                ->applyFilters($request);
+
+            return response()->json(['data' => $invoices, 'authLayout' => $authLayout]);
+        }
+
+        // $invoices = Invoice::with(['order.articles.article', 'shipment.articles.article', 'customer.city'])->orderBy('id', 'desc')->get();
 
         // foreach ($invoices as $invoice) {
         //     $articles = [];
@@ -43,10 +52,8 @@ class InvoiceController extends Controller
         //     $invoice['articles'] = $articles;
         // }
 
-        $authLayout = $this->getAuthLayout($request->route()->getName());
-
         // return $invoices;
-        return view('invoices.index', compact('invoices', 'authLayout'));
+        return view('invoices.index', compact('authLayout'));
     }
 
     /**

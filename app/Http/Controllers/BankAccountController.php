@@ -22,11 +22,25 @@ class BankAccountController extends Controller
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         };
 
-        $bankAccounts = BankAccount::with('subCategory', 'bank')->orderBy('id', 'desc')->get();
+        // $bankAccounts = BankAccount::with('subCategory', 'bank')->orderBy('id', 'desc')->get();
 
         $authLayout = $this->getAuthLayout($request->route()->getName());
 
-        return view("bank-accounts.index", compact("bankAccounts", "authLayout"));
+        if ($request->ajax()) {
+            $bankAccounts = BankAccount::orderByDesc('id')
+                ->applyFilters($request);
+
+            return response()->json(['data' => $bankAccounts, 'authLayout' => $authLayout]);
+        }
+
+        $bank_options = Setup::where('type', 'bank_name')
+            ->get()
+            ->mapWithKeys(fn ($item) => [
+                $item->id => ['text' => $item->title]
+            ])
+            ->toArray();
+
+        return view("bank-accounts.index", compact('bank_options', "authLayout"));
     }
 
     /**
