@@ -104,7 +104,8 @@ Route::group(['middleware' => ['auth', 'activeSession', 'subscriptionExpiry']], 
 
     Route::resource('supplier-payments', SupplierPaymentController::class);
 
-    Route::get('payment-programs/summary', [PaymentProgramController::class, 'summary'])->name('payment-programs.summary');
+    Route::get('payment-programs/customer-summary', [PaymentProgramController::class, 'CustomerSummary'])->name('payment-programs.customer-summary');
+    Route::get('payment-programs/supplier-summary', [PaymentProgramController::class, 'SupplierSummary'])->name('payment-programs.supplier-summary');
     Route::resource('payment-programs', PaymentProgramController::class);
     Route::post('payment-programs.get-summary', [PaymentProgramController::class, 'getSummary'])->name('payment-programs.get-summary');
     Route::post('payment-programs.update-program', [PaymentProgramController::class, 'updateProgram'])->name('payment-programs.update-program');

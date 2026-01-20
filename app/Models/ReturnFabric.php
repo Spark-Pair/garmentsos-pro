@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Traits\Filterable;
+use App\Traits\ReturnFabricComputed;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ReturnFabric extends Model
 {
     use HasFactory;
+
+    use Filterable, ReturnFabricComputed;
 
     protected $fillable = [
         'worker_id',

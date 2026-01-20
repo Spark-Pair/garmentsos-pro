@@ -236,6 +236,10 @@
         function generateModal(item) {
             let data = JSON.parse(item.dataset.json);
 
+            console.log(data);
+
+            data.data.total_payment = data.total_payment;
+
             let modalData = {
                 id: 'modalForm',
                 preview: {type: 'voucher', data: data.data, document: 'Voucher'},

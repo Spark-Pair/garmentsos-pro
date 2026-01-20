@@ -274,57 +274,33 @@ class PaymentProgramController extends Controller
         return redirect()->route('payment-programs.index')->with('success', 'Program marked as paid successfully.');
     }
 
-    public function summary()
+    public function CustomerSummary(Request $request)
     {
         if (!$this->checkRole(['developer', 'owner', 'admin', 'accountant'])) {
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         }
 
-        // --- SUPPLIER DATA ---
-        $suppliers = Supplier::with('paymentPrograms')->get();
+        if ($request->ajax()) {
+            $customers = Customer::whereHas('paymentPrograms')->with('paymentPrograms')->applyFilters($request);
 
-        $supplierData = $suppliers->map(function ($supplier) {
-            $totalAmount = $supplier->paymentPrograms->sum('amount');
-            $totalPayment = $supplier->paymentPrograms->sum('payment');
-            $balance = $totalAmount - $totalPayment;
+            return response()->json(['data' => $customers, 'authLayout' => 'table']);
+        }
 
-            return [
-                'name' => $supplier->supplier_name ?? $supplier->name ?? 'Unnamed Supplier',
-                'total_amount' => $totalAmount,
-                'total_payment' => $totalPayment,
-                'balance' => $balance,
-                'category' => 'Supplier',
-            ];
-        })->filter(fn($item) => $item['balance'] != 0)->values();
+        return view('payment-programs.customerSummary');
+    }
 
+    public function SupplierSummary(Request $request)
+    {
+        if (!$this->checkRole(['developer', 'owner', 'admin', 'accountant'])) {
+            return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
+        }
 
-        // --- CUSTOMER DATA ---
-        $paymentPrograms = PaymentProgram::with('customer:id,customer_name,city_id', 'customer.city:id,title')
-            ->whereNotNull('customer_id')
-            ->get();
+        if ($request->ajax()) {
+            $suppliers = Supplier::whereHas('paymentPrograms')->with('paymentPrograms')->applyFilters($request);
 
-        $grouped = $paymentPrograms->groupBy('customer_id');
+            return response()->json(['data' => $suppliers, 'authLayout' => 'table']);
+        }
 
-        $customerData = $grouped->map(function ($items, $customerId) {
-            $customer = $items->first()->customer;
-            $totalAmount = $items->sum('amount');
-            $totalPayment = $items->sum('payment');
-            $balance = $totalAmount - $totalPayment;
-
-            return [
-                'name' => ($customer->customer_name ?? 'Unnamed Customer') .
-                        (!empty($customer->city?->title) ? ' | ' . $customer->city->title : ''),
-                'total_amount' => $totalAmount,
-                'total_payment' => $totalPayment,
-                'balance' => $balance,
-                'category' => 'Customer',
-            ];
-        })->filter(fn($item) => $item['balance'] != 0)->values();
-
-
-        // --- COMBINE BOTH ---
-        $data = $supplierData->merge($customerData)->values();
-
-        return view('payment-programs.summary', compact('data'));
+        return view('payment-programs.supplierSummary');
     }
 }

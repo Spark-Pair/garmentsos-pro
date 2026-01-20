@@ -26,6 +26,7 @@ trait CustomerComputed
             ],
             'city' => $this->city->title,
             'date' => $this->date,
+            'data' => $this,
             'profile'=> true,
             'oncontextmenu' => "generateContextMenu(event)",
             'onclick' => "generateModal(this)",

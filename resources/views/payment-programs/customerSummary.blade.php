@@ -1,36 +1,26 @@
 @extends('app')
-@section('title', 'Program Summary | ' . $client_company->name)
+@section('title', 'Program Summary (customer) | ' . $client_company->name)
 @section('content')
     @php
         $searchFields = [
-            'Category' => [
-                'id' => 'category',
-                'type' => 'select',
-                'options' => [
-                    'Supplier' => ['text' => 'Supplier'],
-                    'Customer' => ['text' => 'Customer', 'selected' => true],
-                ],
-                'onchange' => 'runDynamicFilter()',
-                'dataFilterPath' => 'category',
-            ],
             'Name' => [
-                'id' => 'name',
+                'id' => 'customer_name',
                 'type' => 'text',
-                'placeholder' => 'Enter name',
+                'placeholder' => 'Enter customer name',
                 'oninput' => 'runDynamicFilter()',
-                'dataFilterPath' => 'name',
+                'dataFilterPath' => 'customer_name',
             ],
         ];
     @endphp
     <div class="w-[80%] mx-auto">
-        <x-search-header heading="Program Summary" :search_fields=$searchFields />
+        <x-search-header heading="Program Summary (customer)" :search_fields=$searchFields />
     </div>
 
     <!-- Main Content -->
     <section class="text-center mx-auto">
         <div
             class="show-box mx-auto w-[80%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
-            <x-form-title-bar printBtn layout="table" title="Program Summary" resetSortBtn />
+            <x-form-title-bar printBtn layout="table" title="Program Summary (customer)" resetSortBtn />
 
             <div class="absolute bottom-0 right-0 flex items-center justify-between gap-2 w-fll z-50 p-3 w-full pointer-events-none">
                 <x-section-navigation-button direction="right" id="info" icon="fa-info" />
@@ -62,34 +52,31 @@
         let authLayout = 'table';
 
         function createRow(data) {
-            return `
-            <div id="${data.id}" class="item row relative group grid grid-cols-4 border-b border-[var(--h-bg-color)] items-center py-2 cursor-pointer hover:bg-[var(--h-secondary-bg-color)] transition-all fade-in ease-in-out">
-                <span>${(data.name)}</span>
-                <span>${(data.total_amount)}</span>
-                <span>${(data.total_payment)}</span>
-                <span>${(data.balance)}</span>
-            </div>`;
+            let total_amount = data.data.payment_programs.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+            let total_payment = data.data.payment_programs.reduce((sum, p) => sum + Number(p.payment || 0), 0);
+            let total_balance = data.data.payment_programs.reduce((sum, p) => sum + Number(p.balance || 0), 0);
+
+            if (total_balance !== 0) {
+                return `
+                <div id="${data.id}" class="item row relative group grid grid-cols-4 border-b border-[var(--h-bg-color)] items-center py-2 cursor-pointer hover:bg-[var(--h-secondary-bg-color)] transition-all fade-in ease-in-out">
+                    <span>${(data.name)}</span>
+                    <span>${total_amount}</span>
+                    <span>${total_payment}</span>
+                    <span>${total_balance}</span>
+                </div>`;
+            }
         }
 
-        const fetchedData = @json($data);
-        let allDataArray = fetchedData.map((item, index) => {
-            return {
-                id: index + 1,
-                name: item.name,
-                total_amount: item.total_amount > 0 ? formatNumbersWithDigits(item.total_amount, 1, 1) : '-',
-                total_payment: item.total_payment > 0 ? formatNumbersWithDigits(item.total_payment, 1, 1) : '-',
-                balance: item.balance > 0 ? formatNumbersWithDigits(item.balance, 1, 1) : '-',
-                category: item.category,
-                visible: true,
-            };
-        });
-
-
-        let infoDom = document.getElementById('info').querySelector('span');
-        infoDom.textContent = `Total Records: ${allDataArray.length}`;
-
-        function onFilter() {
-            infoDom.textContent = `Total Records: ${visibleData.length}`;
-        }
+        // const fetchedData = [];
+        // let allDataArray = fetchedData.map((item, index) => {
+        //     return {
+        //         id: index + 1,
+        //         name: item.name,
+        //         total_amount: item.total_amount > 0 ? formatNumbersWithDigits(item.total_amount, 1, 1) : '-',
+        //         total_payment: item.total_payment > 0 ? formatNumbersWithDigits(item.total_payment, 1, 1) : '-',
+        //         balance: item.balance > 0 ? formatNumbersWithDigits(item.balance, 1, 1) : '-',
+        //         visible: true,
+        //     };
+        // });
     </script>
 @endsection

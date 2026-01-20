@@ -946,6 +946,8 @@
                         order_no: orderNoDom.value
                     },
                     success: function (response) {
+
+                        console.log(response);
                         if (!response.error) {
                             orderedArticles = response.articles;
                             discount = response.discount ?? 0;

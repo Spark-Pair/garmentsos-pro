@@ -460,8 +460,6 @@ function createModal(data, animate = 'animate') {
 
             invoiceTableBody = `
                 ${previewData.payments.map((payment, index) => {
-                    console.log(payment);
-
                     const hrClass = index === 0 ? "mb-2.5" : "my-2.5";
                     return `
                     <div>
@@ -487,6 +485,8 @@ function createModal(data, animate = 'animate') {
             invoiceBottom = '';
 
             if (previewData.supplier) {
+                console.log(previewData);
+
                 invoiceBottom += `
                     <div class="total flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full">
                         <div class="text-nowrap">Previous Balance - Rs</div>
@@ -569,11 +569,13 @@ function createModal(data, animate = 'animate') {
                     ${articlesChunk.map((orderedArticle, index) => {
                         const article = orderedArticle.article;
                         const salesRate = article.sales_rate;
-                        const qty =
-                            orderedArticle.ordered_pcs ||
-                            orderedArticle.invoice_pcs ||
-                            orderedArticle.shipment_pcs;
-
+                        const qtyPriority = {
+                            order: ['ordered_pcs', 'dispatched_pcs', 'shipment_pcs'],
+                            default: ['dispatched_pcs', 'ordered_pcs', 'shipment_pcs'],
+                        };
+                        const qty = (qtyPriority[data.preview.type] || qtyPriority.default)
+                            .map(key => orderedArticle[key])
+                            .find(v => v !== null && v !== undefined) ?? 0;
                         const total = parseInt(salesRate) * qty;
                         const hrClass = index === 0 ? "mb-2.5" : "my-2.5";
 
@@ -1094,12 +1096,6 @@ document.addEventListener('click', (e) => {
         closeOpenedSubMenu();
     }
 })
-
-// function basicSearch(searchValue) {
-//     if (searchValue == '') return;
-
-//     console.log(searchValue, data.cards);
-// }
 
 function reRenderInfoInModal(specifier, value) {
     document.querySelector(specifier + ' .main-text').innerHTML = value;

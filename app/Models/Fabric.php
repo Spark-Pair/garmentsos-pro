@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use App\Traits\FabricComputed;
+use App\Traits\Filterable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Fabric extends Model
 {
     use HasFactory;
-    
+
+    use Filterable, FabricComputed;
+
     protected $fillable = [
         'date',
         'supplier_id',

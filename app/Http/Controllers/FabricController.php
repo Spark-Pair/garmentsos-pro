@@ -9,6 +9,7 @@ use App\Models\Production;
 use App\Models\ReturnFabric;
 use App\Models\Setup;
 use App\Models\Supplier;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class FabricController extends Controller
@@ -16,78 +17,54 @@ class FabricController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         if (!$this->checkRole(['developer', 'owner', 'manager', 'admin', 'accountant', 'guest', 'store_keeper'])) {
             return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         }
 
-        // Added fabric entries
-        $addedFabrics = Fabric::with('supplier', 'fabric')->get()->map(function ($fabric) {
-            return [
-                'id' => $fabric->id,
-                'type' => 'Recived',
-                'tag' => $fabric->tag,
-                'quantity' => $fabric->quantity,
-                'date' => $fabric->date, // Logical fabric addition date
-                'supplier_name' => $fabric->supplier->supplier_name,
-                'fabric' => $fabric->fabric->title,
-                'color' => $fabric->color,
-                'unit' => $fabric->unit,
-                'remarks' => $fabric->remarks,
-                'created_at' => $fabric->created_at,
-            ];
-        })->toArray();
+        if ($request->ajax()) {
+            // Added fabric entries
+            $addedFabrics = Fabric::orderByDesc('id')
+                ->applyFilters($request, false) // 👈 important
+                ->get()->map->toFormattedArray();
 
-        // Issued fabric entries
-        $issuedFabrics = IssuedFabric::with('worker')->get()->map(function ($issue) {
-            return [
-                'id' => $issue->id,
-                'type' => 'Issued',
-                'tag' => $issue->tag,
-                'quantity' => $issue->quantity,
-                'date' => $issue->date, // Logical fabric issue date
-                'employee_name' => $issue->worker->employee_name,
-                'remarks' => $issue->remarks,
-                'created_at' => $issue->created_at,
-            ];
-        })->toArray();
+            // Issued fabric entries
+            $issuedFabrics = IssuedFabric::orderByDesc('id')
+                ->applyFilters($request, false) // 👈 important
+                ->get()->map->toFormattedArray();
 
-        // Return fabric entries
-        $ReturnFabrics = ReturnFabric::with('worker')->get()->map(function ($return) {
-            return [
-                'id' => $return->id,
-                'type' => 'Return',
-                'tag' => $return->tag,
-                'quantity' => $return->quantity,
-                'date' => $return->date, // Logical fabric return date
-                'employee_name' => $return->worker->employee_name,
-                'remarks' => $return->remarks,
-                'created_at' => $return->created_at,
-            ];
-        })->toArray();
+            // Return fabric entries
+            $ReturnFabrics = ReturnFabric::orderByDesc('id')
+                ->applyFilters($request, false) // 👈 important
+                ->get()->map->toFormattedArray();
 
-        // Combine arrays manually
-        $finalData = array_merge($issuedFabrics, $ReturnFabrics, $addedFabrics);
+            // Combine arrays manually
+            $finalData = collect()
+                ->merge($issuedFabrics)
+                ->merge($ReturnFabrics)
+                ->merge($addedFabrics)
+                ->sortByDesc(function ($item) {
+                    $date = Carbon::parse($item['date'])->format('Y-m-d');
+                    $time = Carbon::parse($item['created_at'])->format('H:i:s');
 
-        // Sort the final combined array by date and then by created_at time (both descending)
-        usort($finalData, function ($a, $b) {
-            if ($a['date'] == $b['date']) {
-                return strtotime($b['created_at']) - strtotime($a['created_at']); // time DESC
-            }
-            return strtotime($b['date']) - strtotime($a['date']); // date DESC
-        });
+                    return Carbon::createFromFormat('Y-m-d H:i:s', "$date $time");
+                })
+                ->values();
+
+            return response()->json(['data' => $finalData, 'authLayout' => 'table']);
+        }
 
         $fabrics_options = [];
 
         $fabrics = Setup::where('type', 'fabric')->get();
         foreach ($fabrics as $fabric) {
-            $fabrics_options[$fabric->title] = ["text" => $fabric->title,];
+            $fabrics_options[$fabric->id] = ["text" => $fabric->title,];
         }
 
         // return $fabrics_options;
 
-        return view('fabrics.index', compact('finalData', 'fabrics_options'));
+        return view('fabrics.index', compact('fabrics_options'));
     }
 
     /**

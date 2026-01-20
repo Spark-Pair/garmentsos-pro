@@ -29,8 +29,17 @@ class InvoiceController extends Controller
         $authLayout = $this->getAuthLayout($request->route()->getName());
 
         if ($request->ajax()) {
-            $invoices = Invoice::with(['order.articles.article', 'shipment.articles.article', 'customer.city'])->orderByDesc('id')
-                ->applyFilters($request);
+            $invoices = Invoice::with([
+                'order.articles' => function ($query) {
+                    $query->where('dispatched_pcs', '>', 0);
+                },
+                'order.articles.article',
+                'shipment.articles.article',
+                'customer.city'
+            ])
+            ->orderByDesc('id')
+            ->applyFilters($request);
+
 
             return response()->json(['data' => $invoices, 'authLayout' => $authLayout]);
         }

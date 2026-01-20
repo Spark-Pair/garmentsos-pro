@@ -415,7 +415,8 @@
                     active: false,
                 },
                 subMenu: [
-                    {name: 'Program Summary', href: "/payment-programs/summary"},
+                    {name: 'Summary (customer)', href: "/payment-programs/customer-summary"},
+                    {name: 'Summary (supplier)', href: "/payment-programs/supplier-summary"},
                     {name: 'Show Programs', href: "/payment-programs"},
                     {name: 'Add Program', href: "/payment-programs/create"},
                 ]

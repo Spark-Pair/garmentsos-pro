@@ -147,72 +147,73 @@ class Controller extends BaseController
             return response()->json(["error" => $validator->errors()->first()]);
         }
 
-        $order = Order::with('customer.city', 'articles.article')->where("order_no", $request->order_no)->first();
+        // Load order with customer, city, and articles
+        $order = Order::with('customer.city', 'articles.article')
+            ->where("order_no", $request->order_no)
+            ->first();
 
         if (!$order) {
             return response()->json(["error" => "Order not found."]);
         }
 
-        if ($order->status == 'invoiced') {
+        if ($order->status === 'invoiced') {
             return response()->json(["error" => "This order has already been invoiced."]);
         }
 
-
         if (!$request->boolean('only_order')) {
-            $orderedArticles = $order->articles;
-
-            // $articleIds = array_map(fn($oa) => $oa->id, $orderedArticles);
-            // $articles = Article::whereIn('id', $articleIds)->get()->keyBy('id');
-
             $stockErrors = [];
 
-            foreach ($orderedArticles as $orderedArticle) {
+            // Filter out articles with 0 stock or missing
+            $filteredArticles = $order->articles->filter(function ($orderedArticle) use (&$stockErrors) {
 
                 $article = $orderedArticle->article;
 
                 if (!$article) {
                     $stockErrors[] = "Article with ID {$orderedArticle->article_id} not found.";
-                    continue;
+                    return false; // remove missing articles
                 }
 
-                // $orderedArticle->article = $article;
                 $orderedArticle->total_quantity_in_packets = 0;
 
                 $totalPhysicalStockPackets = PhysicalQuantity::where("article_id", $article->id)->sum('packets');
 
-                if ($totalPhysicalStockPackets > 0 && $article->pcs_per_packet > 0) {
+                if ($totalPhysicalStockPackets > 0 && ($article->pcs_per_packet ?? 0) > 0) {
                     $availablePhysicalQuantity = $article->sold_quantity > 0
                         ? $totalPhysicalStockPackets - ($article->sold_quantity / $article->pcs_per_packet)
                         : $totalPhysicalStockPackets;
 
-                    $orderedPackets = $orderedArticle->ordered_pcs / $article->pcs_per_packet;
+                    $orderedPackets = ($orderedArticle->ordered_pcs ?? 0) / $article->pcs_per_packet;
                     $invoiceQty = $orderedArticle->dispatched_pcs ?? 0;
                     $pendingPackets = $orderedPackets - ($invoiceQty / $article->pcs_per_packet);
 
                     $orderedArticle->total_quantity_in_packets = floor(min($pendingPackets, $availablePhysicalQuantity));
                 }
 
-                $actualQuantity = $orderedArticle->total_quantity_in_packets * $article->pcs_per_packet;
+                $actualQuantity = (int) ($orderedArticle->total_quantity_in_packets ?? 0)
+                                * (int) ($article->pcs_per_packet ?? 0);
 
-                if ($actualQuantity == 0) {
-                    $stockErrors[] = 'Stock is less than order quantity for article: ' . $article->article_no;
+                if ($actualQuantity <= 0) {
+                    $stockErrors[] = "Stock is less than order quantity for article: {$article->article_no}";
+                    return false; // remove articles with 0 stock
                 }
-            }
 
+                return true; // keep valid articles
+            });
+
+            $order->setRelation('articles', $filteredArticles->values());
+
+            // Optional: return stock errors if needed
             // if (!empty($stockErrors)) {
             //     return response()->json(['error' => implode("; ", $stockErrors)]);
             // }
-
-            // $order->articles = array_values($orderedArticles);
         }
 
-        if (empty($order->articles)) {
+        if ($order->articles->isEmpty()) {
             return response()->json(['error' => 'No articles found for this order.']);
         }
 
         return response()->json($order);
     }
-
 
     public function getProgramDetails(Request $request) {
         $validator = Validator::make($request->all(), [
