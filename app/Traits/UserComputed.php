@@ -18,7 +18,7 @@ trait UserComputed
                 'Role' => $this->role,
             ],
             'status' => $this->status,
-            'image' => $this->profile_picture,
+            'image' => $this->profile_picture == 'default_avatar.png' ? '/images/default_avatar.png' : '/storage/uploads/images/' . $this->profile_picture,
             'profile' => true,
             'oncontextmenu' => "generateContextMenu(event)",
             'onclick' => "generateModal(this)",

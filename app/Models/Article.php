@@ -41,6 +41,11 @@ class Article extends Model
         'date' => 'date',
     ];
 
+    protected $appends = [
+        'ordered_quantity',
+        'sold_quantity',
+    ];
+
     public function setDateAttribute($value)
     {
         $this->attributes['date'] = \Carbon\Carbon::parse($value)->toDateString(); // 'Y-m-d'

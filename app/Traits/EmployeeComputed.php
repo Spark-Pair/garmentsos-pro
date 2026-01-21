@@ -13,7 +13,7 @@ trait EmployeeComputed
             'id' => $this->id,
             'uId' => $this->id,
             'status' => $this->status,
-            'image' => $this->profile_picture,
+            'image' => $this->profile_picture == 'default_avatar.png' ? '/images/default_avatar.png' : '/storage/uploads/images/' . $this->profile_picture,
             'name' => $this->employee_name,
             'urdu_title' => $this->urdu_title,
             'phone_number' => $this->phone_number,

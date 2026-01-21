@@ -23,8 +23,8 @@ return new class extends Migration
             $table->string('fabric_type')->nullable();
             $table->decimal('sales_rate', 11, 2);
             $table->json('rates_array');
-            $table->integer('ordered_quantity')->unsigned()->default(0);
-            $table->integer('sold_quantity')->unsigned()->default(0);
+            // $table->integer('ordered_quantity')->unsigned()->default(0);
+            // $table->integer('sold_quantity')->unsigned()->default(0);
             $table->integer('pcs_per_packet')->unsigned()->default(0);
             $table->string('processed_by')->nullable();
             $table->string('image')->default('no_image_icon.png');

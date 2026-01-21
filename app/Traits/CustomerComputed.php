@@ -10,7 +10,7 @@ trait CustomerComputed
     {
         return [
             'id' => $this->id,
-            'image' => $this->user->profile_picture,
+            'image' => $this->user->profile_picture == 'default_avatar.png' ? '/images/default_avatar.png' : '/storage/uploads/images/' . $this->user->profile_picture,
             'name' => $this->customer_name,
             'details' => [
                 'Urdu Title' => $this->urdu_title,
