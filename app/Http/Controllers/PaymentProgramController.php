@@ -25,7 +25,7 @@ class PaymentProgramController extends Controller
         };
 
         if ($request->ajax()) {
-            $payment_programs = PaymentProgram::with('customer.city', 'subCategory')->orderByDesc('id')
+            $payment_programs = PaymentProgram::with('customer.city', 'subCategory')->withPaymentDetails()->orderByDesc('id')
                 ->applyFilters($request);
 
             return response()->json(['data' => $payment_programs, 'authLayout' => 'table']);

@@ -27,7 +27,7 @@ class CustomerPaymentController extends Controller
 
         if ($request->ajax()) {
             $payments = CustomerPayment::whereNotNull('customer_id')
-                ->where('type', '!=', 'DR')
+                // ->where('type', '!=', 'DR')
                 ->orderByDesc('id')
                 ->applyFilters($request);
 
