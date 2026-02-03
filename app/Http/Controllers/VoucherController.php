@@ -139,7 +139,7 @@ class VoucherController extends Controller
 
                 $payments_options = $payments->map(function ($payment) {
                     return [
-                        'id' => (int)$payment->program_id ?? (int)$payment->id,
+                        'id' => (int)$payment->id,
                         'text' => number_format($payment->amount) . ' | ' . ($payment->program->customer->customer_name ?? '-')  . ' | ' . ($payment->program->customer->city->short_title ?? '-') . ' | ' . $payment->transaction_id . ' | ' . date('d-M-Y D', strtotime($payment->date)),
                         'dataset' => $payment,
                     ];
