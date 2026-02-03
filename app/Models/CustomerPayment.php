@@ -49,6 +49,10 @@ class CustomerPayment extends Model
         'is_return' => 'boolean',
     ];
 
+    protected $appends = [
+        'voucher_no',
+    ];
+
     protected static function booted()
     {
         // Automatically set creator_id when creating a new Article

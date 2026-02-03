@@ -9,6 +9,7 @@ use App\Models\PaymentProgram;
 use App\Models\Setup;
 use App\Models\SupplierPayment;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
@@ -583,12 +584,70 @@ class CustomerPaymentController extends Controller
         return redirect()->back()->with('success', 'Payment partial cleared successfully.');
     }
 
+    // public function split(Request $request, CustomerPayment $payment)
+    // {
+    //     if (!$this->checkRole(['developer', 'owner', 'admin', 'accountant'])) {
+    //         return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
+    //     }
+
+    //     $validator = Validator::make($request->all(), [
+    //         'split_amount' => 'required|integer|min:1|max:' . ($payment->amount - 1),
+    //     ]);
+
+    //     if ($validator->fails()) {
+    //         return redirect()->back()->withErrors($validator);
+    //     }
+
+    //     // Determine reference field
+    //     $reffField = match ($payment->method) {
+    //         'cheque'   => 'cheque_no',
+    //         'slip'     => 'slip_no',
+    //         'program'  => 'transaction_id',
+    //         default    => 'reff_no',
+    //     };
+
+    //     // Get base (before | n)
+    //     $currentReff = $payment->$reffField;
+    //     $parts = explode('|', $currentReff);
+    //     $baseReff = trim($parts[0]);
+
+    //     // Find max suffix already used for this base
+    //     $maxSuffix = CustomerPayment::where($reffField, 'like', $baseReff.' | %')
+    //         ->pluck($reffField)
+    //         ->map(function ($r) use ($baseReff) {
+    //             $pieces = explode('|', $r);
+    //             return isset($pieces[1]) ? (int) trim($pieces[1]) : 0;
+    //         })
+    //         ->max();
+
+    //     // If no suffix found, start from 1
+    //     if (!$maxSuffix) {
+    //         $maxSuffix = 1;
+    //         // Update original payment reff_no → base | 1
+    //         $payment->$reffField = $baseReff . ' | ' . $maxSuffix;
+    //     }
+
+    //     // Step 1: Reduce amount in original payment
+    //     $payment->amount = $payment->amount - $request->split_amount;
+    //     $payment->save();
+
+    //     // Step 2: Create duplicate with next suffix
+    //     $newPayment = $payment->replicate();
+    //     $newPayment->amount = $request->split_amount;
+    //     $newPayment->$reffField = $baseReff . ' | ' . ($maxSuffix + 1);
+    //     $newPayment->save();
+
+    //     return redirect()->back()->with('success', 'Payment split successfully.');
+    // }
+
     public function split(Request $request, CustomerPayment $payment)
     {
         if (!$this->checkRole(['developer', 'owner', 'admin', 'accountant'])) {
-            return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
+            return redirect(route('home'))
+                ->with('error', 'You do not have permission to access this page.');
         }
 
+        // ✅ Validation
         $validator = Validator::make($request->all(), [
             'split_amount' => 'required|integer|min:1|max:' . ($payment->amount - 1),
         ]);
@@ -597,7 +656,9 @@ class CustomerPaymentController extends Controller
             return redirect()->back()->withErrors($validator);
         }
 
-        // Determine reference field
+        /**
+         * 🔹 Reference field (Customer + Supplier for program/default)
+         */
         $reffField = match ($payment->method) {
             'cheque'   => 'cheque_no',
             'slip'     => 'slip_no',
@@ -605,36 +666,101 @@ class CustomerPaymentController extends Controller
             default    => 'reff_no',
         };
 
-        // Get base (before | n)
-        $currentReff = $payment->$reffField;
-        $parts = explode('|', $currentReff);
-        $baseReff = trim($parts[0]);
+        /**
+         * 🔹 Base reference
+         */
+        $baseReff = trim(explode('|', $payment->$reffField)[0]);
 
-        // Find max suffix already used for this base
-        $maxSuffix = CustomerPayment::where($reffField, 'like', $baseReff.' | %')
+        /**
+         * 🔹 Max suffix (Customer side decides truth)
+         */
+        $maxSuffix = CustomerPayment::where($reffField, 'like', $baseReff . ' | %')
             ->pluck($reffField)
-            ->map(function ($r) use ($baseReff) {
-                $pieces = explode('|', $r);
-                return isset($pieces[1]) ? (int) trim($pieces[1]) : 0;
-            })
-            ->max();
+            ->map(fn ($r) => (int) trim(explode('|', $r)[1] ?? 0))
+            ->max() ?? 0;
 
-        // If no suffix found, start from 1
-        if (!$maxSuffix) {
-            $maxSuffix = 1;
-            // Update original payment reff_no → base | 1
-            $payment->$reffField = $baseReff . ' | ' . $maxSuffix;
-        }
+        /**
+         * 🔹 Find linked SupplierPayment
+         */
+        $supplierPayment = match ($payment->method) {
 
-        // Step 1: Reduce amount in original payment
-        $payment->amount = $payment->amount - $request->split_amount;
-        $payment->save();
+            // 🔗 ID based (cheque / slip)
+            'cheque' => SupplierPayment::where('cheque_id', $payment->id)->first(),
+            'slip'   => SupplierPayment::where('slip_id', $payment->id)->first(),
 
-        // Step 2: Create duplicate with next suffix
-        $newPayment = $payment->replicate();
-        $newPayment->amount = $request->split_amount;
-        $newPayment->$reffField = $baseReff . ' | ' . ($maxSuffix + 1);
-        $newPayment->save();
+            // 🔁 Same process as customer (program / default)
+            default  => SupplierPayment::where($reffField, $payment->$reffField)
+                            ->where('amount', $payment->amount)
+                            ->whereDate('date', $payment->date)
+                            ->first(),
+        };
+
+        /**
+         * 🔒 TRANSACTION
+         */
+        DB::transaction(function () use (
+            $payment,
+            $supplierPayment,
+            $request,
+            $reffField,
+            $baseReff,
+            &$maxSuffix
+        ) {
+
+            /**
+             * 🧾 First split → update OLD reff on BOTH sides
+             */
+            if ($maxSuffix === 0) {
+
+                $payment->$reffField = $baseReff . ' | 1';
+                $payment->save();
+
+                if ($supplierPayment && !in_array($payment->method, ['cheque', 'slip'])) {
+                    $supplierPayment->$reffField = $baseReff . ' | 1';
+                    $supplierPayment->save();
+                }
+
+                $maxSuffix = 1;
+            }
+
+            /**
+             * 1️⃣ Reduce OLD amounts
+             */
+            $payment->amount -= $request->split_amount;
+            $payment->save();
+
+            if ($supplierPayment) {
+                $supplierPayment->amount -= $request->split_amount;
+                $supplierPayment->save();
+            }
+
+            /**
+             * 2️⃣ Create NEW CustomerPayment
+             */
+            $newCustomer = $payment->replicate();
+            $newCustomer->amount = $request->split_amount;
+            $newCustomer->$reffField = $baseReff . ' | ' . ($maxSuffix + 1);
+            $newCustomer->save();
+
+            /**
+             * 3️⃣ Create NEW SupplierPayment
+             */
+            if ($supplierPayment) {
+
+                $newSupplier = $supplierPayment->replicate();
+                $newSupplier->amount = $request->split_amount;
+
+                if ($payment->method === 'cheque') {
+                    $newSupplier->cheque_id = $newCustomer->id;
+                } elseif ($payment->method === 'slip') {
+                    $newSupplier->slip_id = $newCustomer->id;
+                } else {
+                    $newSupplier->$reffField = $baseReff . ' | ' . ($maxSuffix + 1);
+                }
+
+                $newSupplier->save();
+            }
+        });
 
         return redirect()->back()->with('success', 'Payment split successfully.');
     }

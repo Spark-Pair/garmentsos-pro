@@ -31,10 +31,10 @@ trait CustomerPaymentComputed
                     ->whereDate('date', $this->date)
                     ->first();
 
-                return $supplierPayment?->voucher?->voucher_no ?? '-';
+                return $supplierPayment?->voucher?->voucher_no ?? null;
             }
 
-            return '-';
+            return null;
         });
     }
 
@@ -242,7 +242,7 @@ trait CustomerPaymentComputed
             'method' => $this->method,
             'data' => $this,
             'date' => $this->slip_date ? $this->slip_date->format('d-M-Y, D') : ($this->cheque_date ? $this->cheque_date->format('d-M-Y, D') : $this->date->format('d-M-Y, D')),
-            'voucher_no' => $this->voucher_no,
+            'voucher_no' => $this->voucher_no ?? '-',
             'supplier_name' => $this->supplier_name,
             'reff_no' => $this->reff_no,
             'beneficiary' => $this->beneficiary,
@@ -277,16 +277,43 @@ trait CustomerPaymentComputed
                     });
                 });
 
-            case 'voucher_no':
-                return $query->where(function($q) use ($value) {
-                    $q->whereHas('cheque.voucher', fn($sq) => $sq->where('voucher_no', 'like', "%$value%"))
-                    ->orWhereHas('slip.voucher', fn($sq) => $sq->where('voucher_no', 'like', "%$value%"))
-                    ->orWhereHas('cheque.cr', fn($sq) => $sq->where('c_r_no', 'like', "%$value%"))
-                    ->orWhereHas('slip.cr', fn($sq) => $sq->where('c_r_no', 'like', "%$value%"))
-                    ->orWhereHas('dr', fn($sq) => $sq->where('d_r_no', 'like', "%$value%"));
-                    // Note: Program-based fallback SQL mein filter karna slow hota hai,
-                    // isliye main relations par zor diya gaya hai.
-                });
+case 'voucher_no':
+    return $query->where(function ($q) use ($value) {
+
+        // cheque / slip vouchers
+        $q->whereHas('cheque.voucher', fn ($sq) =>
+                $sq->where('voucher_no', 'like', "%$value%")
+            )
+          ->orWhereHas('slip.voucher', fn ($sq) =>
+                $sq->where('voucher_no', 'like', "%$value%")
+            )
+
+        // cheque / slip CR
+          ->orWhereHas('cheque.cr', fn ($sq) =>
+                $sq->where('c_r_no', 'like', "%$value%")
+            )
+          ->orWhereHas('slip.cr', fn ($sq) =>
+                $sq->where('c_r_no', 'like', "%$value%")
+            )
+
+        // DR
+          ->orWhereHas('dr', fn ($sq) =>
+                $sq->where('d_r_no', 'like', "%$value%")
+            )
+
+        // 🔥 PROGRAM BASED SUPPLIER VOUCHER (FIX)
+          ->orWhereExists(function ($sq) use ($value) {
+                $sq->selectRaw(1)
+                    ->from('supplier_payments')
+                    ->join('vouchers', 'vouchers.id', '=', 'supplier_payments.voucher_id')
+                    ->whereColumn('supplier_payments.program_id', 'customer_payments.program_id')
+                    ->whereColumn('supplier_payments.bank_account_id', 'customer_payments.bank_account_id')
+                    ->whereColumn('supplier_payments.transaction_id', 'customer_payments.transaction_id')
+                    ->whereColumn('supplier_payments.amount', 'customer_payments.amount')
+                    ->whereRaw('DATE(supplier_payments.date) = DATE(customer_payments.date)')
+                    ->where('vouchers.voucher_no', 'like', "%$value%");
+            });
+    });
 
             case 'beneficiary':
                 return $query->where(function($q) use ($value) {
@@ -376,6 +403,9 @@ trait CustomerPaymentComputed
                     if ($value == 'cash') $q->where('category', 'cash');
                     else $q->where('category', '!=', 'cash');
                 });
+
+            case 'method':
+                return $query->where('method', $value);
 
             case 'date':
                 $start = $value['start'] ?? null;
