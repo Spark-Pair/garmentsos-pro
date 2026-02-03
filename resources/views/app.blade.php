@@ -415,7 +415,7 @@
     @endif
 
     <!-- Loader -->
-    <div id="page-loader" class="fixed inset-0 z-[999] bg-[var(--overlay-color)] bg-opacity-80 flex items-center justify-center hidden">
+    <div id="page-loader" class="fixed inset-0 z-[9999] bg-[var(--overlay-color)] bg-opacity-80 flex items-center justify-center hidden">
         <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
     </div>
     <div class="wrapper flex-1 flex flex-col md:h-screen relative w-full overflow-y-hidden">
@@ -489,6 +489,7 @@
     </div>
 
     <script>
+        let calculations = {};
         // go back and refresh script
         if (window.history.length > 1) {
             document.getElementById('go_back_button').classList.remove('hidden');

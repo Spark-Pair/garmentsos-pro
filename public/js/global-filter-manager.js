@@ -137,6 +137,11 @@ const GlobalFilterManager = {
         // Get data array from response
         const items = response.data || response.items || response;
 
+        calculations = response.calculations;
+        if (typeof window.renderCalculation === 'function') {
+            window.renderCalculation(calculations);
+        }
+
         // Use existing page-specific rendering functions
         if (typeof window.createCard === 'function' || typeof window.createRow === 'function') {
             this.renderWithExistingFunctions(items);

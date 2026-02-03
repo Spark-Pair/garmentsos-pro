@@ -637,11 +637,12 @@
                 });
 
                 if (elem.value !== 'cash' && elem.value !== 'adjustment') {
+                    showLoader();
                     $.ajax({
                         url: '/vouchers/create',
                         type: 'GET',
                         data: {
-                            supplier_id: selectedSupplier.id,
+                            supplier_id: selectedSupplier?.id ?? null,
                             payment_method: elem.value,
                             date: dateDom.value,
                         },
@@ -651,6 +652,7 @@
                         success: function(response) {
                             payments_options = response.payments_options;
                             renderOptions()
+                            hideLoader();
                         },
                         error: function(xhr, status, error) {
                             console.error(error);
@@ -718,7 +720,7 @@
                         let selectedPayment = JSON.parse(selectedOption.getAttribute('data-option')) || '';
 
                         console.log(selectedPayment);
-                        
+
 
                         selectedDom.value = JSON.stringify(selectedPayment);
                         document.getElementById('amount').value = selectedPayment.amount;
@@ -827,7 +829,7 @@
                 paymentDetailsArray.forEach((paymentDetail, index) => {
                     let selected = paymentDetail.selected ? JSON.parse(paymentDetail.selected) : null;
                     console.log(paymentDetail);
-                    
+
 
                     clutter += `
                         <div class="flex justify-between items-center border-t border-gray-600 py-3 px-4">
