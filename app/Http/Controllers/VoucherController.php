@@ -130,17 +130,39 @@ class VoucherController extends Controller
                         'dataset' => $expense,
                     ];
                 })->values()->toArray();
-            } else if ($paymentMethod == 'program') {
+            } else if ($paymentMethod === 'program') {
                 $payments = SupplierPayment::where('supplier_id', $supplier_id)
                     ->where('method', 'program')
                     ->whereNull('voucher_id')
-                    // ->with('program.customer.city')
+                    ->select(
+                        'id',
+                        'program_id',
+                        'amount',
+                        'transaction_id',
+                        'date'
+                    )
+                    ->with([
+                        'program:id,customer_id',
+                        'program.customer:id,customer_name,city_id',
+                        'program.customer.city:id,short_title',
+                    ])
                     ->get();
 
                 $payments_options = $payments->map(function ($payment) {
+
+                    // 🔥 IMPORTANT: disable appends on PaymentProgram
+                    if ($payment->relationLoaded('program') && $payment->program) {
+                        $payment->program->setAppends([]);
+                    }
+
                     return [
-                        'id' => (int)$payment->program_id ?? (int)$payment->id,
-                        'text' => number_format($payment->amount) . ' | ' . ($payment->program->customer->customer_name ?? '-')  . ' | ' . ($payment->program->customer->city->short_title ?? '-') . ' | ' . $payment->transaction_id . ' | ' . date('d-M-Y D', strtotime($payment->date)),
+                        'id' => (int)$payment->id,
+                        'text' =>
+                            number_format($payment->amount) . ' | ' .
+                            ($payment->program?->customer?->customer_name ?? '-') . ' | ' .
+                            ($payment->program?->customer?->city?->short_title ?? '-') . ' | ' .
+                            ($payment->transaction_id ?? '-') . ' | ' .
+                            optional($payment->date)->format('d-M-Y D'),
                         'dataset' => $payment,
                     ];
                 })->values()->toArray();
