@@ -53,9 +53,9 @@ class SupplierPayment extends Model
         });
 
         // Always eager load the associated creator
-        static::addGlobalScope('withCreator', function (builder $builder) {
-            $builder->with('creator');
-        });
+        // static::addGlobalScope('withCreator', function (builder $builder) {
+        //     $builder->with('creator');
+        // });
     }
 
     public function creator()
