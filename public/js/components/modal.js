@@ -442,8 +442,8 @@ function createModal(data, animate = 'animate') {
         let invoiceTableBody = "";
         let invoiceBottom = "";
 
-        const articlePages = (previewData.articles || previewData.order?.articles || previewData.shipment?.articles)
-        ? chunkArray((previewData.articles || previewData.order?.articles || previewData.shipment?.articles), 21)
+        const articlePages = (previewData.articles || previewData.invoice_articles )
+        ? chunkArray((previewData.articles || previewData.invoice_articles ), 21)
         : [];
 
 
@@ -543,7 +543,7 @@ function createModal(data, animate = 'animate') {
         } else if (data.preview.type == "form") {
 
         } else {
-            const articlePages = chunkArray((previewData.articles || previewData.order?.articles || previewData.shipment?.articles), 21);
+            const articlePages = chunkArray((previewData.articles || previewData.invoice_articles ), 21);
 
             let totalAmount = 0;
             let totalPcs = 0;
@@ -570,8 +570,8 @@ function createModal(data, animate = 'animate') {
                         const article = orderedArticle.article;
                         const salesRate = article.sales_rate;
                         const qtyPriority = {
-                            order: ['ordered_pcs', 'dispatched_pcs', 'shipment_pcs'],
-                            default: ['dispatched_pcs', 'ordered_pcs', 'shipment_pcs'],
+                            order: ['ordered_pcs', 'invoice_pcs', 'shipment_pcs'],
+                            default: ['invoice_pcs', 'ordered_pcs', 'shipment_pcs'],
                         };
                         const qty = (qtyPriority[data.preview.type] || qtyPriority.default)
                             .map(key => orderedArticle[key])

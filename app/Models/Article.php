@@ -85,4 +85,9 @@ class Article extends Model
     {
         return $this->hasMany(OrderArticles::class, 'article_id');
     }
+
+    public function invoiceArticles()
+    {
+        return $this->hasMany(InvoiceArticles::class, 'article_id');
+    }
 }

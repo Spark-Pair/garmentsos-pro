@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Article;
 use App\Models\BankAccount;
 use App\Models\Customer;
 use App\Models\CustomerPayment;
+use App\Models\OrderArticles;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\FacadesLog;
 
 class ReportController extends Controller
 {
@@ -181,5 +185,44 @@ class ReportController extends Controller
         }
 
         return view("reports.pending-payments");
+    }
+
+    public function article(Request $request)
+    {
+        if(!$this->checkRole(['developer', 'owner', 'manager', 'admin', 'accountant', 'guest', 'store_keeper']))
+        {
+            return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
+        }
+
+        if ($request->ajax()) {
+            $data = [];
+
+            if ($request->article_no) {
+                $article = Article::where('article_no', 'like', "%{$request->article_no}%")
+                    ->with('invoiceArticles.invoice.customer.city')
+                    ->first();
+
+                if (!$article) {
+                    return response()->json(['data' => [], 'authLayout' => 'table']);
+                }
+
+                // Direct invoice data from invoice_articles table
+                $data = $article->invoiceArticles->map(function ($invoiceArticle) use ($article) {
+                    $invoice = $invoiceArticle->invoice;
+
+                    return [
+                        'article_no' => $article->article_no,
+                        'invoice_no' => $invoice->invoice_no,
+                        'customer_name' => $invoice->customer?->customer_name . ' | ' . $invoice->customer?->city?->short_title,
+                        'invoice_date' => $invoice->date?->format('d-M-Y, D'),
+                        'invoice_pcs' => $invoiceArticle->invoice_pcs,
+                    ];
+                });
+            }
+
+            return response()->json(['data' => $data, 'authLayout' => 'table']);
+        }
+
+        return view('reports.article');
     }
 }

@@ -72,6 +72,11 @@ class Invoice extends Model
         return $this->hasOne(Bilty::class);
     }
 
+    public function invoiceArticles()
+    {
+        return $this->hasMany(InvoiceArticles::class, 'invoice_id');
+    }
+
     public function getIsInCargoAttribute()
     {
         $cargos = Cargo::all();

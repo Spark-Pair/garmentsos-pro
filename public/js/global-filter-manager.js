@@ -77,6 +77,7 @@ const GlobalFilterManager = {
         try {
             const url = this.buildUrl(filters);
             const data = await this.fetchData(url);
+console.log(data);
 
             this.renderData(data);
 
