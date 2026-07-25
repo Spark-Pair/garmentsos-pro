@@ -81,94 +81,111 @@ class ArticleController extends Controller
             return $resp;
         }
 
-        // return $request;
-
         $validator = Validator::make($request->all(), [
-            'article_no' => 'required|integer',
-            'date' => 'required|date',
-            'category' => 'nullable|string',
-            'size' => 'required|string',
-            'season' => 'required|string',
-            'quantity' => 'nullable|integer|min:1',
-            'extra_pcs' => 'nullable|integer|min:0',
-            'fabric_type' => 'nullable|string',
-            'rates_array' => 'nullable|json',
-            "sales_rate" => 'required|numeric|min:0',
-            'image_upload' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
+            'article_no'    => 'required|integer',
+            'date'          => 'required|date',
+            'category'      => 'nullable|string',
+            'size'          => 'required|string',
+            'season'        => 'required|string',
+            'quantity'      => 'nullable|integer|min:1',
+            'extra_pcs'     => 'nullable|integer|min:0',
+            'fabric_type'   => 'nullable|string',
+            'rates_array'   => 'nullable|json',
+            'sales_rate'    => 'required|numeric|min:0',
+            'image_upload'  => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
         ]);
 
         $branches = app(ModuleBranchService::class);
         $branchId = $branches->branchIdForCreate('articles');
 
-        // Prepare data for saving
+        // Prepare data
         $data = [
-            'article_no' => $request->article_no,
-            'date' => $request->date,
-            'category' => $request->category,
-            'size' => $request->size,
-            'season' => $request->season,
-            'quantity' => $request->quantity,
-            'extra_pcs' => $request->extra_pcs,
-            'fabric_type' => $request->fabric_type,
-            'rates_array' => json_decode($request->rates_array),
-            'sales_rate' => $request->sales_rate,
-            'branch_id' => $branchId,
+            'article_no'   => $request->article_no,
+            'date'         => $request->date,
+            'category'     => $request->category,
+            'size'         => $request->size,
+            'season'       => $request->season,
+            'quantity'     => $request->quantity,
+            'extra_pcs'    => $request->extra_pcs,
+            'fabric_type'  => $request->fabric_type,
+            'rates_array'  => json_decode($request->rates_array),
+            'sales_rate'   => $request->sales_rate,
+            'branch_id'    => $branchId,
         ];
 
+        // Generate formatted Article No
         $year = date('y');
         $seasonLetter = strtoupper(substr($data['season'], 0, 1));
 
-        // Get first and last digit of the year
         $yearFirstDigit = substr($year, 0, 1);
-        $yearLastDigit = substr($year, -1);
+        $yearLastDigit  = substr($year, -1);
 
-        // Pad article_no to at least 4 digits, e.g. H2-6|0001.
         $articleNoPadded = str_pad($data['article_no'], 4, '0', STR_PAD_LEFT);
 
-        // Combine as F2-5|0001
         $formattedArticleNo = $seasonLetter . $yearFirstDigit . '-' . $yearLastDigit . '|' . $articleNoPadded;
 
         $data['article_no'] = $formattedArticleNo;
 
-        $duplicateQuery = Article::query()->where('article_no', $formattedArticleNo);
-        if ($branches->shouldFilterRecords('articles') && $branchId && Schema::hasColumn('articles', 'branch_id')) {
+        /*
+        |--------------------------------------------------------------------------
+        | Branch-wise Duplicate Check
+        |--------------------------------------------------------------------------
+        | Same article number is allowed in different branches.
+        | Duplicate only if article_no AND branch_id are both the same.
+        |--------------------------------------------------------------------------
+        */
+        $duplicateQuery = Article::where('article_no', $formattedArticleNo);
+
+        if (Schema::hasColumn('articles', 'branch_id')) {
             $duplicateQuery->where('branch_id', $branchId);
         }
 
         if ($duplicateQuery->exists()) {
             $validator->after(function ($validator) {
-                $validator->errors()->add('article_no', 'Article No already exists for the selected branch.');
+                $validator->errors()->add(
+                    'article_no',
+                    'Article No already exists for this branch.'
+                );
             });
-        }
-
-        // Handle the image upload if present
-        if ($request->hasFile('image_upload')) {
-            $file = $request->file('image_upload');
-            $fileName = time() . '_' . $file->getClientOriginalName();
-            $filePath = $file->storeAs('uploads/images', $fileName, 'public'); // Store in public disk
-
-            $data['image'] = $fileName; // Save the file path in the database
         }
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
+        // Upload image
+        if ($request->hasFile('image_upload')) {
+            $file = $request->file('image_upload');
+
+            $fileName = time() . '_' . $file->getClientOriginalName();
+
+            $file->storeAs('uploads/images', $fileName, 'public');
+
+            $data['image'] = $fileName;
+        }
+
         $article = Article::create($data);
 
-        if ($article->sales_rate > 0 && $article->category != null && $article->fabric_type != null && app('pusher.enabled')) {
+        if (
+            $article->sales_rate > 0 &&
+            !empty($article->category) &&
+            !empty($article->fabric_type) &&
+            app('pusher.enabled')
+        ) {
             try {
                 event(new NewNotificationEvent([
-                    'type' => 'success',
-                    'title' => 'New Article Added.',
+                    'type'    => 'success',
+                    'title'   => 'New Article Added.',
                     'message' => 'Your articles feed has been updated. Please check.',
                 ]));
             } catch (\Exception $e) {
-                //
+                // Ignore Pusher errors
             }
         }
 
-        return redirect()->route('articles.create')->with('success', 'Article added successfully');
+        return redirect()
+            ->route('articles.create')
+            ->with('success', 'Article added successfully.');
     }
 
     /**
