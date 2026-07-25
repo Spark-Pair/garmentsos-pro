@@ -31,12 +31,34 @@ class PaymentProgramController extends Controller
             }
 
             $branches = app(ModuleBranchService::class);
-            $payment_programs = $branches->applyScope(PaymentProgram::with('customer.city', 'subCategory')->withPaymentDetails()->orderByDesc('id'), 'payment_programs')
+
+            $paymentProgramsQuery = PaymentProgram::with([
+                'customer.city',
+                'subCategory',
+                'order.invoices',
+            ])
+                ->withPaymentDetails()
+                ->orderByDesc('id');
+
+            $payment_programs = $branches
+                ->applyScope($paymentProgramsQuery, 'payment_programs')
                 ->applyFilters($request);
 
-            $totalAmount = (float) $payment_programs->sum(fn($p) => (float) ($p['amount'] ?? 0));
-            $totalPayment = (float) $payment_programs->sum(fn($p) => (float) ($p['payment'] ?? 0));
-            $totalBalance = (float) $payment_programs->sum(fn($p) => (float) ($p['balance'] ?? 0));
+            $totalAmount = (float) $payment_programs->sum(
+                fn ($program) => (float) ($program['amount'] ?? 0)
+            );
+
+            $totalPayment = (float) $payment_programs->sum(
+                fn ($program) => (float) ($program['payment'] ?? 0)
+            );
+
+            $totalBalance = (float) $payment_programs->sum(
+                fn ($program) => (float) ($program['balance'] ?? 0)
+            );
+
+            $totalOrderBalance = (float) $payment_programs->sum(
+                fn ($program) => (float) ($program['order_balance'] ?? 0)
+            );
 
             return response()->json([
                 'data' => $payment_programs,
@@ -45,6 +67,7 @@ class PaymentProgramController extends Controller
                     'total_amount' => $totalAmount,
                     'total_payment' => $totalPayment,
                     'balance' => $totalBalance,
+                    'order_balance' => $totalOrderBalance,
                 ],
             ]);
         }

@@ -2,7 +2,7 @@
 
 namespace App\Traits;
 
-use App\Models\SupplierPayment;
+use App\Services\Branches\ModuleBranchService;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 
 trait PaymentProgramComputed
@@ -10,66 +10,244 @@ trait PaymentProgramComputed
     public function beneficiary(): Attribute
     {
         return Attribute::get(function () {
+            if ($this->category === 'supplier') {
+                return $this->subCategory?->supplier_name ?? '-';
+            }
 
-            if ($this->category == 'supplier') return $this->subCategory?->supplier_name ?? '-';
-            if ($this->category == 'self_account') return $this->subCategory?->account_title ?? '-';
-            if ($this->category == 'waiting') return $this->remarks ?? '-';
+            if ($this->category === 'self_account') {
+                return $this->subCategory?->account_title ?? '-';
+            }
+
+            if ($this->category === 'waiting') {
+                return $this->remarks ?? '-';
+            }
 
             return '-';
         });
     }
 
-    public function toFormattedArray()
+    /**
+     * Get selected Payment Programs branches.
+     *
+     * Customer balance bhi inhi selected branches ke records
+     * se calculate hoga.
+     */
+    private function paymentProgramBranchScope(): array
     {
-        $paymentRows = $this->customerPayments->map(function ($payment) {
-            $bankAccount = $payment->bankAccount;
+        try {
+            $branches = app(ModuleBranchService::class);
+
+            $branchIds = $branches->selectedBranchIdsForModule(
+                'payment_programs'
+            );
+
+            $branchIds = collect($branchIds ?? [])
+                ->filter(fn ($id) => is_numeric($id))
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->unique()
+                ->values()
+                ->all();
+
+            /*
+             * Jab module single/default branch filtering use kar raha ho
+             * aur selectedBranchIdsForModule empty return kare.
+             */
+            if (
+                $branchIds === [] &&
+                $branches->shouldFilterRecords('payment_programs')
+            ) {
+                $selectedBranchId = $branches
+                    ->selectedBranchIdForModule('payment_programs');
+
+                if ($selectedBranchId) {
+                    $branchIds = [(int) $selectedBranchId];
+                }
+            }
+
+            /*
+             * Purane records jin ka branch_id NULL hai unhein main branch
+             * ke saath include karna hai.
+             */
+            $mainBranchId = $branches->mainBranch()?->id;
+
+            $includeNullBranchRecords = $mainBranchId
+                && in_array(
+                    (int) $mainBranchId,
+                    array_map('intval', $branchIds),
+                    true
+                );
 
             return [
-                'id' => $payment->id,
-                'date' => $payment->date,
-                'amount' => (float) $payment->amount,
-                'transaction_id' => $payment->transaction_id,
-                'bank_account' => $bankAccount ? [
-                    'id' => $bankAccount->id,
-                    'account_title' => $bankAccount->account_title,
-                    'bank' => $bankAccount->bank ? [
-                        'id' => $bankAccount->bank->id,
-                        'short_title' => $bankAccount->bank->short_title,
-                        'title' => $bankAccount->bank->title,
-                    ] : null,
-                    'sub_category' => $bankAccount->subCategory ? [
-                        'id' => $bankAccount->subCategory->id,
-                        'supplier_name' => $bankAccount->subCategory->supplier_name ?? null,
-                        'customer_name' => $bankAccount->subCategory->customer_name ?? null,
-                    ] : null,
-                ] : null,
+                'branch_ids' => $branchIds,
+                'include_null_branch_records' => (bool) $includeNullBranchRecords,
             ];
-        })->values();
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return [
+                'branch_ids' => [],
+                'include_null_branch_records' => false,
+            ];
+        }
+    }
+
+    /**
+     * Selected Payment Programs branch ke mutabiq
+     * customer ka ledger balance.
+     */
+    private function branchWiseCustomerBalance(): float
+    {
+        if (!$this->customer) {
+            return 0;
+        }
+
+        $scope = $this->paymentProgramBranchScope();
+
+        /*
+         * Empty branch scope ka matlab all branches hai.
+         */
+        return (float) $this->customer->calculateBalance(
+            branchIds: $scope['branch_ids'],
+            includeNullBranchRecords: $scope['include_null_branch_records'],
+        );
+    }
+
+    /**
+     * Order ki woh amount jis ki invoice abhi banna baqi hai.
+     *
+     * Sirf order_no/order_id wale programs par calculate hogi.
+     */
+    private function calculateOrderBalance(): float
+    {
+        $hasOrder = !empty($this->order_no)
+            || !empty($this->order_id);
+
+        if (!$hasOrder || !$this->order) {
+            return 0;
+        }
+
+        /*
+         * Apne Order model ke actual total field ko priority dein.
+         * Jo field project mein available ho woh use ho jayegi.
+         */
+        $orderAmount = (float) (
+            $this->order->netAmount
+            ?? $this->order->net_amount
+            ?? $this->order->total_amount
+            ?? $this->order->amount
+            ?? $this->amount
+            ?? 0
+        );
+
+        /*
+         * Invoices ke actual total field ke mutabiq amount sum karein.
+         */
+        $invoicedAmount = (float) $this->order->invoices->sum(
+            fn ($invoice) => (float) (
+                $invoice->netAmount
+                ?? $invoice->net_amount
+                ?? $invoice->total_amount
+                ?? $invoice->amount
+                ?? 0
+            )
+        );
+
+        /*
+         * Negative order balance return nahi karna.
+         */
+        return max(0, $orderAmount - $invoicedAmount);
+    }
+
+    public function toFormattedArray()
+    {
+        $paymentRows = $this->customerPayments
+            ->map(function ($payment) {
+                $bankAccount = $payment->bankAccount;
+
+                return [
+                    'id' => $payment->id,
+                    'date' => $payment->date,
+                    'amount' => (float) $payment->amount,
+                    'transaction_id' => $payment->transaction_id,
+
+                    'bank_account' => $bankAccount ? [
+                        'id' => $bankAccount->id,
+                        'account_title' => $bankAccount->account_title,
+
+                        'bank' => $bankAccount->bank ? [
+                            'id' => $bankAccount->bank->id,
+                            'short_title' => $bankAccount->bank->short_title,
+                            'title' => $bankAccount->bank->title,
+                        ] : null,
+
+                        'sub_category' => $bankAccount->subCategory ? [
+                            'id' => $bankAccount->subCategory->id,
+                            'supplier_name' =>
+                                $bankAccount->subCategory->supplier_name ?? null,
+                            'customer_name' =>
+                                $bankAccount->subCategory->customer_name ?? null,
+                        ] : null,
+                    ] : null,
+                ];
+            })
+            ->values();
+
+        $customerBalance = $this->branchWiseCustomerBalance();
+        $orderBalance = $this->calculateOrderBalance();
 
         return [
             'id' => $this->id,
-            'date' => $this->date->format('d-M-Y, D'),
-            'customer_name' => ($this->customer?->customer_name ?? '-') . ' | ' . ($this->customer?->city?->title ?? '-'),
-            'customer_balance' => $this->customer?->balance ?? 0,
+            'date' => $this->date?->format('d-M-Y, D'),
+
+            'customer_name' =>
+                ($this->customer?->customer_name ?? '-')
+                . ' | '
+                . ($this->customer?->city?->title ?? '-'),
+
+            /*
+             * Selected Payment Programs branch ka customer balance.
+             */
+            'customer_balance' => $customerBalance,
+
             'o_p_no' => $this->order_no ?? $this->program_no,
             'category' => $this->category,
             'beneficiary' => $this->beneficiary,
-            'amount' => $this->amount,
-            'payment' => $this->payment,
-            'balance' => $this->balance,
+
+            'amount' => (float) $this->amount,
+            'payment' => (float) $this->payment,
+            'balance' => (float) $this->balance,
+
+            /*
+             * Sirf order wale record mein meaningful value hogi.
+             * Normal program mein zero hogi.
+             */
+            'order_balance' => $orderBalance,
+
             'status' => $this->status,
-            'type' => $this->order_no ? 'order' : 'program',
+            'type' => $this->order_no || $this->order_id
+                ? 'order'
+                : 'program',
+
             'sub_category' => $this->subCategory ? [
                 'id' => $this->subCategory->id,
             ] : null,
+
             'data' => [
                 'id' => $this->id,
                 'sub_category_id' => $this->sub_category_id,
                 'sub_category_type' => $this->sub_category_type,
                 'payments' => $paymentRows,
+
+                /*
+                 * Modal mein bhi available hoga.
+                 */
+                'customer_balance' => $customerBalance,
+                'order_balance' => $orderBalance,
             ],
-            'oncontextmenu' => "generateContextMenu(event)",
-            'onclick' => "generateModal(this)",
+
+            'oncontextmenu' => 'generateContextMenu(event)',
+            'onclick' => 'generateModal(this)',
         ];
     }
 
@@ -77,23 +255,45 @@ trait PaymentProgramComputed
     {
         switch ($key) {
             case 'customer_name':
-                return $query->whereHas('customer', function ($q) use ($value) {
-                    $q->where('customer_name', 'like', "%$value%")
-                    ->orWhereHas('city', fn($sq) => $sq->where('title', 'like', "%$value%"));
-                });
+                return $query->whereHas(
+                    'customer',
+                    function ($q) use ($value) {
+                        $q->where(
+                            'customer_name',
+                            'like',
+                            "%{$value}%"
+                        )->orWhereHas(
+                            'city',
+                            fn ($sq) => $sq->where(
+                                'title',
+                                'like',
+                                "%{$value}%"
+                            )
+                        );
+                    }
+                );
 
             case 'city':
-                return $query->whereHas('customer.city', function ($q) use ($value) {
-                    // Nested function isliye taake 'OR' condition sirf city ke andar rahe
-                    $q->where(function($sq) use ($value) {
-                        $sq->where('title', 'like', "%{$value}%")
-                        ->orWhere('short_title', 'like', "%{$value}%");
-                    });
-                });
+                return $query->whereHas(
+                    'customer.city',
+                    function ($q) use ($value) {
+                        $q->where(function ($sq) use ($value) {
+                            $sq->where(
+                                'title',
+                                'like',
+                                "%{$value}%"
+                            )->orWhere(
+                                'short_title',
+                                'like',
+                                "%{$value}%"
+                            );
+                        });
+                    }
+                );
 
             case 'type':
                 return $query->where(function ($q) use ($value) {
-                    if ($value == 'order') {
+                    if ($value === 'order') {
                         $q->whereNotNull('order_no');
                     } else {
                         $q->whereNull('order_no');
@@ -101,16 +301,27 @@ trait PaymentProgramComputed
                 });
 
             case 'beneficiary':
-                return $query->where(function($q) use ($value) {
-                    // Has subCategory: check supplier_name or account_title
-                    $q->whereHas('subCategory', function($sq) use ($value) {
-                        $sq->where('supplier_name', 'like', "%$value%")
-                        ->orWhere('account_title', 'like', "%$value%");
-                    })
-                    // Does NOT have subCategory: check remarks
-                    ->orWhere(function($q) use ($value) {
+                return $query->where(function ($q) use ($value) {
+                    $q->whereHas(
+                        'subCategory',
+                        function ($sq) use ($value) {
+                            $sq->where(
+                                'supplier_name',
+                                'like',
+                                "%{$value}%"
+                            )->orWhere(
+                                'account_title',
+                                'like',
+                                "%{$value}%"
+                            );
+                        }
+                    )->orWhere(function ($q) use ($value) {
                         $q->whereDoesntHave('subCategory')
-                        ->where('remarks', 'like', "%$value%");
+                            ->where(
+                                'remarks',
+                                'like',
+                                "%{$value}%"
+                            );
                     });
                 });
 
@@ -119,16 +330,27 @@ trait PaymentProgramComputed
 
             case 'date':
                 $start = $value['start'] ?? null;
-                $end   = $value['end'] ?? null;
+                $end = $value['end'] ?? null;
 
-                if (!$start || !$end) return $query;
+                if (!$start || !$end) {
+                    return $query;
+                }
 
+                \App\Support\DateRange::apply(
+                    $query,
+                    'date',
+                    $start,
+                    $end
+                );
 
-                \App\Support\DateRange::apply($query, 'date', $start, $end);
                 return $query;
 
             default:
-                return $query->where($key, 'like', "%$value%");
+                return $query->where(
+                    $key,
+                    'like',
+                    "%{$value}%"
+                );
         }
     }
 }

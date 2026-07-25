@@ -27,6 +27,7 @@ function initPaymentProgramsIndex() {
             <span class="w-[10%]">${(data.date)}</span>
             <span class="w-[8%]">${data.o_p_no}</span>
             <span class="w-[19%] text-left">${data.customer_name}</span>
+            <span class="w-[10%]">${formatNumbersWithDigits(data.customer_balance, 1, 1)}</span>
             <span class="w-[9%] capitalize">${data.category.replace(/_/g, ' ')}</span>
             <span class="w-[15%]">${data.beneficiary}</span>
             <span class="w-[10%]">${formatNumbersWithDigits(data.amount, 1, 1)}</span>
@@ -390,7 +391,7 @@ function initPaymentProgramsIndex() {
         let modalData = {
             id: 'modalForm',
             class: 'max-w-4xl h-[37rem]',
-            name: `Payment Details - ${data.customer_name} | ${formatNumbersWithDigits(data.customer_balance, 1, 1)} | ${formatNumbersWithDigits(data.balance, 1, 1)}`,
+            name: `Payment Details - ${data.customer_name} | ${formatNumbersWithDigits(data.customer_balance, 1, 1)} | ${formatNumbersWithDigits(data.order_balance, 1, 1)}`,
             table: {
                 name: 'Details',
                 headers: [

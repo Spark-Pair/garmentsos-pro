@@ -88,6 +88,7 @@
                             <div class="w-[10%] cursor-pointer" onclick="sortByThis(this)">Date</div>
                             <div class="w-[8%] cursor-pointer" onclick="sortByThis(this)">O/P No.</div>
                             <div class="w-[19%] cursor-pointer" onclick="sortByThis(this)">Customer</div>
+                            <div class="w-[10%] cursor-pointer" onclick="sortByThis(this)">Cus. Bal.</div>
                             <div class="w-[9%] cursor-pointer" onclick="sortByThis(this)">Category</div>
                             <div class="w-[15%] cursor-pointer" onclick="sortByThis(this)">Beneficiary</div>
                             <div class="w-[10%] cursor-pointer" onclick="sortByThis(this)">Amount</div>
