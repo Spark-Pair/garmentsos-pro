@@ -162,16 +162,7 @@ class CRController extends Controller
 
     private function formatBankAccountOptionPayload(BankAccount $account): array
     {
-        return [
-            'id' => $account->id,
-            'category' => $account->category,
-            'account_title' => $account->account_title,
-            'bank' => [
-                'id' => $account->bank?->id,
-                'title' => $account->bank?->title,
-                'short_title' => $account->bank?->short_title,
-            ],
-        ];
+        return $this->bankAccountOptionPayload($account);
     }
 
     /**

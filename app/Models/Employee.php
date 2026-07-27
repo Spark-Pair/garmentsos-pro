@@ -7,6 +7,7 @@ use App\Traits\Filterable;
 use App\Support\DateRange;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class Employee extends Model
 {
@@ -72,11 +73,35 @@ class Employee extends Model
         return $this->calculateBalance();
     }
 
-    public function calculateBalance($fromDate = null, $toDate = null, $formatted = false, $includeGivenDate = true)
+    public function calculateBalance($fromDate = null, $toDate = null, $formatted = false, $includeGivenDate = true, ?array $branchIds = null, bool $includeNullBranchRecords = false)
     {
         $productionsQuery = $this->productions();
         $paymentsQuery = $this->payments();
         $salariesQuery = $this->salaries(); // 👈 new line
+        $branchIds = collect($branchIds ?? [])
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        $applyBranchScope = function ($query, string $table) use ($branchIds, $includeNullBranchRecords) {
+            if ($branchIds === [] || !Schema::hasColumn($table, 'branch_id')) {
+                return;
+            }
+
+            $query->where(function ($nested) use ($branchIds, $includeNullBranchRecords) {
+                $nested->whereIn('branch_id', $branchIds);
+                if ($includeNullBranchRecords) {
+                    $nested->orWhereNull('branch_id');
+                }
+            });
+        };
+
+        $applyBranchScope($productionsQuery, 'productions');
+        $applyBranchScope($paymentsQuery, 'employee_payments');
+        $applyBranchScope($salariesQuery, 'salaries');
 
         DateRange::apply($productionsQuery, 'date', $fromDate, $toDate, $includeGivenDate);
         DateRange::apply($paymentsQuery, 'date', $fromDate, $toDate, $includeGivenDate);

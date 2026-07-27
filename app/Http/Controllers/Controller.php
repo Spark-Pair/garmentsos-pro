@@ -12,6 +12,7 @@ use App\Models\Order;
 use App\Models\PaymentProgram;
 use App\Models\Shipment;
 use App\Services\ArticleStockService;
+use App\Services\Branches\BranchModuleRegistryService;
 use App\Services\Branches\ModuleBranchService;
 use App\Models\Supplier;
 use App\Models\UtilityAccount;
@@ -110,9 +111,10 @@ class Controller extends BaseController
                 break;
 
             case 'self_account':
-                return Cache::remember('category_data:self_account', now()->addMinutes(5), function () {
-                    return BankAccount::with('subCategory', 'bank')->where('category', 'self')->get();
-                });
+                return BankAccount::with('subCategory', 'bank')
+                    ->where('category', 'self')
+                    ->get()
+                    ->map(fn (BankAccount $account) => $this->bankAccountOptionPayload($account));
                 break;
 
             default:
@@ -597,7 +599,12 @@ class Controller extends BaseController
 
     protected function customerBalance(Customer $customer): float
     {
-        return (float) $customer->calculateBalance();
+        $scope = $this->balanceBranchScope();
+
+        return (float) $customer->calculateBalance(
+            branchIds: $scope['branch_ids'],
+            includeNullBranchRecords: $scope['include_null_branch_records'],
+        );
     }
 
     protected function customerOptionPayload(Customer $customer): array
@@ -620,9 +627,11 @@ class Controller extends BaseController
 
     protected function supplierBalance(Supplier $supplier, mixed $toDate = null): float
     {
+        $scope = $this->balanceBranchScope();
+
         return (float) ($toDate
-            ? $supplier->calculateBalance(null, $toDate, false, true)
-            : $supplier->calculateBalance());
+            ? $supplier->calculateBalance(null, $toDate, false, true, $scope['branch_ids'], $scope['include_null_branch_records'])
+            : $supplier->calculateBalance(branchIds: $scope['branch_ids'], includeNullBranchRecords: $scope['include_null_branch_records']));
     }
 
     protected function supplierOptionPayload(Supplier $supplier, mixed $toDate = null): array
@@ -643,7 +652,11 @@ class Controller extends BaseController
 
     protected function employeeOptionPayload(Employee $employee): array
     {
-        $balance = (float) $employee->calculateBalance();
+        $scope = $this->balanceBranchScope();
+        $balance = (float) $employee->calculateBalance(
+            branchIds: $scope['branch_ids'],
+            includeNullBranchRecords: $scope['include_null_branch_records'],
+        );
 
         return [
             'id' => $employee->id,
@@ -654,6 +667,110 @@ class Controller extends BaseController
             'balance' => $balance,
             'balance_formatted' => \App\Support\Money::format($balance),
         ];
+    }
+
+    protected function bankAccountBalance(BankAccount $account): float
+    {
+        $scope = $this->balanceBranchScope();
+
+        return (float) $account->calculateBalance(
+            branchIds: $scope['branch_ids'],
+            includeNullBranchRecords: $scope['include_null_branch_records'],
+        );
+    }
+
+    protected function bankAccountOptionPayload(BankAccount $account): array
+    {
+        $balance = $this->bankAccountBalance($account);
+
+        return [
+            'id' => $account->id,
+            'account_title' => $account->account_title,
+            'account_no' => $account->account_no,
+            'category' => $account->category,
+            'balance' => $balance,
+            'balance_formatted' => \App\Support\Money::format($balance),
+            'bank' => $account->bank ? [
+                'id' => $account->bank->id,
+                'title' => $account->bank->title,
+                'short_title' => $account->bank->short_title,
+            ] : null,
+            'sub_category' => $account->subCategory ? [
+                'id' => $account->subCategory->id,
+                'supplier_name' => $account->subCategory->supplier_name ?? null,
+                'customer_name' => $account->subCategory->customer_name ?? null,
+            ] : null,
+        ];
+    }
+
+    protected function balanceBranchScope(?string $moduleKey = null): array
+    {
+        try {
+            $branches = app(ModuleBranchService::class);
+            $moduleKey ??= $this->balanceModuleKey($branches);
+
+            if (!$moduleKey || !$branches->shouldFilterRecords($moduleKey)) {
+                return [
+                    'branch_ids' => [],
+                    'include_null_branch_records' => false,
+                ];
+            }
+
+            $branchIds = collect($branches->selectedBranchIdsForModule($moduleKey) ?? [])
+                ->filter(fn ($id) => is_numeric($id))
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->unique()
+                ->values()
+                ->all();
+
+            if ($branchIds === []) {
+                $selectedBranchId = $branches->selectedBranchIdForModule($moduleKey);
+                if ($selectedBranchId) {
+                    $branchIds = [(int) $selectedBranchId];
+                }
+            }
+
+            $mainBranchId = $branches->mainBranch()?->id;
+
+            return [
+                'branch_ids' => $branchIds,
+                'include_null_branch_records' => (bool) (
+                    $mainBranchId && in_array((int) $mainBranchId, $branchIds, true)
+                ),
+            ];
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return [
+                'branch_ids' => [],
+                'include_null_branch_records' => false,
+            ];
+        }
+    }
+
+    protected function balanceModuleKey(ModuleBranchService $branches): ?string
+    {
+        $moduleKey = $branches->currentModuleKey();
+
+        if ($moduleKey && $branches->shouldFilterRecords($moduleKey)) {
+            return $moduleKey;
+        }
+
+        try {
+            $previousUrl = url()->previous();
+            if (!$previousUrl) {
+                return $moduleKey;
+            }
+
+            $previousRequest = request()->create($previousUrl);
+            $previousRoute = app('router')->getRoutes()->match($previousRequest);
+            $previousModuleKey = app(BranchModuleRegistryService::class)->moduleKeyForRoute($previousRoute);
+
+            return $previousModuleKey ?: $moduleKey;
+        } catch (\Throwable) {
+            return $moduleKey;
+        }
     }
 
     public function getVoucherDetails(Request $request)
@@ -763,8 +880,14 @@ class Controller extends BaseController
 
     public function getEmployeesByCategory(Request $request)
     {
+        $branches = app(ModuleBranchService::class);
+        $workingModuleKey = $this->balanceModuleKey($branches);
 
-        $employees = Employee::where('category', $request->category)->where('status', 'active')->with('type')
+        $employees = $branches->applyRelatedScope(
+                Employee::where('category', $request->category)->where('status', 'active')->with('type'),
+                'employees',
+                $workingModuleKey,
+            )
             ->whereHas('type', function ($query) {
                 $query->where('title', 'not like', '% | E%');
             })

@@ -663,20 +663,10 @@ class VoucherController extends Controller
 
     private function formatVoucherBankAccountPayload(BankAccount $account): array
     {
-        return [
-            'id' => $account->id,
-            'category' => $account->category,
-            'account_title' => $account->account_title,
-            'account_no' => $account->account_no,
+        return array_merge($this->bankAccountOptionPayload($account), [
             'date' => optional($account->date)->toJSON(),
-            'balance' => (float) ($account->balance ?? 0),
             'available_cheques' => $account->available_cheques ?? [],
-            'bank' => $account->bank ? [
-                'id' => $account->bank->id,
-                'title' => $account->bank->title,
-                'short_title' => $account->bank->short_title,
-            ] : null,
-        ];
+        ]);
     }
 
     private function formatVoucherExpensePayload(Expense $expense): array

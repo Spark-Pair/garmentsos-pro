@@ -136,17 +136,13 @@ class Customer extends Model
             });
         }
 
-        if ($hasBranchScope) {
-            if (Schema::hasColumn('statement_adjustments', 'branch_id')) {
-                $adjustmentsQuery->where(function ($nested) use ($branchIds, $includeNullBranchRecords) {
-                    $nested->whereIn('branch_id', $branchIds);
-                    if ($includeNullBranchRecords) {
-                        $nested->orWhereNull('branch_id');
-                    }
-                });
-            } else {
-                $adjustmentsQuery->whereRaw('1 = 0');
-            }
+        if ($hasBranchScope && Schema::hasColumn('statement_adjustments', 'branch_id')) {
+            $adjustmentsQuery->where(function ($nested) use ($branchIds, $includeNullBranchRecords) {
+                $nested->whereIn('branch_id', $branchIds);
+                if ($includeNullBranchRecords) {
+                    $nested->orWhereNull('branch_id');
+                }
+            });
         }
 
         DateRange::apply($invoicesQuery, 'date', $fromDate, $toDate, $includeGivenDate);
@@ -205,17 +201,13 @@ class Customer extends Model
             ->get();
         $adjustments = $this->statementAdjustments()
             ->whereBetween(\Illuminate\Support\Facades\DB::raw('DATE(date)'), [$from->toDateString(), $to->toDateString()])
-            ->when($hasBranchScope, function ($query) use ($branchIds, $includeNullBranchRecords) {
-                if (Schema::hasColumn('statement_adjustments', 'branch_id')) {
-                    $query->where(function ($nested) use ($branchIds, $includeNullBranchRecords) {
-                        $nested->whereIn('branch_id', $branchIds);
-                        if ($includeNullBranchRecords) {
-                            $nested->orWhereNull('branch_id');
-                        }
-                    });
-                } else {
-                    $query->whereRaw('1 = 0');
-                }
+            ->when($hasBranchScope && Schema::hasColumn('statement_adjustments', 'branch_id'), function ($query) use ($branchIds, $includeNullBranchRecords) {
+                $query->where(function ($nested) use ($branchIds, $includeNullBranchRecords) {
+                    $nested->whereIn('branch_id', $branchIds);
+                    if ($includeNullBranchRecords) {
+                        $nested->orWhereNull('branch_id');
+                    }
+                });
             })
             ->get();
 

@@ -3,6 +3,7 @@
 namespace App\Traits;
 
 use App\Models\SupplierPayment;
+use App\Services\Branches\ModuleBranchService;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 
 trait VoucherComputed
@@ -12,9 +13,23 @@ trait VoucherComputed
         static $balanceCache = [];
         $previousBalance = 0;
         if ($this->supplier && $this->date) {
-            $cacheKey = $this->supplier->id . '|' . $this->date->format('Y-m-d');
+            $scope = $this->voucherBalanceBranchScope();
+            $cacheKey = implode('|', [
+                $this->supplier->id,
+                $this->date->format('Y-m-d'),
+                implode(',', $scope['branch_ids']),
+                $scope['include_null_branch_records'] ? 'null' : 'strict',
+            ]);
+
             if (!array_key_exists($cacheKey, $balanceCache)) {
-                $balanceCache[$cacheKey] = $this->supplier->calculateBalance(null, $this->date, false, true);
+                $balanceCache[$cacheKey] = $this->supplier->calculateBalance(
+                    null,
+                    $this->date,
+                    false,
+                    true,
+                    $scope['branch_ids'],
+                    $scope['include_null_branch_records'],
+                );
             }
             $previousBalance = $balanceCache[$cacheKey];
         }
@@ -98,6 +113,51 @@ trait VoucherComputed
             'oncontextmenu' => "generateContextMenu(event)",
             'onclick' => "generateModal(this)",
         ];
+    }
+
+    private function voucherBalanceBranchScope(): array
+    {
+        try {
+            $branches = app(ModuleBranchService::class);
+
+            if (!$branches->shouldFilterRecords('vouchers')) {
+                return [
+                    'branch_ids' => [],
+                    'include_null_branch_records' => false,
+                ];
+            }
+
+            $branchIds = collect($branches->selectedBranchIdsForModule('vouchers') ?? [])
+                ->filter(fn ($id) => is_numeric($id))
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->unique()
+                ->values()
+                ->all();
+
+            if ($branchIds === []) {
+                $selectedBranchId = $branches->selectedBranchIdForModule('vouchers');
+                if ($selectedBranchId) {
+                    $branchIds = [(int) $selectedBranchId];
+                }
+            }
+
+            $mainBranchId = $branches->mainBranch()?->id;
+
+            return [
+                'branch_ids' => $branchIds,
+                'include_null_branch_records' => (bool) (
+                    $mainBranchId && in_array((int) $mainBranchId, $branchIds, true)
+                ),
+            ];
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return [
+                'branch_ids' => [],
+                'include_null_branch_records' => false,
+            ];
+        }
     }
 
     public function scopeApplyModelFilters($query, $key, $value)

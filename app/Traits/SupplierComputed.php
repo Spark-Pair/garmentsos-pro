@@ -4,12 +4,15 @@ namespace App\Traits;
 
 use App\Models\Setup;
 use App\Models\SupplierPayment;
+use App\Services\Branches\ModuleBranchService;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 
 trait SupplierComputed
 {
     public function toFormattedArray()
     {
+        $displayBalance = $this->displayBalanceForSupplierPage();
+
         return [
             'id' => $this->id,
             'image' => $this->user->profile_picture == 'default_avatar.png' ? '/images/default_avatar.png' : '/storage/uploads/images/' . $this->user->profile_picture,
@@ -17,7 +20,7 @@ trait SupplierComputed
             'details' => [
                 'Urdu Title' => $this->urdu_title,
                 'Phone' => $this->phone_number,
-                'Balance' => \App\Support\Money::format($this->balance),
+                'Balance' => \App\Support\Money::format($displayBalance),
             ],
             'user' => [
                 'id' => $this->user->id,
@@ -44,6 +47,42 @@ trait SupplierComputed
             'oncontextmenu' => "generateContextMenu(event)",
             'onclick' => "generateModal(this)",
         ];
+    }
+
+    private function displayBalanceForSupplierPage(): float|int
+    {
+        if (!request()->routeIs('suppliers.index')) {
+            return $this->balance;
+        }
+
+        try {
+            $branches = app(ModuleBranchService::class);
+            if (!$branches->canShowSelector('suppliers') && !$branches->shouldFilterRecords('suppliers')) {
+                return $this->balance;
+            }
+
+            $branchIds = $branches->selectedBranchIdsForModule('suppliers');
+            if ($branchIds === [] && $branches->shouldFilterRecords('suppliers')) {
+                $branchIds = array_values(array_filter([
+                    $branches->selectedBranchIdForModule('suppliers'),
+                ]));
+            }
+
+            if ($branchIds === []) {
+                return $this->balance;
+            }
+
+            $mainBranchId = $branches->mainBranch()?->id;
+            $includeNullBranchRecords = $mainBranchId
+                && in_array((int) $mainBranchId, array_map('intval', $branchIds), true);
+
+            return $this->calculateBalance(
+                branchIds: $branchIds,
+                includeNullBranchRecords: (bool) $includeNullBranchRecords,
+            );
+        } catch (\Throwable) {
+            return $this->balance;
+        }
     }
 
     public function scopeApplyModelFilters($query, $key, $value)

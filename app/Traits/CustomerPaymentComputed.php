@@ -311,6 +311,8 @@ trait CustomerPaymentComputed
             if ($this->slip?->voucher)   return $this->slip->voucher->voucher_no;
             if ($this->cheque?->cr)      return $this->cheque->cr->c_r_no;
             if ($this->slip?->cr)        return $this->slip->cr->c_r_no;
+            if ($this->returnedCheque?->cr) return $this->returnedCheque->cr->c_r_no;
+            if ($this->returnedSlip?->cr)   return $this->returnedSlip->cr->c_r_no;
 
             // program-based fallback
             if ($this->isProgramMethod() && $this->program_id) {
@@ -650,10 +652,11 @@ trait CustomerPaymentComputed
                     ->orWhereHas('slip.cr', fn ($sq) =>
                             $sq->where('c_r_no', 'like', "%$value%")
                         )
-
-                    // DR
-                    ->orWhereHas('dr', fn ($sq) =>
-                            $sq->where('d_r_no', 'like', "%$value%")
+                    ->orWhereHas('returnedCheque.cr', fn ($sq) =>
+                            $sq->where('c_r_no', 'like', "%$value%")
+                        )
+                    ->orWhereHas('returnedSlip.cr', fn ($sq) =>
+                            $sq->where('c_r_no', 'like', "%$value%")
                         )
 
                     // 🔥 PROGRAM BASED SUPPLIER VOUCHER (FIX)

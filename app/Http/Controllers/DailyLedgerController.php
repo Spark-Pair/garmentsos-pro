@@ -84,21 +84,24 @@ class DailyLedgerController extends Controller
                 ])
                 ->values();
 
-            // Opening balance calculation
+            $scopedDeposits = fn () => $branches->applyScope(DailyLedgerDeposit::query(), 'daily_ledger');
+            $scopedUses = fn () => $branches->applyScope(DailyLedgerUse::query(), 'daily_ledger');
+
             $openingBalance = 0;
             if ($filteredLedgers->isNotEmpty()) {
-                $filteredDepositIds = $filteredLedgers->where('deposit', '>', 0)->pluck('id')->toArray();
-                $filteredUseIds = $filteredLedgers->where('use', '>', 0)->pluck('id')->toArray();
-                
-                $beforeDeposits = empty($filteredDepositIds) 
-                    ? $branches->applyScope(DailyLedgerDeposit::query(), 'daily_ledger')->sum('amount')
-                    : $branches->applyScope(DailyLedgerDeposit::query(), 'daily_ledger')->whereNotIn('id', $filteredDepositIds)->sum('amount');
-                
-                $beforeUses = empty($filteredUseIds)
-                    ? $branches->applyScope(DailyLedgerUse::query(), 'daily_ledger')->sum('amount')
-                    : $branches->applyScope(DailyLedgerUse::query(), 'daily_ledger')->whereNotIn('id', $filteredUseIds)->sum('amount');
-                
-                $openingBalance = $beforeDeposits - $beforeUses;
+                $firstVisibleDate = $filteredLedgers
+                    ->pluck('date_raw')
+                    ->filter()
+                    ->sort()
+                    ->first();
+
+                if ($firstVisibleDate) {
+                    $beforeDeposits = $scopedDeposits()->whereDate('date', '<', $firstVisibleDate)->sum('amount');
+                    $beforeUses = $scopedUses()->whereDate('date', '<', $firstVisibleDate)->sum('amount');
+                    $openingBalance = $beforeDeposits - $beforeUses;
+                }
+            } else {
+                $openingBalance = $scopedDeposits()->sum('amount') - $scopedUses()->sum('amount');
             }
 
             // Final sort: newest first
@@ -127,8 +130,7 @@ class DailyLedgerController extends Controller
             $totalUse = $finalData->sum('use');
             $netChange = $totalDeposit - $totalUse;
             $closingBalance = $openingBalance + $netChange;
-            $totalRecordsCount = $branches->applyScope(DailyLedgerDeposit::query(), 'daily_ledger')->count()
-                + $branches->applyScope(DailyLedgerUse::query(), 'daily_ledger')->count();
+            $totalRecordsCount = $scopedDeposits()->count() + $scopedUses()->count();
 
             return response()->json([
                 'data' => $finalData,
