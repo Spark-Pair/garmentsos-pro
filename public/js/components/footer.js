@@ -2,6 +2,15 @@
     function initFooter() {
         const config = window.__footer || {};
 
+        function removeFooterFromTabOrder() {
+            document.querySelectorAll('footer a, footer button, footer [role="button"], footer [tabindex]')
+                .forEach(element => {
+                    element.setAttribute('tabindex', '-1');
+                });
+        }
+
+        removeFooterFromTabOrder();
+
         if (config.wizardEnabled) {
             const yearDom = document.getElementById('year');
             if (yearDom) yearDom.textContent = new Date().getFullYear();

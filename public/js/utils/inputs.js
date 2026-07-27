@@ -121,3 +121,144 @@ function initializeArticleQuantityPair(pcsPerPacket, maxPcs = 0, pcsValue = '') 
     pcsInput.value = pcsValue ? parseInt(pcsValue, 10) : '';
     syncArticleQuantityPair('pcs', pcsPerPacket, maxPcs);
 }
+
+(function initEnterToNextField() {
+    const fieldSelector = [
+        'input:not([type="hidden"])',
+        'select',
+        'textarea',
+    ].join(',');
+
+    function isVisibleField(field) {
+        if (!field || field.disabled || field.readOnly) return false;
+        if (field.closest('[hidden], .hidden')) return false;
+        if (field.closest('.dropDownParent')) return false;
+
+        const style = window.getComputedStyle(field);
+        if (style.display === 'none' || style.visibility === 'hidden') return false;
+
+        const rect = field.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+    }
+
+    function fieldAnchor(field) {
+        const selectParent = field.closest?.('.selectParent');
+        if (!selectParent) return field;
+
+        const visibleSelectInput = selectParent.querySelector(':scope > .form-group input:not([type="hidden"])')
+            || selectParent.querySelector('input:not([type="hidden"]):not(.dbInput)');
+
+        return visibleSelectInput || field;
+    }
+
+    function getFieldScope(field) {
+        return field.closest('form')
+            || field.closest('div[id$="-wrapper"]')
+            || field.closest('.main-child')
+            || document;
+    }
+
+    function getFocusableFields(scope) {
+        return Array.from(scope.querySelectorAll(fieldSelector))
+            .filter(field => !field.classList.contains('dbInput'))
+            .filter(isVisibleField)
+            .map(fieldAnchor)
+            .filter((field, index, fields) => fields.indexOf(field) === index);
+    }
+
+    function focusField(field) {
+        field.focus();
+        field.select?.();
+
+        if (
+            ['date', 'time', 'datetime-local', 'month', 'week'].includes(field.type)
+            && typeof field.showPicker === 'function'
+        ) {
+            try {
+                field.showPicker();
+            } catch (_) {
+                // Some browsers only allow showPicker during direct user activation.
+            }
+        }
+    }
+
+    window.focusNextFormField = function focusNextFormField(currentField) {
+        const current = fieldAnchor(currentField);
+        const fields = getFocusableFields(getFieldScope(current));
+        if (!fields.length) return false;
+
+        const currentIndex = fields.indexOf(current);
+        if (currentIndex === -1 || currentIndex >= fields.length - 1) return false;
+
+        const next = fields[currentIndex + 1];
+        focusField(next);
+        return true;
+    };
+
+    window.focusFirstFormField = function focusFirstFormField(scope = document, options = {}) {
+        const form = scope.matches?.('form') ? scope : scope.querySelector?.('form');
+        if (!form || form.dataset.autoFocusApplied === 'true') return false;
+
+        if (options.onlyWhenIdle !== false) {
+            const active = document.activeElement;
+            const canMoveFocus = !active || active === document.body || active === document.documentElement;
+            if (!canMoveFocus) return false;
+        }
+
+        const first = getFocusableFields(form)[0];
+        if (!first) return false;
+
+        form.dataset.autoFocusApplied = 'true';
+        requestAnimationFrame(() => {
+            focusField(first);
+        });
+        return true;
+    };
+
+    document.addEventListener('keydown', event => {
+        if (event.defaultPrevented) return;
+        if (event.key !== 'Enter') return;
+        if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+
+        const target = event.target;
+        if (!target?.matches?.(fieldSelector)) return;
+        if (target.matches('textarea')) return;
+        if (target.closest('.dropDownParent')) return;
+        if (!isVisibleField(target)) return;
+
+        if (window.focusNextFormField(target)) {
+            event.preventDefault();
+        }
+    });
+
+    function focusInitialPageForm() {
+        document.querySelectorAll('form').forEach(form => {
+            window.focusFirstFormField(form);
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', focusInitialPageForm);
+    } else {
+        focusInitialPageForm();
+    }
+
+    const observer = new MutationObserver(mutations => {
+        mutations.forEach(mutation => {
+            mutation.addedNodes.forEach(node => {
+                if (!(node instanceof HTMLElement)) return;
+
+                if (node.matches('form')) {
+                    window.focusFirstFormField(node, { onlyWhenIdle: false });
+                    return;
+                }
+
+                node.querySelectorAll?.('form').forEach(form => {
+                    window.focusFirstFormField(form, { onlyWhenIdle: false });
+                });
+            });
+        });
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+})();

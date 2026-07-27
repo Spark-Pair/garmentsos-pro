@@ -4,6 +4,13 @@
         const menuData = config.menuData || [];
         const pageName = window.location.href.toLowerCase().split('/')[3];
 
+        function removeSidebarFromTabOrder() {
+            document.querySelectorAll('aside a, aside button, aside [role="button"], aside [tabindex], #mobileMenu a, #mobileMenu button, #mobileMenu [role="button"], #mobileMenu [tabindex]')
+                .forEach(element => {
+                    element.setAttribute('tabindex', '-1');
+                });
+        }
+
         function getAppConfigShortcuts() {
             if (window.__appConfig?.menuShortcuts) {
                 return window.__appConfig.menuShortcuts;
@@ -58,6 +65,7 @@
                     <div class="relative group">
                         <button
                             type="button"
+                            tabindex="-1"
                             onclick="openDropDown(event, this)"
                             onkeydown="handleSidebarDropdownKeydown(event, this)"
                             aria-haspopup="menu"
@@ -86,6 +94,7 @@
                                     <li>
                                         <a
                                             href="${item.href}"
+                                            tabindex="-1"
                                             role="menuitem"
                                             class="block px-4 py-2 hover:bg-[var(--h-bg-color)] rounded-lg transition-all duration-200 ease-in-out"
                                         >
@@ -101,6 +110,7 @@
                 `;
             });
             customMenuShortcutsDom.innerHTML = clutter;
+            removeSidebarFromTabOrder();
         }
         window.renderMenuShortcuts = renderMenuShortcuts;
         renderMenuShortcuts();
@@ -132,6 +142,7 @@
             if (typeof window.renderMenuShortcuts === 'function') {
                 window.renderMenuShortcuts();
             }
+            removeSidebarFromTabOrder();
         });
 
         document.addEventListener('keydown', function (event) {
@@ -244,6 +255,8 @@
                 button.querySelector('i').classList.toggle('rotate-180');
             });
         });
+
+        removeSidebarFromTabOrder();
 
         function closeAllMobileMenuDropdowns() {
             document.querySelectorAll('.dropdown-menu').forEach(menu => {

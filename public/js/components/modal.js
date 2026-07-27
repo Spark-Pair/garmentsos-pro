@@ -1141,6 +1141,34 @@ function createModal(data, animate = 'animate') {
     `;
     modalWrapper.innerHTML = clutter;
 
+    const focusModalSearchInput = () => {
+        const wrappers = Array.from(document.querySelectorAll('div[id$="-wrapper"]'));
+        const lastWrapper = wrappers[wrappers.length - 1];
+        if (!lastWrapper || lastWrapper !== modalWrapper) return false;
+
+        const input = modalWrapper.querySelector('#basicSearch input');
+        if (!input) return false;
+
+        input.focus();
+        input.select?.();
+        return true;
+    };
+
+    const focusSearchShortcut = (e) => {
+        if (!e.altKey || e.ctrlKey || e.metaKey || e.key.toLowerCase() !== 'f') return;
+        if (!focusModalSearchInput()) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    const removeModalListeners = () => {
+        document.removeEventListener('mousedown', closeOnClickOutside);
+        document.removeEventListener('keydown', escToClose);
+        document.removeEventListener('keydown', enterToSubmit);
+        document.removeEventListener('keydown', focusSearchShortcut);
+    };
+
     closeOnClickOutside = (e) => {
         const clickedId = e.target.id;
         if (clickedId === `${data.id}-wrapper` || clickedId === `${data.id}`) {
@@ -1154,9 +1182,7 @@ function createModal(data, animate = 'animate') {
                     modalWrapper.remove();
                 }, { once: true });
             }, { once: true });
-            document.removeEventListener('mousedown', closeOnClickOutside);
-            document.removeEventListener('keydown', escToClose);
-            document.removeEventListener('keydown', enterToSubmit);
+            removeModalListeners();
         }
     };
     document.addEventListener('mousedown', closeOnClickOutside);
@@ -1177,15 +1203,15 @@ function createModal(data, animate = 'animate') {
                 }, { once: true });
             }, { once: true });
 
-            // Optionally: remove these listeners after first use
-            document.removeEventListener('mousedown', closeOnClickOutside);
-            document.removeEventListener('keydown', escToClose);
-            document.removeEventListener('keydown', enterToSubmit);
+            removeModalListeners();
         }
     };
 
     // ✅ enter Key to subbmit
     enterToSubmit = (e) => {
+        if (e.defaultPrevented) return;
+        if (e.target?.matches?.('input, select, textarea')) return;
+
         if (e.key === 'Enter') {
             const form = modalWrapper.querySelector('form');
             const btn = form.querySelector('#modal-action button[id*="add"], #modal-action button[id*="update"]');
@@ -1196,6 +1222,7 @@ function createModal(data, animate = 'animate') {
     };
 
     document.addEventListener('keydown', escToClose);
+    document.addEventListener('keydown', focusSearchShortcut);
     if (data.defaultListener !== false) {
         document.addEventListener('keydown', enterToSubmit);
     }
@@ -1213,7 +1240,7 @@ function createModal(data, animate = 'animate') {
         }
     })
 
-    data.basicSearch ? document.querySelector('#basicSearch input').focus() : '';
+    data.basicSearch ? focusModalSearchInput() : '';
 
     formatAllAmountInputs();
 }
@@ -1331,7 +1358,7 @@ function createMenuModalCard(data) {
                         ${description ? `<p class="mt-1 text-xs leading-5 text-[var(--secondary-text)]">${description}</p>` : ''}
                     </div>
                 </div>
-                <div data-for='${data.id}' onclick='switchBtnTogggle(this)' title="${isEnabled ? 'Remove from menu' : 'Add to menu'}"
+                <div data-for='${data.id}' onclick='switchBtnTogggle(this, event)' title="${isEnabled ? 'Remove from menu' : 'Add to menu'}"
                     class="switchBtn shrink-0 ${isEnabled ? 'active' : ''}">
                     <div class="circle"></div>
                 </div>
@@ -1630,5 +1657,14 @@ document.addEventListener('click', (e) => {
 })
 
 function reRenderInfoInModal(specifier, value) {
-    document.querySelector(specifier + ' .main-text').innerHTML = value;
+    const container = document.querySelector(specifier);
+    if (!container) return;
+
+    const mainText = container.querySelector('.main-text');
+    if (mainText) {
+        mainText.innerHTML = value;
+        return;
+    }
+
+    container.innerHTML = value;
 }

@@ -11,6 +11,13 @@
     $primaryColor = $effectiveBranding['theme_primary_color'] ?? '#2563eb';
     $secondaryColor = $effectiveBranding['theme_secondary_color'] ?? '#1f2937';
     $accentColor = $effectiveBranding['theme_accent_color'] ?? '#2563eb';
+    $menuShortcuts = [];
+    if (Auth::check()) {
+        $rawMenuShortcuts = Auth::user()->menu_shortcuts;
+        $menuShortcuts = is_array($rawMenuShortcuts)
+            ? $rawMenuShortcuts
+            : (json_decode((string) $rawMenuShortcuts, true) ?: []);
+    }
     $activeUpdateLock = null;
     try {
         $activeUpdateLock = app(\App\Services\Updater\UpdateLockService::class)->activeLock();
@@ -21,7 +28,7 @@
     $appConfig = [
         'authenticated' => Auth::check(),
         'homeUrl' => route('home'),
-        'menuShortcuts' => Auth::check() ? (json_decode(Auth::user()->menu_shortcuts, true) ?? []) : [],
+        'menuShortcuts' => $menuShortcuts,
         'maxShortcutsLimit' => 7,
         'pusherEnabled' => $pusherEnabled,
         'pusherKey' => $pusherFrontend['key'] ?? null,

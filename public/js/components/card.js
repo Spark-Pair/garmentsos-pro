@@ -90,7 +90,7 @@ function createCard(data) {
 
     if (data.switchBtn) {
         clutter += `
-            <div data-for='${data.id}' onclick='switchBtnTogggle(this)' class="switchBtn absolute top-4 right-4 ${data.switchBtn.active && 'active'} ">
+            <div data-for='${data.id}' onclick='switchBtnTogggle(this, event)' class="switchBtn absolute top-4 right-4 ${data.switchBtn.active && 'active'} ">
                 <div class="circle">
                 </div>
             </div>

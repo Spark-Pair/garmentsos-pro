@@ -179,6 +179,9 @@ function selectKeyDown(event, input) {
         if (selected) {
             selectThisOption(selected);
             input.blur();
+            if (typeof window.focusNextFormField === 'function') {
+                window.focusNextFormField(input);
+            }
         }
     } else if (event.key === "Escape") {
         input.blur();

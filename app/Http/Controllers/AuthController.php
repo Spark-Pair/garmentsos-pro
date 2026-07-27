@@ -126,7 +126,7 @@ class AuthController extends Controller
     public function updateMenuShortcuts(Request $request)
     {
         if (auth()->check()) {
-            $userId = Auth::user()->id;
+            $user = Auth::user();
             $shortcuts = $request->input('menu_shortcuts', []);
             if (is_string($shortcuts)) {
                 $decoded = json_decode($shortcuts, true);
@@ -135,13 +135,54 @@ class AuthController extends Controller
             if (!is_array($shortcuts)) {
                 $shortcuts = [];
             }
-            $shortcuts = array_values(array_filter($shortcuts, fn($v) => is_string($v) && $v !== ''));
+            $allowedShortcuts = [
+                'articles',
+                'attendances',
+                'balance-entries',
+                'bank-accounts',
+                'bilties',
+                'cargos',
+                'cr',
+                'customer-payments',
+                'customers',
+                'daily-ledger',
+                'dr',
+                'employee-payments',
+                'employees',
+                'expenses',
+                'fabrics',
+                'inventory',
+                'invoices',
+                'orders',
+                'payment-programs',
+                'physical-quantities',
+                'productions',
+                'reports',
+                'sales-returns',
+                'shipments',
+                'statement',
+                'suppliers',
+                'users',
+                'utility-accounts',
+                'utility-bills',
+                'vouchers',
+            ];
+            $shortcuts = array_values(array_unique(array_filter(
+                $shortcuts,
+                fn($v) => is_string($v) && in_array($v, $allowedShortcuts, true)
+            )));
 
-            User::where('id', $userId)->update([
-                'menu_shortcuts' => json_encode($shortcuts),
+            User::where('id', $user->id)->update([
+                'menu_shortcuts' => $shortcuts,
             ]);
+            $user->menu_shortcuts = $shortcuts;
+            Auth::setUser($user);
 
-            return response()->json(['status' => 'updated']);
+            return response()->json([
+                'status' => 'success',
+                'saved' => true,
+                'menu_shortcuts' => $shortcuts,
+            ]);
         }
 
         return response()->json(['status' => 'unauthorized'], 401);

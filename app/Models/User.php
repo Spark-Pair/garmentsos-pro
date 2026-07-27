@@ -53,6 +53,10 @@ class User extends Authenticatable
         'physical_quantity_report_type' => 'altration',
     ];
 
+    protected $casts = [
+        'menu_shortcuts' => 'array',
+    ];
+
     /**
      * The attributes that should be hidden for arrays.
      *
