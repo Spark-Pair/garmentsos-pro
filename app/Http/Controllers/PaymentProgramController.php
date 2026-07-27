@@ -128,10 +128,11 @@ class PaymentProgramController extends Controller
             ->select('id', 'customer_name', 'date', 'city_id')
             ->get();
 
+        $customerPayloads = $this->customerOptionPayloads($customers, 'payment_programs');
         $customers_options = [];
 
         foreach ($customers as $customer) {
-            $customerPayload = $this->customerOptionPayload($customer);
+            $customerPayload = $customerPayloads[(int) $customer->id];
 
             $customers_options[(int)$customer->id] = [
                 'text' => $customer->customer_name . ' | ' . ($customer->city->title ?? 'N/A') . ' | Balance: ' . $customerPayload['balance_formatted'],
@@ -523,4 +524,5 @@ class PaymentProgramController extends Controller
             default => null,
         };
     }
+
 }

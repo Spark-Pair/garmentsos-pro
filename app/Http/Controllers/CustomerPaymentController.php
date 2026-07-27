@@ -288,7 +288,7 @@ class CustomerPaymentController extends Controller
                         ->with('error', 'Selected payment program is already cleared.');
                 }
 
-                $customerPayload = $this->customerOptionPayload($program->customer);
+                $customerPayload = $this->customerOptionPayloads(collect([$program->customer]), 'customer_payments')[(int) $program->customer->id];
                 $customerPayload['payment_programs'] = $programPayload;
 
                 $customers_options = [
@@ -327,14 +327,15 @@ class CustomerPaymentController extends Controller
             ->select('id', 'customer_name', 'date', 'city_id')
             ->get();
 
-        $customers_options = $customers->mapWithKeys(function ($customer) {
+        $customerPayloads = $this->customerOptionPayloads($customers, 'customer_payments');
+        $customers_options = $customers->mapWithKeys(function ($customer) use ($customerPayloads) {
             $programs = $customer->paymentPrograms
                 ->map(fn($program) => $this->formatProgramPayload($program))
                 ->filter(fn($program) => ($program['balance'] ?? 0) > 0)
                 ->values()
                 ->all();
 
-            $customerPayload = $this->customerOptionPayload($customer);
+            $customerPayload = $customerPayloads[(int) $customer->id];
             $customerPayload['payment_programs'] = $programs;
 
             return [(int)$customer->id => [

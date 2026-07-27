@@ -114,8 +114,9 @@ class ProductionController extends Controller
                 'productions',
             )
             ->get();
+        $employeePayloads = $this->employeeOptionPayloads($workers, 'productions');
         foreach($workers as $worker) {
-            $employeePayload = $this->employeeOptionPayload($worker);
+            $employeePayload = $employeePayloads[(int) $worker->id];
             $worker['taags'] = $worker['tags']
                 ->groupBy('tag')
                 ->map(function ($items, $tag) use ($worker, $articles) {
@@ -142,7 +143,7 @@ class ProductionController extends Controller
                             'quantity' => $items->sum('quantity'),
                             'sumofinproductions' => $sum,
                             'returned_quantity' => $total_return_fabric,
-                            'unit' => ucfirst($fabric->unit),
+                            'unit' => ucfirst((string) ($fabric?->unit ?? '')),
                             'available_quantity' => $availableQuantity,
                             'supplier_name' => $supplier->supplier_name ?? null,
                         ];

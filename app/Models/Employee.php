@@ -108,7 +108,7 @@ class Employee extends Model
         DateRange::apply($salariesQuery, 'date', $fromDate, $toDate, $includeGivenDate);
 
         // Calculate totals
-        $totalProductions = $productionsQuery->sum('netAmount') ?? 0;
+        $totalProductions = $productionsQuery->sum('amount') ?? 0;
         $totalPayments = $paymentsQuery->sum('amount') ?? 0;
         $totalSalaries = $salariesQuery->sum('amount') ?? 0; // 👈 added
 

@@ -224,11 +224,12 @@ class VoucherController extends Controller
             ->get()
             ->makeHidden('creator');
 
-        $self_accounts_options = $self_accounts->mapWithKeys(function ($account) {
+        $bankAccountPayloads = $this->bankAccountOptionPayloads($self_accounts, 'vouchers');
+        $self_accounts_options = $self_accounts->mapWithKeys(function ($account) use ($bankAccountPayloads) {
             return [
                 (int)$account->id => [
                     'text' => $account->account_title . ' - ' . $account->bank->short_title,
-                    'data_option' => $this->formatVoucherBankAccountPayload($account),
+                    'data_option' => $this->formatVoucherBankAccountPayload($account, $bankAccountPayloads[(int) $account->id]),
                 ]
             ];
         })->toArray();
@@ -240,11 +241,12 @@ class VoucherController extends Controller
                 ->select('id', 'supplier_name', 'date')
                 ->get();
 
-            $suppliers_options = $suppliers->mapWithKeys(function ($supplier) {
+            $supplierPayloads = $this->supplierOptionPayloads($suppliers, 'vouchers');
+            $suppliers_options = $suppliers->mapWithKeys(function ($supplier) use ($supplierPayloads) {
                 return [
                     (int)$supplier->id => [
                         'text' => $supplier->supplier_name,
-                        'data_option' => $this->supplierOptionPayload($supplier),
+                        'data_option' => $supplierPayloads[(int) $supplier->id],
                     ]
                 ];
             })->toArray();
@@ -661,9 +663,9 @@ class VoucherController extends Controller
         ];
     }
 
-    private function formatVoucherBankAccountPayload(BankAccount $account): array
+    private function formatVoucherBankAccountPayload(BankAccount $account, ?array $accountPayload = null): array
     {
-        return array_merge($this->bankAccountOptionPayload($account), [
+        return array_merge($accountPayload ?? $this->bankAccountOptionPayload($account), [
             'date' => optional($account->date)->toJSON(),
             'available_cheques' => $account->available_cheques ?? [],
         ]);

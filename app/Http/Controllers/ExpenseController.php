@@ -83,6 +83,7 @@ class ExpenseController extends Controller
             $query->where('status', 'active');
         }), 'suppliers', 'expenses')->get();
 
+        $supplierPayloads = $this->supplierOptionPayloads($suppliers, 'expenses');
         $suppliers_options = [];
         foreach ($suppliers as $supplier) {
             $categoriesIdArray = json_decode($supplier->categories_array, true);
@@ -91,7 +92,7 @@ class ExpenseController extends Controller
                 ->where('type', 'supplier_category')
                 ->get();
 
-            $supplierPayload = $this->supplierOptionPayload($supplier);
+            $supplierPayload = $supplierPayloads[(int) $supplier->id];
             $supplierPayload['categories'] = $categories;
             $supplierPayload['categories_array'] = $supplier->categories_array;
             $suppliers_options[$supplier->id] = [

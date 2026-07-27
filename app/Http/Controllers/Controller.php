@@ -26,6 +26,8 @@ use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 
 class Controller extends BaseController
@@ -99,7 +101,7 @@ class Controller extends BaseController
                     $query->where('status', 'active');
                 })->select('id', 'supplier_name', 'date')->get()->makeHidden('creator', 'categories');
 
-                return $suppliers->map(fn (Supplier $supplier) => $this->supplierOptionPayload($supplier));
+                return collect($this->supplierOptionPayloads($suppliers))->values();
                 break;
 
             case 'customer':
@@ -107,14 +109,15 @@ class Controller extends BaseController
                     $query->where('status', 'active');
                 })->select('id', 'customer_name', 'date', 'city_id')->get()->makeHidden('creator');
 
-                return $customers->map(fn (Customer $customer) => $this->customerOptionPayload($customer));
+                return collect($this->customerOptionPayloads($customers))->values();
                 break;
 
             case 'self_account':
-                return BankAccount::with('subCategory', 'bank')
+                $accounts = BankAccount::with('subCategory', 'bank')
                     ->where('category', 'self')
-                    ->get()
-                    ->map(fn (BankAccount $account) => $this->bankAccountOptionPayload($account));
+                    ->get();
+
+                return collect($this->bankAccountOptionPayloads($accounts))->values();
                 break;
 
             default:
@@ -625,6 +628,37 @@ class Controller extends BaseController
         ];
     }
 
+    protected function customerOptionPayloads(iterable $customers, ?string $moduleKey = null): array
+    {
+        $customers = collect($customers);
+        $balances = $this->customerBalances($customers->pluck('id')->all(), $moduleKey);
+
+        return $customers
+            ->mapWithKeys(fn (Customer $customer) => [
+                (int) $customer->id => $this->customerOptionPayloadFromBalance(
+                    $customer,
+                    (float) ($balances[(int) $customer->id] ?? 0)
+                ),
+            ])
+            ->all();
+    }
+
+    protected function customerOptionPayloadFromBalance(Customer $customer, float $balance): array
+    {
+        return [
+            'id' => $customer->id,
+            'customer_name' => $customer->customer_name,
+            'date' => $customer->date?->format('Y-m-d'),
+            'balance' => $balance,
+            'balance_formatted' => \App\Support\Money::format($balance),
+            'city' => $customer->city ? [
+                'id' => $customer->city->id,
+                'title' => $customer->city->title,
+                'short_title' => $customer->city->short_title,
+            ] : null,
+        ];
+    }
+
     protected function supplierBalance(Supplier $supplier, mixed $toDate = null): float
     {
         $scope = $this->balanceBranchScope();
@@ -650,6 +684,34 @@ class Controller extends BaseController
         ];
     }
 
+    protected function supplierOptionPayloads(iterable $suppliers, ?string $moduleKey = null): array
+    {
+        $suppliers = collect($suppliers);
+        $balances = $this->supplierBalances($suppliers->pluck('id')->all(), $moduleKey);
+
+        return $suppliers
+            ->mapWithKeys(fn (Supplier $supplier) => [
+                (int) $supplier->id => $this->supplierOptionPayloadFromBalance(
+                    $supplier,
+                    (float) ($balances[(int) $supplier->id] ?? 0)
+                ),
+            ])
+            ->all();
+    }
+
+    protected function supplierOptionPayloadFromBalance(Supplier $supplier, float $balance): array
+    {
+        return [
+            'id' => $supplier->id,
+            'supplier_name' => $supplier->supplier_name,
+            'date' => optional($supplier->date)->toJSON(),
+            'balance' => $balance,
+            'balance_formatted' => \App\Support\Money::format($balance),
+            'balance_at_date' => $balance,
+            'balance_at_date_formatted' => \App\Support\Money::format($balance),
+        ];
+    }
+
     protected function employeeOptionPayload(Employee $employee): array
     {
         $scope = $this->balanceBranchScope();
@@ -658,6 +720,34 @@ class Controller extends BaseController
             includeNullBranchRecords: $scope['include_null_branch_records'],
         );
 
+        return [
+            'id' => $employee->id,
+            'employee_name' => $employee->employee_name,
+            'category' => $employee->category,
+            'joining_date' => $employee->joining_date?->format('Y-m-d'),
+            'type' => $employee->type,
+            'balance' => $balance,
+            'balance_formatted' => \App\Support\Money::format($balance),
+        ];
+    }
+
+    protected function employeeOptionPayloads(iterable $employees, ?string $moduleKey = null): array
+    {
+        $employees = collect($employees);
+        $balances = $this->employeeBalances($employees->pluck('id')->all(), $moduleKey);
+
+        return $employees
+            ->mapWithKeys(fn (Employee $employee) => [
+                (int) $employee->id => $this->employeeOptionPayloadFromBalance(
+                    $employee,
+                    (float) ($balances[(int) $employee->id] ?? 0)
+                ),
+            ])
+            ->all();
+    }
+
+    protected function employeeOptionPayloadFromBalance(Employee $employee, float $balance): array
+    {
         return [
             'id' => $employee->id,
             'employee_name' => $employee->employee_name,
@@ -683,6 +773,43 @@ class Controller extends BaseController
     {
         $balance = $this->bankAccountBalance($account);
 
+        return [
+            'id' => $account->id,
+            'account_title' => $account->account_title,
+            'account_no' => $account->account_no,
+            'category' => $account->category,
+            'balance' => $balance,
+            'balance_formatted' => \App\Support\Money::format($balance),
+            'bank' => $account->bank ? [
+                'id' => $account->bank->id,
+                'title' => $account->bank->title,
+                'short_title' => $account->bank->short_title,
+            ] : null,
+            'sub_category' => $account->subCategory ? [
+                'id' => $account->subCategory->id,
+                'supplier_name' => $account->subCategory->supplier_name ?? null,
+                'customer_name' => $account->subCategory->customer_name ?? null,
+            ] : null,
+        ];
+    }
+
+    protected function bankAccountOptionPayloads(iterable $accounts, ?string $moduleKey = null): array
+    {
+        $accounts = collect($accounts);
+        $balances = $this->bankAccountBalances($accounts->pluck('id')->all(), $moduleKey);
+
+        return $accounts
+            ->mapWithKeys(fn (BankAccount $account) => [
+                (int) $account->id => $this->bankAccountOptionPayloadFromBalance(
+                    $account,
+                    (float) ($balances[(int) $account->id] ?? 0)
+                ),
+            ])
+            ->all();
+    }
+
+    protected function bankAccountOptionPayloadFromBalance(BankAccount $account, float $balance): array
+    {
         return [
             'id' => $account->id,
             'account_title' => $account->account_title,
@@ -747,6 +874,237 @@ class Controller extends BaseController
                 'include_null_branch_records' => false,
             ];
         }
+    }
+
+    protected function applyBulkBalanceBranchScope(mixed $query, string $table, array $scope): void
+    {
+        $branchIds = $scope['branch_ids'] ?? [];
+
+        if ($branchIds === [] || !Schema::hasColumn($table, 'branch_id')) {
+            return;
+        }
+
+        $query->where(function ($nested) use ($branchIds, $scope, $table) {
+            $nested->whereIn($table . '.branch_id', $branchIds);
+
+            if ($scope['include_null_branch_records'] ?? false) {
+                $nested->orWhereNull($table . '.branch_id');
+            }
+        });
+    }
+
+    protected function normalizeBalanceIds(array $ids): array
+    {
+        return collect($ids)
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    protected function customerBalances(array $customerIds, ?string $moduleKey = null): array
+    {
+        $customerIds = $this->normalizeBalanceIds($customerIds);
+
+        if ($customerIds === []) {
+            return [];
+        }
+
+        $scope = $this->balanceBranchScope($moduleKey);
+
+        $invoiceTotals = DB::table('invoices')
+            ->select('customer_id', DB::raw('COALESCE(SUM(netAmount), 0) as total'))
+            ->whereIn('customer_id', $customerIds)
+            ->tap(fn ($query) => $this->applyBulkBalanceBranchScope($query, 'invoices', $scope))
+            ->groupBy('customer_id')
+            ->pluck('total', 'customer_id');
+
+        $paymentTotals = DB::table('customer_payments')
+            ->select('customer_id', DB::raw('COALESCE(SUM(amount), 0) as total'))
+            ->whereIn('customer_id', $customerIds)
+            ->where('type', '!=', 'DR')
+            ->tap(fn ($query) => $this->applyBulkBalanceBranchScope($query, 'customer_payments', $scope))
+            ->groupBy('customer_id')
+            ->pluck('total', 'customer_id');
+
+        $adjustmentTotals = DB::table('statement_adjustments')
+            ->select('adjustable_id', DB::raw("COALESCE(SUM(CASE WHEN direction = 'minus' THEN -amount ELSE amount END), 0) as total"))
+            ->where('adjustable_type', Customer::class)
+            ->whereIn('adjustable_id', $customerIds)
+            ->tap(fn ($query) => $this->applyBulkBalanceBranchScope($query, 'statement_adjustments', $scope))
+            ->groupBy('adjustable_id')
+            ->pluck('total', 'adjustable_id');
+
+        return collect($customerIds)
+            ->mapWithKeys(fn ($customerId) => [
+                $customerId => (float) ($invoiceTotals[$customerId] ?? 0)
+                    - (float) ($paymentTotals[$customerId] ?? 0)
+                    + (float) ($adjustmentTotals[$customerId] ?? 0),
+            ])
+            ->all();
+    }
+
+    protected function supplierBalances(array $supplierIds, ?string $moduleKey = null): array
+    {
+        $supplierIds = $this->normalizeBalanceIds($supplierIds);
+
+        if ($supplierIds === []) {
+            return [];
+        }
+
+        $scope = $this->balanceBranchScope($moduleKey);
+
+        $expenseTotals = DB::table('expenses')
+            ->select('supplier_id', DB::raw('COALESCE(SUM(amount), 0) as total'))
+            ->whereIn('supplier_id', $supplierIds)
+            ->tap(fn ($query) => $this->applyBulkBalanceBranchScope($query, 'expenses', $scope))
+            ->groupBy('supplier_id')
+            ->pluck('total', 'supplier_id');
+
+        $paymentTotals = DB::table('supplier_payments')
+            ->select('supplier_id', DB::raw('COALESCE(SUM(amount), 0) as total'))
+            ->whereIn('supplier_id', $supplierIds)
+            ->whereRaw('LOWER(method) IN (?, ?, ?, ?, ?, ?, ?, ?)', [
+                'cheque',
+                'cash',
+                'slip',
+                'atm',
+                'self cheque',
+                'program',
+                'p. return',
+                'adjustment',
+            ])
+            ->tap(fn ($query) => $this->applyBulkBalanceBranchScope($query, 'supplier_payments', $scope))
+            ->groupBy('supplier_id')
+            ->pluck('total', 'supplier_id');
+
+        $productionTotals = DB::table('productions')
+            ->join('suppliers', 'suppliers.worker_id', '=', 'productions.worker_id')
+            ->select('suppliers.id as supplier_id', DB::raw('COALESCE(SUM(productions.amount), 0) as total'))
+            ->whereIn('suppliers.id', $supplierIds)
+            ->tap(fn ($query) => $this->applyBulkBalanceBranchScope($query, 'productions', $scope))
+            ->groupBy('suppliers.id')
+            ->pluck('total', 'supplier_id');
+
+        $adjustmentTotals = DB::table('statement_adjustments')
+            ->select('adjustable_id', DB::raw("COALESCE(SUM(CASE WHEN direction = 'minus' THEN -amount ELSE amount END), 0) as total"))
+            ->where('adjustable_type', Supplier::class)
+            ->whereIn('adjustable_id', $supplierIds)
+            ->tap(fn ($query) => $this->applyBulkBalanceBranchScope($query, 'statement_adjustments', $scope))
+            ->groupBy('adjustable_id')
+            ->pluck('total', 'adjustable_id');
+
+        return collect($supplierIds)
+            ->mapWithKeys(fn ($supplierId) => [
+                $supplierId => (float) ($expenseTotals[$supplierId] ?? 0)
+                    + (float) ($productionTotals[$supplierId] ?? 0)
+                    - (float) ($paymentTotals[$supplierId] ?? 0)
+                    + (float) ($adjustmentTotals[$supplierId] ?? 0),
+            ])
+            ->all();
+    }
+
+    protected function employeeBalances(array $employeeIds, ?string $moduleKey = null): array
+    {
+        $employeeIds = $this->normalizeBalanceIds($employeeIds);
+
+        if ($employeeIds === []) {
+            return [];
+        }
+
+        $scope = $this->balanceBranchScope($moduleKey);
+
+        $productionTotals = DB::table('productions')
+            ->select('worker_id', DB::raw('COALESCE(SUM(amount), 0) as total'))
+            ->whereIn('worker_id', $employeeIds)
+            ->tap(fn ($query) => $this->applyBulkBalanceBranchScope($query, 'productions', $scope))
+            ->groupBy('worker_id')
+            ->pluck('total', 'worker_id');
+
+        $paymentTotals = DB::table('employee_payments')
+            ->select('employee_id', DB::raw('COALESCE(SUM(amount), 0) as total'))
+            ->whereIn('employee_id', $employeeIds)
+            ->tap(fn ($query) => $this->applyBulkBalanceBranchScope($query, 'employee_payments', $scope))
+            ->groupBy('employee_id')
+            ->pluck('total', 'employee_id');
+
+        $salaryTotals = DB::table('salaries')
+            ->select('employee_id', DB::raw('COALESCE(SUM(amount), 0) as total'))
+            ->whereIn('employee_id', $employeeIds)
+            ->tap(fn ($query) => $this->applyBulkBalanceBranchScope($query, 'salaries', $scope))
+            ->groupBy('employee_id')
+            ->pluck('total', 'employee_id');
+
+        return collect($employeeIds)
+            ->mapWithKeys(fn ($employeeId) => [
+                $employeeId => (float) ($productionTotals[$employeeId] ?? 0)
+                    + (float) ($salaryTotals[$employeeId] ?? 0)
+                    - (float) ($paymentTotals[$employeeId] ?? 0),
+            ])
+            ->all();
+    }
+
+    protected function bankAccountBalances(array $accountIds, ?string $moduleKey = null): array
+    {
+        $accountIds = $this->normalizeBalanceIds($accountIds);
+
+        if ($accountIds === []) {
+            return [];
+        }
+
+        $scope = $this->balanceBranchScope($moduleKey);
+
+        $accounts = DB::table('bank_accounts')
+            ->whereIn('id', $accountIds)
+            ->select('id', 'category')
+            ->get()
+            ->keyBy('id');
+
+        $customerPaymentTotals = DB::table('customer_payments')
+            ->select('bank_account_id', DB::raw('COALESCE(SUM(amount), 0) as total'))
+            ->whereIn('bank_account_id', $accountIds)
+            ->tap(fn ($query) => $this->applyBulkBalanceBranchScope($query, 'customer_payments', $scope))
+            ->groupBy('bank_account_id')
+            ->pluck('total', 'bank_account_id');
+
+        $supplierPaymentTotals = DB::table('supplier_payments')
+            ->select('bank_account_id', DB::raw('COALESCE(SUM(amount), 0) as total'))
+            ->whereIn('bank_account_id', $accountIds)
+            ->tap(fn ($query) => $this->applyBulkBalanceBranchScope($query, 'supplier_payments', $scope))
+            ->groupBy('bank_account_id')
+            ->pluck('total', 'bank_account_id');
+
+        $paymentClearTotals = Schema::hasTable('payment_clears')
+            ? DB::table('payment_clears')
+                ->select('bank_account_id', DB::raw('COALESCE(SUM(amount), 0) as total'))
+                ->whereIn('bank_account_id', $accountIds)
+                ->where('method', '!=', 'cash')
+                ->tap(fn ($query) => $this->applyBulkBalanceBranchScope($query, 'payment_clears', $scope))
+                ->groupBy('bank_account_id')
+                ->pluck('total', 'bank_account_id')
+            : collect();
+
+        $adjustmentTotals = DB::table('statement_adjustments')
+            ->select('adjustable_id', DB::raw("COALESCE(SUM(CASE WHEN direction = 'minus' THEN -amount ELSE amount END), 0) as total"))
+            ->where('adjustable_type', BankAccount::class)
+            ->whereIn('adjustable_id', $accountIds)
+            ->tap(fn ($query) => $this->applyBulkBalanceBranchScope($query, 'statement_adjustments', $scope))
+            ->groupBy('adjustable_id')
+            ->pluck('total', 'adjustable_id');
+
+        return collect($accountIds)
+            ->mapWithKeys(function ($accountId) use ($accounts, $customerPaymentTotals, $supplierPaymentTotals, $paymentClearTotals, $adjustmentTotals) {
+                $category = $accounts[$accountId]->category ?? null;
+                $adjustments = (float) ($adjustmentTotals[$accountId] ?? 0);
+                $balance = $category === 'self'
+                    ? (float) ($customerPaymentTotals[$accountId] ?? 0) - (float) ($supplierPaymentTotals[$accountId] ?? 0) + $adjustments
+                    : (float) ($paymentClearTotals[$accountId] ?? 0) + $adjustments;
+
+                return [$accountId => $balance];
+            })
+            ->all();
     }
 
     protected function balanceModuleKey(ModuleBranchService $branches): ?string
@@ -891,8 +1249,9 @@ class Controller extends BaseController
             ->whereHas('type', function ($query) {
                 $query->where('title', 'not like', '% | E%');
             })
-            ->get()
-            ->map(fn (Employee $employee) => $this->employeeOptionPayload($employee));
+            ->get();
+
+        $employees = collect($this->employeeOptionPayloads($employees, $workingModuleKey))->values();
         return response()->json([
             'status' => 'success',
             'data' => $employees
