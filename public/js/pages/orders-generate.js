@@ -773,7 +773,7 @@
                 applyDefaultOrderDiscount(response.default_order_discount_percent);
             },
             error: function () {
-                alert('Error submitting form');
+                appAlert('Error submitting form');
             },
         });
     };

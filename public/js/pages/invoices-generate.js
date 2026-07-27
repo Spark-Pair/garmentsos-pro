@@ -212,7 +212,7 @@
                     location.reload();
                 },
                 error: function () {
-                    alert("Failed to update invoice type.");
+                    appAlert("Failed to update invoice type.");
                     $(btn).prop("disabled", false);
                 },
             });

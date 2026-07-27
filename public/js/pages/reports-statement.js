@@ -266,7 +266,7 @@
                 error: function (xhr, status, error) {
                     if (status === "abort") return;
                     console.error("Error fetching statement record details:", error);
-                    alert("Failed to load statement record details.");
+                    appAlert("Failed to load statement record details.");
                 },
                 complete: function () {
                     setStatementRowLoading(row, false);
@@ -292,7 +292,7 @@
                     location.reload();
                 },
                 error: function () {
-                    alert("Failed to update statement type.");
+                    appAlert("Failed to update statement type.");
                     $(btn).prop("disabled", false);
                 },
             });

@@ -64,6 +64,15 @@ function showToast(type = 'info', message = '') {
     showMessageBox(type, message);
 }
 
+function appAlert(message = '', type = 'error') {
+    if (typeof showMessageBox === 'function') {
+        showMessageBox(type, message);
+        return;
+    }
+
+    console.error(message);
+}
+
 function hideNotification(notificationElem) {
     notificationElem.classList.add('fade-out');
     notificationElem.addEventListener('animationend', () => {

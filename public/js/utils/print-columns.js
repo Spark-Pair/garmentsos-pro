@@ -6,7 +6,7 @@
     window.openPrintColumnModal = function() {
         const tableHead = document.querySelector('#table-head');
         if (!tableHead) {
-            alert('Table header not found');
+            appAlert('Table header not found');
             return;
         }
 
@@ -262,7 +262,7 @@
         const selectedColumns = printColumns.filter(col => col.selected);
 
         if (selectedColumns.length === 0) {
-            alert('Please select at least one column');
+            appAlert('Please select at least one column');
             return;
         }
 

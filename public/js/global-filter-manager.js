@@ -165,7 +165,7 @@ const GlobalFilterManager = {
 
         } catch (error) {
             console.error('Error applying filters:', error);
-            alert('Failed to apply filters. Please try again.');
+            appAlert('Failed to apply filters. Please try again.');
         } finally {
             this.showLoading(false);
         }

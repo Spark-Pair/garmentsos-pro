@@ -18,7 +18,7 @@
 
     window.exportPageToExcel = function exportPageToExcel() {
         if (typeof XLSX === 'undefined') {
-            alert('Excel export library failed to load.');
+            appAlert('Excel export library failed to load.');
             return;
         }
 
@@ -26,7 +26,7 @@
         const searchContainer = document.querySelector('.search_container');
 
         if (!tableHead || !searchContainer) {
-            alert('Table data not found for export.');
+            appAlert('Table data not found for export.');
             return;
         }
 
@@ -39,7 +39,7 @@
             .filter((row) => row.some(Boolean));
 
         if (!headers.length || !rows.length) {
-            alert('No table data available for export.');
+            appAlert('No table data available for export.');
             return;
         }
 

@@ -69,7 +69,7 @@ function initVouchersCreate() {
                 location.reload();
             },
             error: function () {
-                alert("Failed to update vaoucher type.");
+                appAlert("Failed to update vaoucher type.");
                 $(btn).prop("disabled", false);
             }
         });

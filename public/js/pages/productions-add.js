@@ -61,7 +61,7 @@
                     location.reload();
                 },
                 error: function () {
-                    alert("Failed to update production type.");
+                    appAlert("Failed to update production type.");
                     $(btn).prop("disabled", false);
                 },
             });
@@ -1074,7 +1074,6 @@
             };
 
             window.generateQuantityModal = function generateQuantityModal(item) {
-                console.log(item);
                 
                 let quantityModalData = {
                     id: "quantityModalForm",
@@ -1306,7 +1305,6 @@
             window.trackTicketState = function trackTicketState(elem) {
                 if (elem.value != "") {
                     let selectedTicket = JSON.parse(elem.parentElement.querySelector("li.selected").dataset.option);
-                    console.log(selectedTicket);
                     
                     selectThisArticle(selectedTicket.article);
                     selectThisOption(document.querySelector(`li[data-value="${selectedTicket.work_id}"]`));

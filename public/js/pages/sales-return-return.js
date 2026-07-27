@@ -415,7 +415,7 @@
 
             if (selectedReturns.length === 0) {
                 event.preventDefault();
-                alert(`Please select at least one invoice article for ${currentTypeLabel().toLowerCase()}.`);
+                appAlert(`Please select at least one invoice article for ${currentTypeLabel().toLowerCase()}.`);
             }
         });
 

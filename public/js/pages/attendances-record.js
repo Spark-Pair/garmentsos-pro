@@ -38,7 +38,7 @@
         document.getElementById("form")?.addEventListener("submit", function (e) {
             if (!formattedData.length) {
                 e.preventDefault();
-                alert("Please upload an attendance XLS file before saving.");
+                appAlert("Please upload an attendance XLS file before saving.");
             }
         });
 

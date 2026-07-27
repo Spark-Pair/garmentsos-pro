@@ -386,8 +386,6 @@ function initPaymentProgramsIndex() {
             ];
         });
 
-        console.log(data);
-
         let modalData = {
             id: 'modalForm',
             class: 'max-w-4xl h-[37rem]',

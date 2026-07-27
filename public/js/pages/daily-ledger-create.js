@@ -27,7 +27,7 @@ function initDailyLedgerCreate() {
                 location.reload();
             },
             error: function () {
-                alert("Failed to update daily ledger type.");
+                appAlert("Failed to update daily ledger type.");
                 $(btn).prop("disabled", false);
             }
         });

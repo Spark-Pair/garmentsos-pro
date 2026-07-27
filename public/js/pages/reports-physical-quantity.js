@@ -87,7 +87,7 @@
                     location.reload();
                 },
                 error: function () {
-                    alert("Failed to update physical quantity report type.");
+                    appAlert("Failed to update physical quantity report type.");
                 },
             });
         };
@@ -122,12 +122,12 @@
             const proceedBy = getInputValue("proceed_by");
 
             if (mode === "article_wise" && !articleId) {
-                alert("Please select an article.");
+                appAlert("Please select an article.");
                 return false;
             }
 
             if (mode === "proceed_by_wise" && !proceedBy) {
-                alert("Please type a Proceed By value.");
+                appAlert("Please type a Proceed By value.");
                 return false;
             }
 
@@ -155,7 +155,7 @@
                 },
                 error: function (xhr, status, error) {
                     console.error("Error fetching physical quantity report:", error);
-                    alert("Failed to generate the report preview.");
+                    appAlert("Failed to generate the report preview.");
                 },
             });
         }
@@ -164,7 +164,7 @@
             const preview = document.getElementById("preview-container");
 
             if (!preview) {
-                alert("Preview not ready yet.");
+                appAlert("Preview not ready yet.");
                 return;
             }
 

@@ -563,7 +563,7 @@
                 }
             },
             error: function () {
-                alert('Error submitting form');
+                appAlert('Error submitting form');
             },
         });
     };
