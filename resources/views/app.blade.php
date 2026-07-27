@@ -638,6 +638,7 @@
             $latestVersion = $developerUpdateStatus['latest_version'] ?? ($developerUpdateStatus['feed']['version'] ?? 'latest');
             $currentVersion = $developerUpdateStatus['current_version'] ?? config('app.version', 'Installed');
             $releaseNotes = $developerUpdateStatus['notes'] ?? data_get($developerUpdateStatus, 'feed.notes') ?? data_get($developerUpdateStatus, 'feed.body') ?? 'Laravel prepares the update handoff. The Windows launcher applies the update outside the running app.';
+            $releaseNoteItems = format_release_notes($releaseNotes);
             $mandatoryUpdate = (bool) ($developerUpdateStatus['mandatory'] ?? data_get($developerUpdateStatus, 'feed.mandatory', false));
         @endphp
         <div id="developer-update-modal"
@@ -672,8 +673,23 @@
                         </div>
                     @endif
                     <details class="rounded-lg border border-[var(--glass-border-color)]/10 bg-[var(--h-bg-color)] p-3 text-sm" open>
-                        <summary class="cursor-pointer font-semibold">Details</summary>
-                        <div class="mt-2 max-h-60 overflow-y-auto whitespace-pre-line rounded-lg pr-2 text-[var(--secondary-text)] my-scrollbar-2">{{ $releaseNotes }}</div>
+                        <summary class="cursor-pointer font-semibold">What will change</summary>
+                        <div class="mt-3 max-h-60 overflow-y-auto pr-2 my-scrollbar-2">
+                            @if ($releaseNoteItems)
+                                <ul class="space-y-2">
+                                    @foreach ($releaseNoteItems as $note)
+                                        <li class="flex gap-2 rounded-lg border border-[var(--glass-border-color)]/10 bg-[var(--secondary-bg-color)] px-3 py-2 text-[var(--secondary-text)]">
+                                            <span class="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--primary-color)]"></span>
+                                            <span>{{ $note }}</span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @else
+                                <div class="rounded-lg border border-[var(--glass-border-color)]/10 bg-[var(--secondary-bg-color)] px-3 py-2 text-[var(--secondary-text)]">
+                                    Release details are not available for this update.
+                                </div>
+                            @endif
+                        </div>
                     </details>
                 </div>
                 <div class="flex shrink-0 flex-wrap justify-end gap-2 border-t border-[var(--glass-border-color)]/10 px-5 py-4">

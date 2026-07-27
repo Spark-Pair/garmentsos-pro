@@ -46,6 +46,8 @@
         $applyStatus = $manifestReady
             ? 'Available after signed manifest and package validation'
             : 'Advanced signed-manifest apply is not configured';
+        $releaseNoteItems = format_release_notes($releaseFeed['notes'] ?? null);
+        $manifestReleaseNoteItems = format_release_notes($result['manifest']['release_notes'] ?? null);
     @endphp
 
     <div class="max-w-6xl mx-auto w-full">
@@ -170,7 +172,20 @@
                 </div>
                 <div class="{{ $softPanel }} md:col-span-2">
                     <dt class="text-[var(--secondary-text)]">Notes</dt>
-                    <dd class="mt-1 whitespace-pre-line">{{ $releaseFeed['notes'] ?? '-' }}</dd>
+                    <dd class="mt-2">
+                        @if ($releaseNoteItems)
+                            <ul class="space-y-1.5">
+                                @foreach ($releaseNoteItems as $note)
+                                    <li class="flex gap-2 text-sm">
+                                        <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--primary-color)]"></span>
+                                        <span>{{ $note }}</span>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @else
+                            -
+                        @endif
+                    </dd>
                 </div>
             </dl>
 
@@ -347,7 +362,20 @@
                             </div>
                             <div class="{{ $softPanel }} md:col-span-2">
                                 <div class="text-[var(--secondary-text)]">Release notes</div>
-                                <div class="whitespace-pre-line">{{ $result['manifest']['release_notes'] ?? '-' }}</div>
+                                <div class="mt-2">
+                                    @if ($manifestReleaseNoteItems)
+                                        <ul class="space-y-1.5">
+                                            @foreach ($manifestReleaseNoteItems as $note)
+                                                <li class="flex gap-2 text-sm">
+                                                    <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--primary-color)]"></span>
+                                                    <span>{{ $note }}</span>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    @else
+                                        -
+                                    @endif
+                                </div>
                             </div>
                         </div>
 
