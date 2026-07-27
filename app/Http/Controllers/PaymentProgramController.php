@@ -35,7 +35,6 @@ class PaymentProgramController extends Controller
             $paymentProgramsQuery = PaymentProgram::with([
                 'customer.city',
                 'subCategory',
-                'order.invoices',
             ])
                 ->withPaymentDetails()
                 ->orderByDesc('id');

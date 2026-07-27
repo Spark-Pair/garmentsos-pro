@@ -391,7 +391,7 @@ function initPaymentProgramsIndex() {
         let modalData = {
             id: 'modalForm',
             class: 'max-w-4xl h-[37rem]',
-            name: `Payment Details - ${data.customer_name} | ${formatNumbersWithDigits(data.customer_balance, 1, 1)} | ${formatNumbersWithDigits(data.order_balance, 1, 1)}`,
+            name: `Payment Details - ${data.customer_name} | Customer Bal. ${formatNumbersWithDigits(data.customer_balance, 1, 1)} | Order Bal. ${formatNumbersWithDigits(data.order_balance, 1, 1)}`,
             table: {
                 name: 'Details',
                 headers: [

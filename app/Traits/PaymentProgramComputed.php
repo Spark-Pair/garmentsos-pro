@@ -3,6 +3,7 @@
 namespace App\Traits;
 
 use App\Services\Branches\ModuleBranchService;
+use App\Services\Orders\OrderBalanceService;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 
 trait PaymentProgramComputed
@@ -113,52 +114,6 @@ trait PaymentProgramComputed
         );
     }
 
-    /**
-     * Order ki woh amount jis ki invoice abhi banna baqi hai.
-     *
-     * Sirf order_no/order_id wale programs par calculate hogi.
-     */
-    private function calculateOrderBalance(): float
-    {
-        $hasOrder = !empty($this->order_no)
-            || !empty($this->order_id);
-
-        if (!$hasOrder || !$this->order) {
-            return 0;
-        }
-
-        /*
-         * Apne Order model ke actual total field ko priority dein.
-         * Jo field project mein available ho woh use ho jayegi.
-         */
-        $orderAmount = (float) (
-            $this->order->netAmount
-            ?? $this->order->net_amount
-            ?? $this->order->total_amount
-            ?? $this->order->amount
-            ?? $this->amount
-            ?? 0
-        );
-
-        /*
-         * Invoices ke actual total field ke mutabiq amount sum karein.
-         */
-        $invoicedAmount = (float) $this->order->invoices->sum(
-            fn ($invoice) => (float) (
-                $invoice->netAmount
-                ?? $invoice->net_amount
-                ?? $invoice->total_amount
-                ?? $invoice->amount
-                ?? 0
-            )
-        );
-
-        /*
-         * Negative order balance return nahi karna.
-         */
-        return max(0, $orderAmount - $invoicedAmount);
-    }
-
     public function toFormattedArray()
     {
         $paymentRows = $this->customerPayments
@@ -194,7 +149,12 @@ trait PaymentProgramComputed
             ->values();
 
         $customerBalance = $this->branchWiseCustomerBalance();
-        $orderBalance = $this->calculateOrderBalance();
+        $scope = $this->paymentProgramBranchScope();
+        $orderBalance = app(OrderBalanceService::class)->pendingForCustomer(
+            $this->customer,
+            $scope['branch_ids'],
+            $scope['include_null_branch_records'],
+        );
 
         return [
             'id' => $this->id,
@@ -219,8 +179,7 @@ trait PaymentProgramComputed
             'balance' => (float) $this->balance,
 
             /*
-             * Sirf order wale record mein meaningful value hogi.
-             * Normal program mein zero hogi.
+             * Customer ke selected branch scope ka total pending order balance.
              */
             'order_balance' => $orderBalance,
 

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Traits\CustomerComputed;
 use App\Traits\Filterable;
+use App\Services\Orders\OrderBalanceService;
 use App\Support\DateRange;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -403,6 +404,11 @@ class Customer extends Model
             'bill' => $statement->sum('bill'),
             'payment' => $statement->sum('payment'),
             'balance' => $statement->sum('bill') - $statement->sum('payment'),
+            'order_balance' => app(OrderBalanceService::class)->pendingForCustomer(
+                $this,
+                $branchIds,
+                $includeNullBranchRecords,
+            ),
         ];
 
         return [

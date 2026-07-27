@@ -192,7 +192,7 @@
                                     <div class="right my-auto pr-3 text-sm text-gray-800 space-y-1.5">
                                         <div class="total-bill leading-none">Total Bill: {{ \App\Support\Money::format($data['totals']['bill']) }}</div>
                                         <div class="total-payment leading-none">Total Payment: {{ \App\Support\Money::format($data['totals']['payment']) }}</div>
-                                        <div class="total-balance leading-none">Total Balance: {{ \App\Support\Money::format($data['totals']['balance']) }}</div>
+                                        <div class="total-balance leading-none">Total Order Balance: {{ \App\Support\Money::format($data['totals']['order_balance'] ?? 0) }}</div>
                                     </div>
                                 </div>
 
