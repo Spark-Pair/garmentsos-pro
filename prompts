@@ -65,12 +65,14 @@ do the same thing, calculate it just in one place and use it everywhere the cust
 13. production ticket issue
 ✅
 
-14. Manage all the stock, not just fabric but the fabric maangement is ecists dont remove it 
+14. Manage all the stock, not just fabric but the fabric maangement is ecists dont remove it
+✅
 
 15. update popup/modal close kar rahe hen ya later press kar rahe hen to wo har refresh per dobara show ho raha hai agar latter/close/x press kuch bhi kiya hai or wo update optional hai to dobara login karne per popup ae or agar mandatory hai to wo bar bar ae
 ✅
 
 16. production materials/tags store in saperate table not in array
+✅
 
 17. bundeling building issue on github new migrations are not biuld if build then not pullling on client PC
 ✅
@@ -82,5 +84,7 @@ do the same thing, calculate it just in one place and use it everywhere the cust
 ✅
 
 18. developer settings save but not showing toggle on
+✅
 
 19. developer branch modules settings mai issues hen sahyad hard coded chal raha hai kiyun ke settings change karne se koi farq nahi parh raha hai kuch update nahi ho raha hai
+✅

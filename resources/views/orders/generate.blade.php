@@ -24,7 +24,7 @@
         <div class="step1 space-y-4 ">
             <div class="flex justify-between gap-4">
                 {{-- order date --}}
-                <div class="w-1/2 grid grid-cols-2 gap-2">
+                <div class="w-1/2 grid grid-cols-2 gap-4">
                     <x-input label="Date" name="date" id="date" type="date" onchange="getDataByDate(this)" validateMax max='{{ now()->toDateString() }}' validateMin min="2024-01-01" required />
 
                     <x-input label="Deliver To" name="deliver_to" id="deliver_to" placeholder="Optional delivery address / person" />
