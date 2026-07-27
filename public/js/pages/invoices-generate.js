@@ -296,7 +296,6 @@
                     : '';
 
                 return `
-                    <div id="preview-container" class="h-auto mx-auto relative flex flex-col">
                         <div id="preview" class="preview w-[148mm] h-[210mm] gos-a5-document gos-a5-invoice overflow-hidden flex flex-col">
                             <div class="flex flex-col h-full">
                                 <div id="banner" class="banner w-full flex justify-between items-center px-5">
@@ -365,7 +364,6 @@
                                     <p class="leading-none text-sm">&copy; ${new Date().getFullYear()} SparkPair | +92 316 5825495</p>
                                 </div>
                             </div>
-                        </div>
                     </div>
                 `;
             }).join('');
@@ -967,7 +965,7 @@
             let invoiceNo;
             let invoiceDate;
             let cottonCount = 0;
-            const previewDom = document.getElementById("preview");
+            const previewDom = document.getElementById("preview-container");
 
             function generateInvoiceNo() {
                 return nextInvoicePreviewNo();
@@ -1026,13 +1024,17 @@
                         })),
                     };
 
+                    previewDom.className = "h-auto mx-auto relative flex flex-col";
                     previewDom.innerHTML = [
                         buildInvoicePreviewLikeModal(previewData, 'Customer'),
                         buildInvoicePreviewLikeModal(previewData, 'Office'),
                     ].join('');
                 } else {
+                    previewDom.className = "w-[148mm] h-[210mm] mx-auto overflow-hidden relative";
                     previewDom.innerHTML = `
-                        <h1 class="text-[var(--border-error)] font-medium text-center mt-5">No Preview avalaible.</h1>
+                        <div id="preview" class="preview w-[148mm] h-[210mm] gos-a5-document gos-a5-invoice overflow-hidden flex flex-col">
+                            <h1 class="text-[var(--border-error)] font-medium text-center mt-5">No Preview avalaible.</h1>
+                        </div>
                     `;
                 }
             }
@@ -1446,7 +1448,7 @@
 
             let invoiceNo;
             let invoiceDate;
-            const previewDom = document.getElementById("preview");
+            const previewDom = document.getElementById("preview-container");
 
             function generateInvoiceNo() {
                 return nextInvoicePreviewNo();
@@ -1505,13 +1507,17 @@
                         })),
                     };
 
+                    previewDom.className = "h-auto mx-auto relative flex flex-col";
                     previewDom.innerHTML = [
                         buildOrderInvoicePreviewLikeModal(previewData, 'Customer'),
                         buildOrderInvoicePreviewLikeModal(previewData, 'Office'),
                     ].join('');
                 } else {
+                    previewDom.className = "w-[148mm] h-[210mm] mx-auto overflow-hidden relative";
                     previewDom.innerHTML = `
-                        <h1 class="text-[var(--border-error)] font-medium text-center mt-5">No Preview avalaible.</h1>
+                        <div id="preview" class="preview w-[148mm] h-[210mm] gos-a5-document gos-a5-invoice overflow-hidden flex flex-col">
+                            <h1 class="text-[var(--border-error)] font-medium text-center mt-5">No Preview avalaible.</h1>
+                        </div>
                     `;
                 }
             }
@@ -1673,8 +1679,7 @@
                     e.preventDefault();
                     closeAllDropdowns();
                     generateInvoice();
-                    const previewRoot = document.getElementById("preview");
-                    const preview = previewRoot || document.getElementById("preview-container");
+                    const preview = document.getElementById("preview-container") || document.getElementById("preview");
 
                     let oldIframe = document.getElementById("printIframe");
                     if (oldIframe) {
@@ -1708,31 +1713,44 @@
                                     }
 
                                     @media print {
+                                        html,
                                         body {
                                             margin: 0;
                                             padding: 0;
-                                            width: 148mm;
-                                            height: 210mm;
+                                            width: auto;
+                                            min-height: 0;
                                         }
 
-                                        #preview-container,
-                                        #preview,
-                                        .preview-container,
+                                        #preview-container {
+                                            width: auto !important;
+                                            height: auto !important;
+                                            max-height: none !important;
+                                            overflow: visible !important;
+                                        }
+
                                         .preview {
                                             width: 148mm !important;
                                             height: 210mm !important;
                                             max-width: 148mm !important;
                                             max-height: 210mm !important;
+                                            overflow: hidden !important;
+                                            break-after: page;
+                                            page-break-after: always;
                                         }
 
-                                        .preview-container, .preview-container * {
+                                        #preview-container .preview:last-child {
+                                            break-after: auto;
+                                            page-break-after: auto;
+                                        }
+
+                                        .preview {
                                             page-break-inside: avoid;
                                         }
                                     }
                                 </style>
                             </head>
                             <body>
-                                ${preview ? preview.innerHTML : ''}
+                                <div id="preview-container" class="preview-container">${preview ? preview.innerHTML : ''}</div>
                             </body>
                         </html>
                     `);

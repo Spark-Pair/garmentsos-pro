@@ -606,7 +606,30 @@
     let companyData;
     let orderNo;
     let orderDate;
-    const previewDom = document.getElementById('preview');
+    const previewContainer = document.getElementById('preview-container');
+
+    function chunkA5Rows(rows) {
+        const source = Array.isArray(rows) ? rows : [];
+        const chunks = [];
+        let remaining = source.slice();
+        const maxRowsWithoutTotals = 12;
+        const maxRowsWithTotals = 11;
+
+        if (remaining.length <= maxRowsWithTotals) {
+            return [remaining];
+        }
+
+        while (remaining.length > maxRowsWithTotals) {
+            const take = remaining.length <= maxRowsWithoutTotals + maxRowsWithTotals
+                ? Math.min(maxRowsWithoutTotals, remaining.length - 1)
+                : maxRowsWithoutTotals;
+            chunks.push(remaining.slice(0, take));
+            remaining = remaining.slice(take);
+        }
+
+        chunks.push(remaining);
+        return chunks;
+    }
 
     function generateOrderNo() {
         return safeDocumentNumberPreview(
@@ -630,10 +653,41 @@
         orderNo = generateOrderNo();
         orderDate = getOrderDate();
 
-        if (!previewDom) return;
+        if (!previewContainer) return;
         if (selectedArticles.length > 0) {
-            previewDom.innerHTML = `
-                    <div id="order" class="order flex flex-col h-full">
+            const pages = chunkA5Rows(sortedSelectedArticles());
+            let serial = 1;
+
+            previewContainer.className = 'h-auto mx-auto relative flex flex-col';
+            previewContainer.innerHTML = pages.map((pageArticles, pageIndex) => {
+                const isLastPage = pageIndex === pages.length - 1;
+                const bodyRows = pageArticles.map((article) => {
+                    const detailLine = orderDetailLine(article);
+                    const dispatched = orderDispatchText(article);
+                    const currentSerial = String(serial++).padStart(2, '0');
+
+                    return `
+                        <div class="invoice-item-row">
+                            <div class="tr invoice-item-main grid grid-cols-9 justify-between w-full px-4 gap-0.5">
+                                <div class="td text-sm font-semibold truncate">${currentSerial}</div>
+                                <div class="td invoice-article-cell text-sm font-semibold">
+                                    <div class="invoice-article-code">${article.article_no}</div>
+                                </div>
+                                <div class="td invoice-description-cell text-sm font-semibold">${detailLine}</div>
+                                <div class="td text-sm font-semibold truncate">${article?.pcs_per_packet ?? 0}</div>
+                                <div class="td text-sm font-semibold truncate">${article?.pcs_per_packet ? Math.floor(article.orderedQuantity / article.pcs_per_packet) : 0}</div>
+                                <div class="td text-sm font-semibold truncate">${article.orderedQuantity}</div>
+                                <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(article.sales_rate)}</div>
+                                <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(parseFormattedNumber(article.sales_rate) * article.orderedQuantity)}</div>
+                                <div class="td text-sm font-semibold text-center">${dispatched}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                return `
+                    <div id="preview" class="preview w-[148mm] h-[210mm] gos-a5-document gos-a5-invoice overflow-hidden flex flex-col">
+                        <div id="order" class="order flex flex-col h-full">
                         <div id="banner" class="banner w-full flex justify-between items-center px-5">
                             <div class="left">
                                 <div class="logo">
@@ -679,49 +733,27 @@
                                         </div>
                                     </div>
                                     <div id="tbody" class="tbody w-full">
-                                        ${sortedSelectedArticles()
-                                            .map((article, index) => {
-                                                const hrClass = index === 0 ? 'mb-2.5' : 'my-2.5';
-                                                const detailLine = orderDetailLine(article);
-                                                const dispatched = orderDispatchText(article);
-                                                return `
-                                                    <div class="invoice-item-row">
-                                                        <hr class="w-full ${hrClass} border-gray-600">
-                                                        <div class="tr invoice-item-main grid grid-cols-9 justify-between w-full px-4 gap-0.5">
-                                                            <div class="td text-sm font-semibold truncate">${String(index + 1).padStart(2, '0')}</div>
-                                                            <div class="td invoice-article-cell text-sm font-semibold">
-                                                                <div class="invoice-article-code">${article.article_no}</div>
-                                                            </div>
-                                                            <div class="td invoice-description-cell text-sm font-semibold">${detailLine}</div>
-                                                            <div class="td text-sm font-semibold truncate">${article?.pcs_per_packet ?? 0}</div>
-                                                            <div class="td text-sm font-semibold truncate">${article?.pcs_per_packet ? Math.floor(article.orderedQuantity / article.pcs_per_packet) : 0}</div>
-                                                            <div class="td text-sm font-semibold truncate">${article.orderedQuantity}</div>
-                                                            <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(article.sales_rate)}</div>
-                                                            <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(parseFormattedNumber(article.sales_rate) * article.orderedQuantity)}</div>
-                                                            <div class="td text-sm font-semibold text-center">${dispatched}</div>
-                                                        </div>
-                                                    </div>
-                                                    `;
-                                            })
-                                            .join('')}
+                                        ${bodyRows}
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <hr class="w-full my-3 border-gray-600">
-                        ${orderDocumentTotalsHtml()}
+                        ${isLastPage ? `<hr class="w-full my-3 border-gray-600">${orderDocumentTotalsHtml()}` : ''}
                         <hr class="w-full my-3 border-gray-600">
                         <div class="tfooter flex w-full text-sm px-4 justify-between text-gray-600">
                             <P class="leading-none">Powered by SparkPair</P>
-                            <p class="leading-none text-sm">Page 1 of 1</p>
+                            <p class="leading-none text-sm">Page ${pageIndex + 1} of ${pages.length}</p>
                             <p class="leading-none text-sm">Printed: ${printDateTime()}</p>
                             <p class="leading-none text-sm">&copy; ${new Date().getFullYear()} SparkPair | +92 316 5825495</p>
                         </div>
                     </div>
+                    </div>
                 `;
+            }).join('');
         } else {
-            previewDom.innerHTML =
-                '<h1 class="text-[var(--border-error)] font-medium text-center mt-5">No Preview avalaible.</h1>';
+            previewContainer.className = 'w-[148mm] h-[210mm] mx-auto overflow-hidden relative';
+            previewContainer.innerHTML =
+                '<div id="preview" class="preview w-[148mm] h-[210mm] gos-a5-document gos-a5-invoice overflow-hidden flex flex-col"><h1 class="text-[var(--border-error)] font-medium text-center mt-5">No Preview avalaible.</h1></div>';
         }
     };
 

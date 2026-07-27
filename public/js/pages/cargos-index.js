@@ -56,22 +56,69 @@
                         <title>Print Cargo List</title>
                         ${headContent}
                         <style>
+                            @page {
+                                size: A5 portrait;
+                                margin: 3mm;
+                            }
+
                             @media print {
+                                html,
                                 body {
                                     margin: 0;
                                     padding: 0;
-                                    width: 210mm;
-                                    height: 297mm;
+                                    width: auto;
+                                    min-height: 0;
                                 }
 
-                                .preview-container, .preview-container * {
+                                #preview-container {
+                                    width: auto !important;
+                                    height: auto !important;
+                                    max-height: none !important;
+                                    overflow: visible !important;
+                                }
+
+                                .preview {
+                                    width: 142mm !important;
+                                    height: 204mm !important;
+                                    max-width: 142mm !important;
+                                    max-height: 204mm !important;
+                                    overflow: hidden !important;
+                                    break-after: page;
+                                    page-break-after: always;
                                     page-break-inside: avoid;
+                                }
+
+                                .preview,
+                                .preview * {
+                                    box-sizing: border-box;
+                                }
+
+                                .preview-document {
+                                    display: flex !important;
+                                    flex-direction: column !important;
+                                    height: 100% !important;
+                                    min-height: 0 !important;
+                                }
+
+                                .preview-body {
+                                    flex: 1 1 auto !important;
+                                    min-height: 0 !important;
+                                }
+
+                                .tfooter,
+                                .footer {
+                                    break-inside: avoid;
+                                    page-break-inside: avoid;
+                                }
+
+                                #preview-container .preview:last-child {
+                                    break-after: auto;
+                                    page-break-after: auto;
                                 }
                             }
                         </style>
                     </head>
                     <body>
-                        <div class="preview-container">${preview.innerHTML}</div>
                         <div id="preview-container" class="preview-container">${preview.innerHTML}</div>
                     </body>
                 </html>

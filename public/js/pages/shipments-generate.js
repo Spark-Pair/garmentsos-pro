@@ -431,7 +431,30 @@
 
     let shipmentNo;
     let shipmentDate;
-    const previewDom = document.getElementById('preview');
+    const previewContainer = document.getElementById('preview-container');
+
+    function chunkA5Rows(rows) {
+        const source = Array.isArray(rows) ? rows : [];
+        const chunks = [];
+        let remaining = source.slice();
+        const maxRowsWithoutTotals = 12;
+        const maxRowsWithTotals = 11;
+
+        if (remaining.length <= maxRowsWithTotals) {
+            return [remaining];
+        }
+
+        while (remaining.length > maxRowsWithTotals) {
+            const take = remaining.length <= maxRowsWithoutTotals + maxRowsWithTotals
+                ? Math.min(maxRowsWithoutTotals, remaining.length - 1)
+                : maxRowsWithoutTotals;
+            chunks.push(remaining.slice(0, take));
+            remaining = remaining.slice(take);
+        }
+
+        chunks.push(remaining);
+        return chunks;
+    }
 
     function generateShipmentNo() {
         const shipmentNo = String(lastShipment?.shipment_no ?? '').trim();
@@ -478,9 +501,38 @@
         shipmentNo = generateShipmentNo();
         shipmentDate = getShipmentDate();
 
-        if (!previewDom) return;
+        if (!previewContainer) return;
         if (selectedArticles.length > 0) {
-            previewDom.innerHTML = `
+            const pages = chunkA5Rows(sortedSelectedArticles());
+            let serial = 1;
+
+            previewContainer.className = 'h-auto mx-auto relative flex flex-col';
+            previewContainer.innerHTML = pages.map((pageArticles, pageIndex) => {
+                const isLastPage = pageIndex === pages.length - 1;
+                const bodyRows = pageArticles.map((article) => {
+                    const packets = article.pcs_per_packet ? Math.floor(article.shipmentQuantity / article.pcs_per_packet) : 0;
+                    const currentSerial = String(serial++).padStart(2, '0');
+
+                    return `
+                        <div class="invoice-item-row">
+                            <div class="tr invoice-item-main grid grid-cols-8 justify-between w-full px-4 gap-0.5">
+                                <div class="td text-sm font-semibold truncate">${currentSerial}</div>
+                                <div class="td invoice-article-cell text-sm font-semibold">
+                                    <div class="invoice-article-code">${article.article_no}</div>
+                                </div>
+                                <div class="td invoice-description-cell text-sm font-semibold">${shipmentDetailLine(article)}</div>
+                                <div class="td text-sm font-semibold truncate">${article.pcs_per_packet || 0}</div>
+                                <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(packets)}</div>
+                                <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(article.shipmentQuantity)}</div>
+                                <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(article.sales_rate)}</div>
+                                <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(parseFormattedNumber(article.sales_rate) * article.shipmentQuantity)}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                return `
+                    <div id="preview" class="preview w-[148mm] h-[210mm] gos-a5-document gos-a5-invoice overflow-hidden flex flex-col">
                     <div id="shipment" class="shipment flex flex-col h-full">
                         <div id="banner" class="banner w-full flex justify-between items-center px-5">
                             <div class="left">
@@ -524,33 +576,12 @@
                                         </div>
                                     </div>
                                     <div id="tbody" class="tbody w-full">
-                                        ${sortedSelectedArticles()
-                                            .map((article, index) => {
-                                                const hrClass = index === 0 ? 'mb-2.5' : 'my-2.5';
-                                                const packets = article.pcs_per_packet ? Math.floor(article.shipmentQuantity / article.pcs_per_packet) : 0;
-                                                return `
-                                                <div class="invoice-item-row">
-                                                    <hr class="w-full ${hrClass} border-black">
-                                                    <div class="tr invoice-item-main grid grid-cols-8 justify-between w-full px-4 gap-0.5">
-                                                        <div class="td text-sm font-semibold truncate">${String(index + 1).padStart(2, '0')}</div>
-                                                        <div class="td invoice-article-cell text-sm font-semibold">
-                                                            <div class="invoice-article-code">${article.article_no}</div>
-                                                        </div>
-                                                        <div class="td invoice-description-cell text-sm font-semibold">${shipmentDetailLine(article)}</div>
-                                                        <div class="td text-sm font-semibold truncate">${article.pcs_per_packet || 0}</div>
-                                                        <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(packets)}</div>
-                                                        <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(article.shipmentQuantity)}</div>
-                                                        <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(article.sales_rate)}</div>
-                                                        <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(parseFormattedNumber(article.sales_rate) * article.shipmentQuantity)}</div>
-                                                    </div>
-                                                </div>
-                                            `;
-                                            })
-                                            .join('')}
+                                        ${bodyRows}
                                     </div>
                                 </div>
                             </div>
                         </div>
+                        ${isLastPage ? `
                         <hr class="w-full my-3 border-black">
                         <div class="grid grid-cols-2 gap-2 px-5">
                             <div class="total flex justify-between items-center border border-black rounded-lg py-2 px-4 w-full">
@@ -570,18 +601,22 @@
                                 <div class="w-1/4 text-right grow">${finalNetAmount.value}</div>
                             </div>
                         </div>
+                        ` : ''}
                         <hr class="w-full my-3 border-black">
                         <div class="footer flex w-full text-sm px-5 justify-between text-black">
                             <p class="leading-none">Powered by SparkPair</p>
-                            <p class="leading-none text-sm">Page 1 of 1</p>
+                            <p class="leading-none text-sm">Page ${pageIndex + 1} of ${pages.length}</p>
                             <p class="leading-none text-sm">Printed: ${printDateTime()}</p>
                             <p class="leading-none text-sm">&copy; ${new Date().getFullYear()} SparkPair | +92 316 5825495</p>
                         </div>
                     </div>
+                    </div>
                 `;
+            }).join('');
         } else {
-            previewDom.innerHTML =
-                '<h1 class="text-[var(--border-error)] font-medium text-center mt-5">No Preview avalaible.</h1>';
+            previewContainer.className = 'w-[148mm] h-[210mm] mx-auto overflow-hidden relative';
+            previewContainer.innerHTML =
+                '<div id="preview" class="preview w-[148mm] h-[210mm] gos-a5-document gos-a5-invoice overflow-hidden flex flex-col"><h1 class="text-[var(--border-error)] font-medium text-center mt-5">No Preview avalaible.</h1></div>';
         }
     };
 
@@ -634,10 +669,104 @@
         return true;
     };
 
+    function addListenerToPrintAndSaveBtn() {
+        const printAndSaveBtn = document.getElementById('printAndSaveBtn');
+        if (!printAndSaveBtn) return;
+
+        printAndSaveBtn.addEventListener('click', event => {
+            event.preventDefault();
+            closeAllDropdowns();
+
+            if (typeof validateForNextStep === 'function' && validateForNextStep() === false) {
+                return;
+            }
+
+            const form = document.getElementById('form');
+            const preview = document.getElementById('preview-container');
+            if (!form || !preview) return;
+
+            const oldIframe = document.getElementById('printIframe');
+            if (oldIframe) oldIframe.remove();
+
+            const printIframe = document.createElement('iframe');
+            printIframe.id = 'printIframe';
+            printIframe.style.position = 'absolute';
+            printIframe.style.width = '0px';
+            printIframe.style.height = '0px';
+            printIframe.style.border = 'none';
+            printIframe.style.display = 'none';
+            document.body.appendChild(printIframe);
+
+            const printDocument = printIframe.contentDocument || printIframe.contentWindow.document;
+            printDocument.open();
+            printDocument.write(`
+                <html>
+                    <head>
+                        <title>Print Shipment</title>
+                        ${document.head.innerHTML}
+                        <style>
+                            @page {
+                                size: A5 portrait;
+                                margin: 0;
+                            }
+
+                            @media print {
+                                html,
+                                body {
+                                    margin: 0;
+                                    padding: 0;
+                                    width: auto;
+                                    min-height: 0;
+                                }
+
+                                #preview-container {
+                                    width: auto !important;
+                                    height: auto !important;
+                                    max-height: none !important;
+                                    overflow: visible !important;
+                                }
+
+                                .preview {
+                                    width: 148mm !important;
+                                    height: 210mm !important;
+                                    max-width: 148mm !important;
+                                    max-height: 210mm !important;
+                                    overflow: hidden !important;
+                                    break-after: page;
+                                    page-break-after: always;
+                                    page-break-inside: avoid;
+                                }
+
+                                #preview-container .preview:last-child {
+                                    break-after: auto;
+                                    page-break-after: auto;
+                                }
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div id="preview-container" class="preview-container">${preview.innerHTML}</div>
+                    </body>
+                </html>
+            `);
+            printDocument.close();
+
+            printIframe.onload = () => {
+                printIframe.contentWindow.onafterprint = () => form.submit();
+
+                setTimeout(() => {
+                    printIframe.contentWindow.focus();
+                    printIframe.contentWindow.print();
+                }, 1000);
+            };
+        });
+    }
+
     function initShipmentsGenerate(data) {
         lastShipment = data?.lastShipment || null;
         companyData = data?.companyData || null;
         renderList();
+        addListenerToPrintAndSaveBtn();
     }
 
     window.initShipmentsGenerate = initShipmentsGenerate;

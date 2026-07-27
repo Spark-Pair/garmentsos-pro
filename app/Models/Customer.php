@@ -410,9 +410,12 @@ class Customer extends Model
                 $includeNullBranchRecords,
             ),
         ];
+        $statementDateRange = $statement->isNotEmpty()
+            ? Carbon::parse($statement->min('date'))->format('d-M-Y') . ' - ' . Carbon::parse($statement->max('date'))->format('d-M-Y')
+            : $from->format('d-M-Y') . ' - ' . $to->format('d-M-Y');
 
         return [
-            'date' => $from->format('d-M-Y') . ' - ' . $to->format('d-M-Y'),
+            'date' => $statementDateRange,
             'name' => "{$this->customer_name} | {$this->city->title}",
             'opening_balance' => $openingBalance,
             'closing_balance' => $closingBalance,

@@ -183,16 +183,16 @@
                                     <div class="left my-auto pr-3 text-sm text-gray-800 space-y-1.5">
                                         <div class="date-range leading-none">Date: {{ $data['date'] }}</div>
                                         <div class="branch-scope leading-none">Branches: {{ $data['branch_scope_label'] ?? implode(', ', $selectedBranchLabels) }}</div>
-                                        <div class="opening-balance leading-none">Opening Balance: Rs.{{ \App\Support\Money::format($data['opening_balance']) }}</div>
-                                        <div class="closing-balance leading-none">Closing Balance: Rs.{{ \App\Support\Money::format($data['closing_balance']) }}</div>
+                                        <div class="total-balance leading-none">Total Order Balance: {{ \App\Support\Money::format($data['totals']['order_balance'] ?? 0) }}</div>
                                     </div>
                                     <div class="center my-auto">
                                         <div class="name capitalize font-semibold text-md">{{ $data['name'] }}</div>
                                     </div>
                                     <div class="right my-auto pr-3 text-sm text-gray-800 space-y-1.5">
+                                        <div class="opening-balance leading-none">Opening Balance: Rs.{{ \App\Support\Money::format($data['opening_balance']) }}</div>
                                         <div class="total-bill leading-none">Total Bill: {{ \App\Support\Money::format($data['totals']['bill']) }}</div>
                                         <div class="total-payment leading-none">Total Payment: {{ \App\Support\Money::format($data['totals']['payment']) }}</div>
-                                        <div class="total-balance leading-none">Total Order Balance: {{ \App\Support\Money::format($data['totals']['order_balance'] ?? 0) }}</div>
+                                        <div class="closing-balance leading-none">Closing Balance: Rs.{{ \App\Support\Money::format($data['closing_balance']) }}</div>
                                     </div>
                                 </div>
 

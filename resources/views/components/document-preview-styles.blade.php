@@ -597,6 +597,64 @@
         font-weight: 700;
     }
 
+    .gos-a5-invoice .cargo-list-document .thead .tr {
+        min-height: 21px;
+        padding-top: 3px !important;
+        padding-bottom: 3px !important;
+    }
+
+    .gos-a5-invoice .cargo-list-document .tbody .tr {
+        min-height: 20.5px;
+        padding-top: 2.5px !important;
+        padding-bottom: 2.5px !important;
+    }
+
+    .gos-a5-invoice .cargo-list-document .th,
+    .gos-a5-invoice .cargo-list-document .td {
+        font-size: 9.2px !important;
+        line-height: 1.08 !important;
+    }
+
+    .gos-a5-invoice.cargo-list-preview {
+        padding: 4mm !important;
+    }
+
+    .gos-a5-invoice.cargo-list-preview #banner,
+    .gos-a5-invoice.cargo-list-preview .banner,
+    .gos-a5-invoice.cargo-list-preview #header,
+    .gos-a5-invoice.cargo-list-preview .header,
+    .gos-a5-invoice.cargo-list-preview .body,
+    .gos-a5-invoice.cargo-list-preview .footer,
+    .gos-a5-invoice.cargo-list-preview .tfooter {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+    }
+
+    .gos-a5-invoice.cargo-list-preview .thead .tr,
+    .gos-a5-invoice.cargo-list-preview .tbody .tr {
+        column-gap: 8px !important;
+    }
+
+    .gos-a5-invoice .cargo-list-document .thead .th,
+    .gos-a5-invoice .cargo-list-document .tbody .td {
+        justify-content: flex-start;
+        text-align: left;
+    }
+
+    .gos-a5-invoice .cargo-list-document .thead .th:first-child,
+    .gos-a5-invoice .cargo-list-document .tbody .td:first-child,
+    .gos-a5-invoice .cargo-list-document .thead .th:nth-child(4),
+    .gos-a5-invoice .cargo-list-document .tbody .td:nth-child(4) {
+        justify-content: center;
+        text-align: center;
+    }
+
+    .gos-a5-invoice .cargo-list-document .thead .th:last-child,
+    .gos-a5-invoice .cargo-list-document .tbody .td:last-child {
+        justify-content: flex-end;
+        text-align: right;
+    }
+
     .gos-a5-invoice > .flex > .grid.grid-cols-2 {
         gap: 6px !important;
     }

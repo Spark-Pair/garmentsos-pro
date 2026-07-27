@@ -65,8 +65,8 @@
 
         <!-- Step 2: view shipment -->
         <div class="step2 hidden space-y-4 text-black h-[35rem] overflow-y-auto my-scrollbar-2 bg-white rounded-md">
-            <div id="preview-container" class="w-[210mm] h-[297mm] mx-auto overflow-hidden relative">
-                <div id="preview" class="preview flex flex-col h-full">
+            <div id="preview-container" class="w-[148mm] h-[210mm] mx-auto overflow-hidden relative">
+                <div id="preview" class="preview w-[148mm] h-[210mm] gos-a5-document gos-a5-invoice overflow-hidden flex flex-col">
                     <h1 class="text-[var(--border-error)] font-medium text-center mt-5">No Preview avalaible.</h1>
                 </div>
             </div>
