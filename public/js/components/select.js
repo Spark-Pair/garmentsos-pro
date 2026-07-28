@@ -90,6 +90,51 @@ function searchSelect(selectSearchInput) {
             li.innerHTML = li.textContent;
         }
     });
+
+    const visibleOptions = Array.from(allOptions).filter(li => !li.classList.contains('hidden'));
+    const bestMatch = findBestSelectSearchMatch(visibleOptions, inputValue);
+
+    allOptions.forEach(li => li.classList.remove('selected'));
+    if (bestMatch) {
+        bestMatch.classList.add('selected');
+        if (typeof bestMatch.scrollIntoView === 'function') {
+            bestMatch.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
+    }
+}
+
+function findBestSelectSearchMatch(options, query) {
+    if (!options.length) return null;
+
+    const realOptions = options.filter(li => !li.textContent.trim().toLowerCase().startsWith('-- select'));
+    if (!query) {
+        return realOptions[0] || options[0];
+    }
+
+    const normalizedQuery = query.toLowerCase().trim();
+    const scored = (realOptions.length ? realOptions : options)
+        .map((li, index) => {
+            const text = li.textContent.toLowerCase().trim();
+            const startsAt = text.indexOf(normalizedQuery);
+            const tokens = text.split(/[\s|,\-_/]+/).filter(Boolean);
+            const tokenStarts = tokens.some(token => token.startsWith(normalizedQuery));
+
+            let score = 1000 + index;
+            if (text === normalizedQuery) {
+                score = index;
+            } else if (text.startsWith(normalizedQuery)) {
+                score = 50 + index;
+            } else if (tokenStarts) {
+                score = 100 + index;
+            } else if (startsAt >= 0) {
+                score = 200 + startsAt + index;
+            }
+
+            return { li, score };
+        })
+        .sort((left, right) => left.score - right.score);
+
+    return scored[0]?.li || null;
 }
 
 function validateSelectInput(selectSearchInput) {

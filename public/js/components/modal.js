@@ -314,7 +314,7 @@ function createModal(data, animate = 'animate') {
                         setTimeout(() => {
                             const input = document.getElementById(`${field.id}`);
                             if (input) input.focus();
-                        }, 0);
+                        }, 120);
                     }
                 } else {
                     clutter += `
@@ -1141,6 +1141,14 @@ function createModal(data, animate = 'animate') {
     `;
     modalWrapper.innerHTML = clutter;
 
+    const deferModalFocus = (callback) => {
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+                window.setTimeout(callback, 40);
+            });
+        });
+    };
+
     const focusModalSearchInput = () => {
         const wrappers = Array.from(document.querySelectorAll('div[id$="-wrapper"]'));
         const lastWrapper = wrappers[wrappers.length - 1];
@@ -1234,13 +1242,15 @@ function createModal(data, animate = 'animate') {
 
     data.table ? renderTableBody(data.table.body) : '';
 
-    data.fields?.forEach(field => {
-        if (field.category == 'explicitHtml' && field.focus) {
-            document.querySelector(`#${field.focus}`).focus();
-        }
-    })
+    deferModalFocus(() => {
+        data.fields?.forEach(field => {
+            if (field.category == 'explicitHtml' && field.focus) {
+                document.querySelector(`#${field.focus}`)?.focus();
+            }
+        });
 
-    data.basicSearch ? focusModalSearchInput() : '';
+        data.basicSearch ? focusModalSearchInput() : '';
+    });
 
     formatAllAmountInputs();
 }
@@ -1608,16 +1618,25 @@ function setupCardKeyboardNavigation(modalWrapper, data) {
 
     const searchInput = modalWrapper.querySelector('#basicSearch input');
     if (searchInput) {
-        focusSearchInput();
         searchInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 focusCard(0);
             }
         });
-    } else {
-        focusCard(0);
     }
+
+    window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+            window.setTimeout(() => {
+                if (searchInput) {
+                    focusSearchInput();
+                } else {
+                    focusCard(0);
+                }
+            }, 40);
+        });
+    });
 
     modalWrapper.addEventListener('keyup', (e) => {
         if (modalWrapper.dataset.kbJustOpened === '1' && (e.key === 'Enter' || e.key === ' ')) {

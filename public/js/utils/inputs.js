@@ -127,10 +127,13 @@ function initializeArticleQuantityPair(pcsPerPacket, maxPcs = 0, pcsValue = '') 
         'input:not([type="hidden"])',
         'select',
         'textarea',
+        'button',
+        'a[href]',
+        '[role="button"]',
     ].join(',');
 
-    function isVisibleField(field) {
-        if (!field || field.disabled || field.readOnly) return false;
+    function isRenderedField(field) {
+        if (!field) return false;
         if (field.closest('[hidden], .hidden')) return false;
         if (field.closest('.dropDownParent')) return false;
 
@@ -139,6 +142,14 @@ function initializeArticleQuantityPair(pcsPerPacket, maxPcs = 0, pcsValue = '') 
 
         const rect = field.getBoundingClientRect();
         return rect.width > 0 && rect.height > 0;
+    }
+
+    function isVisibleField(field) {
+        if (!isRenderedField(field) || field.disabled || field.readOnly) return false;
+        if (field.matches?.('button[type="submit"], input[type="submit"]')) return false;
+        if (field.matches?.('[tabindex="-1"]')) return false;
+
+        return true;
     }
 
     function fieldAnchor(field) {
@@ -166,25 +177,147 @@ function initializeArticleQuantityPair(pcsPerPacket, maxPcs = 0, pcsValue = '') 
             .filter((field, index, fields) => fields.indexOf(field) === index);
     }
 
-    function focusField(field) {
-        field.focus();
-        field.select?.();
+    function getRenderedFields(scope) {
+        return Array.from(scope.querySelectorAll(fieldSelector))
+            .filter(field => !field.classList.contains('dbInput'))
+            .filter(isRenderedField)
+            .map(fieldAnchor)
+            .filter((field, index, fields) => fields.indexOf(field) === index);
+    }
 
-        if (
-            ['date', 'time', 'datetime-local', 'month', 'week'].includes(field.type)
-            && typeof field.showPicker === 'function'
-        ) {
+    function isPickerField(field) {
+        return ['date', 'time', 'datetime-local', 'month', 'week'].includes(field?.type);
+    }
+
+    function openNativePicker(field) {
+        if (!isPickerField(field) || typeof field.showPicker !== 'function') {
+            return;
+        }
+
+        window.setTimeout(() => {
+            if (document.activeElement !== field || field.disabled || field.readOnly) {
+                return;
+            }
+
             try {
                 field.showPicker();
             } catch (_) {
-                // Some browsers only allow showPicker during direct user activation.
+                // Browsers may block native pickers when focus was not caused by a direct user action.
             }
+        }, 80);
+    }
+
+    function focusField(field) {
+        field.focus();
+        if (field.matches?.('input, textarea') && !isPickerField(field)) {
+            field.select?.();
         }
+
+        openNativePicker(field);
+    }
+
+    function waitForFieldAndFocus(field, options = {}) {
+        const timeout = options.timeout ?? 1600;
+        const startedAt = Date.now();
+
+        const tryFocus = () => {
+            if (!field?.isConnected || !isRenderedField(field)) {
+                return false;
+            }
+
+            if (!field.disabled && !field.readOnly) {
+                focusField(field);
+                return true;
+            }
+
+            if (Date.now() - startedAt >= timeout) {
+                return false;
+            }
+
+            window.setTimeout(tryFocus, 50);
+            return true;
+        };
+
+        return tryFocus();
+    }
+
+    function isActionField(field) {
+        return field?.matches?.('button, a[href], [role="button"], input[type="button"]');
+    }
+
+    function nextRenderedField(currentField) {
+        const current = fieldAnchor(currentField);
+        const renderedFields = getRenderedFields(getFieldScope(current));
+        const renderedIndex = renderedFields.indexOf(current);
+
+        if (renderedIndex === -1 || renderedIndex >= renderedFields.length - 1) {
+            return null;
+        }
+
+        return renderedFields[renderedIndex + 1];
+    }
+
+    function watchImmediateNextAction(currentField) {
+        const current = fieldAnchor(currentField);
+        const next = nextRenderedField(current);
+
+        if (!isActionField(next) || (!next.disabled && !next.readOnly)) {
+            return false;
+        }
+
+        const startedAt = Date.now();
+        const timeout = 1600;
+
+        const tryFocus = () => {
+            if (!current.isConnected || !next.isConnected || document.activeElement !== current) {
+                return;
+            }
+
+            if (!next.disabled && !next.readOnly && isVisibleField(next)) {
+                focusField(next);
+                return;
+            }
+
+            if (Date.now() - startedAt < timeout) {
+                window.setTimeout(tryFocus, 40);
+            }
+        };
+
+        window.setTimeout(tryFocus, 0);
+        return true;
+    }
+
+    function deferUntilInterfaceReady(callback, delay = 80) {
+        const run = () => {
+            window.requestAnimationFrame(() => {
+                window.requestAnimationFrame(() => {
+                    window.setTimeout(callback, delay);
+                });
+            });
+        };
+
+        if (document.readyState === 'complete') {
+            run();
+            return;
+        }
+
+        window.addEventListener('load', run, { once: true });
     }
 
     window.focusNextFormField = function focusNextFormField(currentField) {
         const current = fieldAnchor(currentField);
-        const fields = getFocusableFields(getFieldScope(current));
+        const scope = getFieldScope(current);
+        const renderedFields = getRenderedFields(scope);
+        const renderedIndex = renderedFields.indexOf(current);
+
+        if (renderedIndex !== -1 && renderedIndex < renderedFields.length - 1) {
+            const immediateNext = renderedFields[renderedIndex + 1];
+            if (immediateNext.disabled || immediateNext.readOnly) {
+                return waitForFieldAndFocus(immediateNext);
+            }
+        }
+
+        const fields = getFocusableFields(scope);
         if (!fields.length) return false;
 
         const currentIndex = fields.indexOf(current);
@@ -209,9 +342,9 @@ function initializeArticleQuantityPair(pcsPerPacket, maxPcs = 0, pcsValue = '') 
         if (!first) return false;
 
         form.dataset.autoFocusApplied = 'true';
-        requestAnimationFrame(() => {
+        deferUntilInterfaceReady(() => {
             focusField(first);
-        });
+        }, options.delay ?? 80);
         return true;
     };
 
@@ -223,6 +356,7 @@ function initializeArticleQuantityPair(pcsPerPacket, maxPcs = 0, pcsValue = '') 
         const target = event.target;
         if (!target?.matches?.(fieldSelector)) return;
         if (target.matches('textarea')) return;
+        if (target.matches('button, a[href], [role="button"]')) return;
         if (target.closest('.dropDownParent')) return;
         if (!isVisibleField(target)) return;
 
@@ -231,17 +365,33 @@ function initializeArticleQuantityPair(pcsPerPacket, maxPcs = 0, pcsValue = '') 
         }
     });
 
+    document.addEventListener('input', event => {
+        const target = event.target;
+        if (!target?.matches?.('input:not([type="hidden"]), textarea')) return;
+        watchImmediateNextAction(target);
+    });
+
+    document.addEventListener('change', event => {
+        const target = event.target;
+        if (!target?.matches?.(fieldSelector)) return;
+        watchImmediateNextAction(target);
+    });
+
     function focusInitialPageForm() {
         document.querySelectorAll('form').forEach(form => {
             window.focusFirstFormField(form);
         });
     }
 
+    const scheduleInitialPageFocus = () => deferUntilInterfaceReady(focusInitialPageForm, 120);
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', focusInitialPageForm);
+        document.addEventListener('DOMContentLoaded', scheduleInitialPageFocus);
     } else {
-        focusInitialPageForm();
+        scheduleInitialPageFocus();
     }
+
+    document.addEventListener('app:config:ready', scheduleInitialPageFocus, { once: true });
 
     const observer = new MutationObserver(mutations => {
         mutations.forEach(mutation => {
@@ -249,12 +399,12 @@ function initializeArticleQuantityPair(pcsPerPacket, maxPcs = 0, pcsValue = '') 
                 if (!(node instanceof HTMLElement)) return;
 
                 if (node.matches('form')) {
-                    window.focusFirstFormField(node, { onlyWhenIdle: false });
+                    window.focusFirstFormField(node, { delay: 80 });
                     return;
                 }
 
                 node.querySelectorAll?.('form').forEach(form => {
-                    window.focusFirstFormField(form, { onlyWhenIdle: false });
+                    window.focusFirstFormField(form, { delay: 80 });
                 });
             });
         });

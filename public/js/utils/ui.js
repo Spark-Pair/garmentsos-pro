@@ -224,12 +224,52 @@ function initGlobalUI() {
     observer.observe(document.body, { childList: true, subtree: true });
 
     document.addEventListener('focus', function(event) {
-        if (!event.isTrusted) return;
-        if (event.target.matches('input[type=\"date\"]')) {
-            try { event.target.showPicker(); } catch (_) {}
-        } else if (event.target.matches('input[type=\"month\"]')) {
-            try { event.target.showPicker(); } catch (_) {}
+        const target = event.target;
+        if (!target.matches('input[type=\"date\"], input[type=\"month\"]')) {
+            return;
         }
+
+        window.setTimeout(() => {
+            if (document.activeElement !== target || target.disabled || target.readOnly) {
+                return;
+            }
+
+            try { target.showPicker(); } catch (_) {}
+        }, 80);
+    }, true);
+
+    document.addEventListener('pointerdown', function(event) {
+        const target = event.target;
+        if (!target.matches?.('input[type=\"date\"], input[type=\"month\"]')) {
+            return;
+        }
+
+        window.setTimeout(() => {
+            if (document.activeElement !== target || target.disabled || target.readOnly) {
+                return;
+            }
+
+            try { target.showPicker(); } catch (_) {}
+        }, 0);
+    }, true);
+
+    document.addEventListener('keydown', function(event) {
+        if (event.key !== 'Enter' && event.key !== ' ') {
+            return;
+        }
+
+        const target = event.target;
+        if (!target.matches?.('input[type=\"date\"], input[type=\"month\"]')) {
+            return;
+        }
+
+        window.setTimeout(() => {
+            if (document.activeElement !== target || target.disabled || target.readOnly) {
+                return;
+            }
+
+            try { target.showPicker(); } catch (_) {}
+        }, 0);
     }, true);
 
     document.addEventListener('keydown', function(event) {
