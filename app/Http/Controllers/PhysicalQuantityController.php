@@ -106,10 +106,16 @@ class PhysicalQuantityController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create()
+    public function create(Request $request)
     {
         if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant', 'store_keeper'])) {
             return $resp;
+        }
+
+        if (!$request->ajax()) {
+            $articles = collect();
+
+            return view('physical-quantities.create', compact('articles'));
         }
 
         $branches = app(ModuleBranchService::class);
@@ -163,8 +169,10 @@ class PhysicalQuantityController extends Controller
                 'remaining_packets' => $article->remaining_packets,
             ])
             ->values();
-        
-        return view('physical-quantities.create', compact('articles'));
+        return response()->json([
+            'status' => 'success',
+            'articles' => $articles,
+        ]);
     }
 
     /**

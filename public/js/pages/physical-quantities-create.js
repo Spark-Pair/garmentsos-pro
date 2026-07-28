@@ -1,7 +1,9 @@
 (() => {
     function initPhysicalQuantitiesCreate() {
         const config = window.__physicalQuantitiesCreate || {};
-        const articles = config.articles || [];
+        let articles = config.articles || [];
+        let articlesLoaded = Array.isArray(articles) && articles.length > 0;
+        let articlesLoading = false;
 
         const articleSelectInputDOM = document.getElementById("article");
         const articleIdInputDOM = document.getElementById("article_id");
@@ -56,11 +58,51 @@
             renderCardsInModal(modalData);
         };
 
-        articleSelectInputDOM.addEventListener("click", () => {
-            generateArticlesModal();
+        articleSelectInputDOM.addEventListener("click", async () => {
+            await generateArticlesModal();
         });
 
-        function generateArticlesModal() {
+        async function loadArticles() {
+            if (articlesLoaded || articlesLoading) return;
+
+            articlesLoading = true;
+            articleSelectInputDOM.value = "Loading articles...";
+            articleSelectInputDOM.classList.add("cursor-wait");
+
+            try {
+                const response = await fetch(config.articlesUrl || window.location.href, {
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest",
+                        Accept: "application/json",
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const payload = await response.json();
+                articles = payload.articles || [];
+                articlesLoaded = true;
+            } catch (error) {
+                if (window.showToast) {
+                    window.showToast("Articles could not be loaded. Please try again.", "error");
+                } else if (window.appAlert) {
+                    window.appAlert("Articles could not be loaded. Please try again.");
+                }
+            } finally {
+                articlesLoading = false;
+                articleSelectInputDOM.classList.remove("cursor-wait");
+                if (!selectedArticle) {
+                    articleSelectInputDOM.value = "";
+                }
+            }
+        }
+
+        async function generateArticlesModal() {
+            await loadArticles();
+            if (!articlesLoaded) return;
+
             cardData = [];
             let data = Object.values(articles);
 

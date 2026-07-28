@@ -6,6 +6,7 @@ use App\Models\Article;
 use App\Models\Employee;
 use App\Models\Fabric;
 use App\Models\InventoryItem;
+use App\Models\InventoryTransaction;
 use App\Models\Production;
 use App\Models\Rate;
 use App\Models\ReturnFabric;
@@ -109,24 +110,37 @@ class ProductionController extends Controller
         }
         $worker_options = [];
         $workers = $branches->applyRelatedScope(
-                Employee::with('type')->where('category', 'worker')->where('status', 'active'),
+                Employee::with(['type', 'tags'])->where('category', 'worker')->where('status', 'active'),
                 'employees',
                 'productions',
             )
             ->get();
         $employeePayloads = $this->employeeOptionPayloads($workers, 'productions');
+        $issuedTags = $workers
+            ->flatMap(fn (Employee $worker) => $worker->tags->pluck('tag'))
+            ->filter()
+            ->unique()
+            ->values();
+        $fabricsByTag = $issuedTags->isEmpty()
+            ? collect()
+            : Fabric::with('supplier')
+                ->whereIn('tag', $issuedTags)
+                ->get()
+                ->keyBy('tag');
+        $returnedQuantityByTag = $issuedTags->isEmpty()
+            ? collect()
+            : ReturnFabric::whereIn('tag', $issuedTags)
+                ->selectRaw('tag, SUM(quantity) as total_quantity')
+                ->groupBy('tag')
+                ->pluck('total_quantity', 'tag');
+
         foreach($workers as $worker) {
             $employeePayload = $employeePayloads[(int) $worker->id];
             $worker['taags'] = $worker['tags']
                 ->groupBy('tag')
-                ->map(function ($items, $tag) use ($worker, $articles) {
-                    $fabric = Fabric::where('tag', $tag)->first();
-                    $total_return_fabric = ReturnFabric::where('tag', $tag)->sum('quantity');
-
-                    $supplier = null;
-                    if ($fabric && $fabric->supplier_id) {
-                        $supplier = Supplier::find($fabric->supplier_id);
-                    }
+                ->map(function ($items, $tag) use ($worker, $articles, $fabricsByTag, $returnedQuantityByTag) {
+                    $fabric = $fabricsByTag->get($tag);
+                    $total_return_fabric = (float) ($returnedQuantityByTag->get($tag) ?? 0);
 
                     $sum = $articles
                         ->flatMap->production
@@ -145,7 +159,7 @@ class ProductionController extends Controller
                             'returned_quantity' => $total_return_fabric,
                             'unit' => ucfirst((string) ($fabric?->unit ?? '')),
                             'available_quantity' => $availableQuantity,
-                            'supplier_name' => $supplier->supplier_name ?? null,
+                            'supplier_name' => $fabric?->supplier?->supplier_name,
                         ];
                     }
 
@@ -166,13 +180,25 @@ class ProductionController extends Controller
         $rates = Rate::with('type')->get();
         $inventoryItems = collect();
         if (Schema::hasTable('inventory_items')) {
-            $inventoryItems = $branches->applyRelatedScope(
-                    InventoryItem::where('is_active', true)->with('fabric', 'transactions'),
+            $inventoryRecords = $branches->applyRelatedScope(
+                    InventoryItem::where('is_active', true)->with('fabric'),
                     'inventory',
                     'productions',
                 )
                 ->orderBy('name')
-                ->get()
+                ->get();
+            $inventorySums = $inventoryRecords->isEmpty()
+                ? collect()
+                : InventoryTransaction::whereIn('inventory_item_id', $inventoryRecords->pluck('id'))
+                    ->selectRaw("
+                        inventory_item_id,
+                        SUM(CASE WHEN direction = 'in' THEN quantity ELSE 0 END) as in_quantity,
+                        SUM(CASE WHEN direction = 'out' THEN quantity ELSE 0 END) as out_quantity
+                    ")
+                    ->groupBy('inventory_item_id')
+                    ->get()
+                    ->keyBy('inventory_item_id');
+            $inventoryItems = $inventoryRecords
                 ->map(fn (InventoryItem $item) => [
                     'id' => $item->id,
                     'name' => $item->name,
@@ -180,7 +206,8 @@ class ProductionController extends Controller
                     'unit' => $item->unit,
                     'tag' => $item->tag,
                     'fabric' => $item->fabric?->title,
-                    'stock_quantity' => $item->stock_quantity,
+                    'stock_quantity' => (float) ($inventorySums->get($item->id)?->in_quantity ?? 0)
+                        - (float) ($inventorySums->get($item->id)?->out_quantity ?? 0),
                 ])
                 ->values();
         }

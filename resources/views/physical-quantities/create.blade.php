@@ -101,6 +101,7 @@
 <script>
         window.__physicalQuantitiesCreate = {
             articles: @json($articles),
+            articlesUrl: @json(route('physical-quantities.create')),
         };
     </script>
 @endpush
