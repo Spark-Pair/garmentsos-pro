@@ -581,7 +581,7 @@
                 @endif
             </div>
             <!-- Notification Box -->
-            <div id="notificationBox" class="absolute top-5 right-5 flex flex-col space-y-3 z-[100] text-sm mx-auto items-end w-full select-none">
+            <div id="notificationBox" class="absolute top-5 right-5 flex flex-col space-y-3 z-[100] text-sm mx-auto items-end select-none">
                 {{-- <x-notification
                     title="Payment Method Expiring"
                     message="Your card ending in 1122 is expiring soon. Please update your billing info."
