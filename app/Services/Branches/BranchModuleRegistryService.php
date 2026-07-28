@@ -9,8 +9,23 @@ use Illuminate\Support\Str;
 
 class BranchModuleRegistryService
 {
+    private ?array $registryCache = null;
+    private ?array $labelsCache = null;
+    private ?array $aliasMapCache = null;
+    private ?Collection $discoveredRouteModulesCache = null;
+    private array $configCache = [];
+    private array $aliasesForCache = [];
+    private array $tableNamesCache = [];
+    private array $schemaTableCache = [];
+    private array $schemaColumnCache = [];
+    private ?array $branchModulesConfigCache = null;
+
     public function registry(): array
     {
+        if ($this->registryCache !== null) {
+            return $this->registryCache;
+        }
+
         $configured = collect($this->configuredModules())
             ->mapWithKeys(fn (array $module, string $key) => [
                 $this->normalizeKey($key) => $this->normalizeModule($this->normalizeKey($key), $module, true, false),
@@ -18,7 +33,7 @@ class BranchModuleRegistryService
 
         $discovered = $this->discoverRouteModules();
 
-        return $configured
+        return $this->registryCache = $configured
             ->keys()
             ->merge($discovered->keys())
             ->unique()
@@ -40,7 +55,7 @@ class BranchModuleRegistryService
 
     public function labels(): array
     {
-        return collect($this->registry())
+        return $this->labelsCache ??= collect($this->registry())
             ->mapWithKeys(fn (array $module, string $key) => [$key => $module['label']])
             ->all();
     }
@@ -48,26 +63,22 @@ class BranchModuleRegistryService
     public function canonicalKey(string $moduleKey): string
     {
         $key = $this->normalizeKey($moduleKey);
-        $aliases = collect($this->configuredAliases())
-            ->mapWithKeys(fn (string $target, string $alias) => [$this->normalizeKey($alias) => $this->normalizeKey($target)])
-            ->all();
 
-        return $aliases[$key] ?? $key;
+        return $this->aliasMap()[$key] ?? $key;
     }
 
     public function configFor(string $moduleKey): ?array
     {
         $key = $this->canonicalKey($moduleKey);
 
-        return $this->registry()[$key] ?? null;
+        return $this->configCache[$key] ??= ($this->registry()[$key] ?? null);
     }
 
     public function aliasesFor(string $moduleKey): array
     {
         $canonical = $this->canonicalKey($moduleKey);
 
-        return collect($this->configuredAliases())
-            ->mapWithKeys(fn (string $target, string $alias) => [$this->normalizeKey($alias) => $this->normalizeKey($target)])
+        return $this->aliasesForCache[$canonical] ??= collect($this->aliasMap())
             ->filter(fn (string $target) => $target === $canonical)
             ->keys()
             ->push($canonical)
@@ -96,7 +107,11 @@ class BranchModuleRegistryService
 
     private function discoverRouteModules(): Collection
     {
-        return collect(Route::getRoutes())
+        if ($this->discoveredRouteModulesCache !== null) {
+            return $this->discoveredRouteModulesCache;
+        }
+
+        return $this->discoveredRouteModulesCache = collect(Route::getRoutes())
             ->map(fn ($route) => [
                 'uri' => trim($route->uri(), '/'),
                 'name' => $route->getName(),
@@ -252,17 +267,26 @@ class BranchModuleRegistryService
             return (bool) ($module['has_branch_id_support'] ?? false);
         }
 
-        return collect($tables)->every(fn (string $table) => Schema::hasTable($table) && Schema::hasColumn($table, 'branch_id'));
+        return collect($tables)->every(fn (string $table) => $this->schemaHasColumn($table, 'branch_id'));
     }
 
     private function tableNamesFor(string $key, array $module): array
     {
+        $cacheKey = $key . ':' . md5(json_encode([
+            $module['table_names'] ?? null,
+            $module['table_name'] ?? null,
+        ]));
+
+        if (array_key_exists($cacheKey, $this->tableNamesCache)) {
+            return $this->tableNamesCache[$cacheKey];
+        }
+
         if (!empty($module['table_names']) && is_array($module['table_names'])) {
-            return array_values($module['table_names']);
+            return $this->tableNamesCache[$cacheKey] = array_values($module['table_names']);
         }
 
         if (!empty($module['table_name'])) {
-            return [(string) $module['table_name']];
+            return $this->tableNamesCache[$cacheKey] = [(string) $module['table_name']];
         }
 
         $tables = [
@@ -278,8 +302,8 @@ class BranchModuleRegistryService
             'reports' => [],
         ][$key] ?? [$key];
 
-        return collect($tables)
-            ->filter(fn (string $table) => $table !== '' && Schema::hasTable($table))
+        return $this->tableNamesCache[$cacheKey] = collect($tables)
+            ->filter(fn (string $table) => $table !== '' && $this->schemaHasTable($table))
             ->values()
             ->all();
     }
@@ -291,14 +315,18 @@ class BranchModuleRegistryService
 
     private function branchModulesConfig(): array
     {
+        if ($this->branchModulesConfigCache !== null) {
+            return $this->branchModulesConfigCache;
+        }
+
         $config = config('branch_modules');
         if (is_array($config)) {
-            return $config;
+            return $this->branchModulesConfigCache = $config;
         }
 
         $path = config_path('branch_modules.php');
 
-        return is_file($path) ? require $path : [];
+        return $this->branchModulesConfigCache = is_file($path) ? require $path : [];
     }
 
     private function configuredModules(): array
@@ -314,5 +342,24 @@ class BranchModuleRegistryService
     private function ignoredRoutePrefixes(): array
     {
         return $this->branchModulesConfig()['ignored_route_prefixes'] ?? [];
+    }
+
+    private function aliasMap(): array
+    {
+        return $this->aliasMapCache ??= collect($this->configuredAliases())
+            ->mapWithKeys(fn (string $target, string $alias) => [$this->normalizeKey($alias) => $this->normalizeKey($target)])
+            ->all();
+    }
+
+    private function schemaHasTable(string $table): bool
+    {
+        return $this->schemaTableCache[$table] ??= Schema::hasTable($table);
+    }
+
+    private function schemaHasColumn(string $table, string $column): bool
+    {
+        $key = $table . '.' . $column;
+
+        return $this->schemaColumnCache[$key] ??= ($this->schemaHasTable($table) && Schema::hasColumn($table, $column));
     }
 }

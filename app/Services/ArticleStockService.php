@@ -12,6 +12,8 @@ use Illuminate\Support\Collection;
 
 class ArticleStockService
 {
+    private array $summaryCache = [];
+
     public function summaries($articleIds, ?int $excludeOrderId = null, int|array|null $branchId = null, bool $includeNullBranchRecords = false): Collection
     {
         $branchIds = collect(is_array($branchId) ? $branchId : (filled($branchId) ? [$branchId] : []))
@@ -32,13 +34,36 @@ class ArticleStockService
             return collect();
         }
 
+        $cachePrefix = implode('|', [
+            (string) ($excludeOrderId ?? ''),
+            implode(',', $branchIds),
+            $includeNullBranchRecords ? '1' : '0',
+        ]);
+        $cached = collect();
+        $missingArticleIds = $articleIds
+            ->reject(function (int $articleId) use ($cachePrefix, $cached) {
+                $cacheKey = $cachePrefix . '|' . $articleId;
+                if (!array_key_exists($cacheKey, $this->summaryCache)) {
+                    return false;
+                }
+
+                $cached->put($articleId, $this->summaryCache[$cacheKey]);
+
+                return true;
+            })
+            ->values();
+
+        if ($missingArticleIds->isEmpty()) {
+            return $articleIds->mapWithKeys(fn (int $articleId) => [$articleId => $cached->get($articleId)]);
+        }
+
         $articles = Article::query()
-            ->whereIn('id', $articleIds)
+            ->whereIn('id', $missingArticleIds)
             ->get(['id', 'quantity', 'extra_pcs', 'pcs_per_packet'])
             ->keyBy('id');
 
         $physicalRows = PhysicalQuantity::query()
-            ->whereIn('article_id', $articleIds)
+            ->whereIn('article_id', $missingArticleIds)
             ->when(!empty($branchIds) && Schema::hasColumn('physical_quantities', 'branch_id'), fn ($query) => $query->where(function ($scope) use ($branchIds, $includeNullBranchRecords) {
                 $scope->whereIn('branch_id', $branchIds);
                 if ($includeNullBranchRecords) {
@@ -49,7 +74,7 @@ class ArticleStockService
             ->groupBy('article_id');
 
         $orderedPcs = OrderArticles::query()
-            ->whereIn('article_id', $articleIds)
+            ->whereIn('article_id', $missingArticleIds)
             ->when($excludeOrderId, fn ($query) => $query->where('order_id', '!=', $excludeOrderId))
             ->when(!empty($branchIds) && Schema::hasColumn('orders', 'branch_id'), fn ($query) => $query->whereHas('order', fn ($orderQuery) => $orderQuery->where(function ($scope) use ($branchIds, $includeNullBranchRecords) {
                 $scope->whereIn('branch_id', $branchIds);
@@ -62,7 +87,7 @@ class ArticleStockService
             ->pluck('quantity', 'article_id');
 
         $invoicedPcs = InvoiceArticles::query()
-            ->whereIn('article_id', $articleIds)
+            ->whereIn('article_id', $missingArticleIds)
             ->when(!empty($branchIds) && Schema::hasColumn('invoices', 'branch_id'), fn ($query) => $query->whereHas('invoice', fn ($invoiceQuery) => $invoiceQuery->where(function ($scope) use ($branchIds, $includeNullBranchRecords) {
                 $scope->whereIn('branch_id', $branchIds);
                 if ($includeNullBranchRecords) {
@@ -74,7 +99,7 @@ class ArticleStockService
             ->pluck('quantity', 'article_id');
 
         $returnRows = SalesReturn::query()
-            ->whereIn('article_id', $articleIds)
+            ->whereIn('article_id', $missingArticleIds)
             ->when(!empty($branchIds) && Schema::hasColumn('sales_returns', 'branch_id'), fn ($query) => $query->where(function ($scope) use ($branchIds, $includeNullBranchRecords) {
                 $scope->whereIn('branch_id', $branchIds);
                 if ($includeNullBranchRecords) {
@@ -86,7 +111,7 @@ class ArticleStockService
             ->get()
             ->groupBy('article_id');
 
-        return $articleIds->mapWithKeys(function (int $articleId) use (
+        $fresh = $missingArticleIds->mapWithKeys(function (int $articleId) use (
             $articles,
             $physicalRows,
             $orderedPcs,
@@ -141,5 +166,13 @@ class ArticleStockService
 
             return [$articleId => $summary];
         });
+
+        foreach ($fresh as $articleId => $summary) {
+            $this->summaryCache[$cachePrefix . '|' . $articleId] = $summary;
+        }
+
+        return $articleIds->mapWithKeys(fn (int $articleId) => [
+            $articleId => $fresh->get($articleId, $cached->get($articleId, [])),
+        ]);
     }
 }

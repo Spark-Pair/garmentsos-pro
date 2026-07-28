@@ -820,6 +820,19 @@ class ModuleBranchService
     private array $moduleConfigCache = [];
     private array $availableBranchesCache = [];
     private array $selectedBranchCache = [];
+    private array $selectedBranchIdsCache = [];
+    private array $settingCache = [];
+    private array $branchSettingCache = [];
+    private array $branchSettingsPriorityCache = [];
+    private array $isEnabledCache = [];
+    private array $isBranchEnabledCache = [];
+    private array $branchAllowsSwitchingCache = [];
+    private array $shouldFilterRecordsCache = [];
+    private array $schemaTableCache = [];
+    private array $schemaColumnCache = [];
+    private ?bool $moduleSettingsHaveBranchIdCache = null;
+    private ?bool $branchTablesReadyCache = null;
+    private ?Branch $mainBranchCache = null;
     private bool $branchReadinessWarningLogged = false;
 
     private const DEVELOPER_MODULE_OVERRIDE_KEYS = [
@@ -945,8 +958,12 @@ class ModuleBranchService
     private function branchSettingsByModuleKeyPriority(string $moduleKey, int $branchId)
     {
         $keys = $this->moduleKeyCandidates($moduleKey);
+        $cacheKey = $moduleKey . ':' . $branchId;
+        if (array_key_exists($cacheKey, $this->branchSettingsPriorityCache)) {
+            return $this->branchSettingsPriorityCache[$cacheKey];
+        }
 
-        return BranchModuleSetting::query()
+        return $this->branchSettingsPriorityCache[$cacheKey] = BranchModuleSetting::query()
             ->where('branch_id', $branchId)
             ->whereIn('module_key', $keys)
             ->get()
@@ -966,7 +983,7 @@ class ModuleBranchService
     {
         $moduleKey = $this->canonicalModuleKey($moduleKey);
         $candidateKeys = array_values(array_diff($this->moduleKeyCandidates($moduleKey), [$moduleKey]));
-        if ($candidateKeys === [] || !Schema::hasTable('branch_module_settings')) {
+        if ($candidateKeys === [] || !$this->schemaHasTable('branch_module_settings')) {
             return false;
         }
 
@@ -1042,7 +1059,7 @@ class ModuleBranchService
 
     public function ensureRegistryModuleSettings(?Branch $mainBranch = null): void
     {
-        if (!Schema::hasTable('branch_module_settings')) {
+        if (!$this->schemaHasTable('branch_module_settings')) {
             return;
         }
 
@@ -1058,7 +1075,7 @@ class ModuleBranchService
 
     public function ensureMainBranchHasAllModules(?Branch $mainBranch = null): void
     {
-        if (!Schema::hasTable('branches') || !Schema::hasTable('branch_module_settings') || !$this->moduleSettingsHaveBranchId()) {
+        if (!$this->schemaHasTable('branches') || !$this->schemaHasTable('branch_module_settings') || !$this->moduleSettingsHaveBranchId()) {
             return;
         }
 
@@ -1089,11 +1106,11 @@ class ModuleBranchService
 
     public function ensureGlobalModuleRows(?Branch $mainBranch = null): void
     {
-        if (!Schema::hasTable('branch_module_settings')) {
+        if (!$this->schemaHasTable('branch_module_settings')) {
             return;
         }
 
-        $mainBranch ??= Schema::hasTable('branches')
+        $mainBranch ??= $this->schemaHasTable('branches')
             ? Branch::query()->where('is_main', true)->first()
             : null;
 
@@ -1121,11 +1138,15 @@ class ModuleBranchService
 
     public function setting(string $moduleKey): ?BranchModuleSetting
     {
-        if (!Schema::hasTable('branch_module_settings')) {
+        if (!$this->schemaHasTable('branch_module_settings')) {
             return null;
         }
 
         $moduleKey = $this->canonicalModuleKey($moduleKey);
+        if (array_key_exists($moduleKey, $this->settingCache)) {
+            return $this->settingCache[$moduleKey];
+        }
+
         $keys = $this->moduleKeyCandidates($moduleKey);
         $query = BranchModuleSetting::query()->whereIn('module_key', $keys);
         if ($this->moduleSettingsHaveBranchId()) {
@@ -1146,18 +1167,22 @@ class ModuleBranchService
                 ?? $this->firstSettingByModuleKeyPriority(BranchModuleSetting::query()->whereIn('module_key', $keys)->get(), $keys);
         }
 
-        return $setting;
+        return $this->settingCache[$moduleKey] = $setting;
     }
 
     public function branchSetting(string $moduleKey, ?int $branchId): ?BranchModuleSetting
     {
-        if (!$branchId || !Schema::hasTable('branch_module_settings') || !$this->moduleSettingsHaveBranchId()) {
+        if (!$branchId || !$this->schemaHasTable('branch_module_settings') || !$this->moduleSettingsHaveBranchId()) {
             return null;
         }
 
         $moduleKey = $this->canonicalModuleKey($moduleKey);
+        $cacheKey = $moduleKey . ':' . $branchId;
+        if (array_key_exists($cacheKey, $this->branchSettingCache)) {
+            return $this->branchSettingCache[$cacheKey];
+        }
 
-        return $this->firstSettingByModuleKeyPriority(BranchModuleSetting::query()
+        return $this->branchSettingCache[$cacheKey] = $this->firstSettingByModuleKeyPriority(BranchModuleSetting::query()
             ->where('branch_id', $branchId)
             ->whereIn('module_key', $this->moduleKeyCandidates($moduleKey))
             ->get(), $this->moduleKeyCandidates($moduleKey));
@@ -1166,24 +1191,28 @@ class ModuleBranchService
     public function isEnabled(string $moduleKey): bool
     {
         $moduleKey = $this->canonicalModuleKey($moduleKey);
+        if (array_key_exists($moduleKey, $this->isEnabledCache)) {
+            return $this->isEnabledCache[$moduleKey];
+        }
+
         if (!$this->isRegisteredModule($moduleKey) || !$this->branchTablesReadyForSelectors()) {
-            return false;
+            return $this->isEnabledCache[$moduleKey] = false;
         }
 
         $setting = $this->setting($moduleKey);
         if ($setting?->branch_enabled && $setting->status === 'active') {
-            return true;
+            return $this->isEnabledCache[$moduleKey] = true;
         }
 
         if ($this->fallbackCandidateSettingEnabled($moduleKey)) {
-            return true;
+            return $this->isEnabledCache[$moduleKey] = true;
         }
 
         if (!$this->moduleSettingsHaveBranchId()) {
-            return false;
+            return $this->isEnabledCache[$moduleKey] = false;
         }
 
-        return BranchModuleSetting::query()
+        return $this->isEnabledCache[$moduleKey] = BranchModuleSetting::query()
             ->where('module_key', $moduleKey)
             ->whereNotNull('branch_id')
             ->where('branch_enabled', true)
@@ -1194,8 +1223,13 @@ class ModuleBranchService
     public function isBranchEnabled(string $moduleKey, int $branchId): bool
     {
         $moduleKey = $this->canonicalModuleKey($moduleKey);
+        $cacheKey = $moduleKey . ':' . $branchId;
+        if (array_key_exists($cacheKey, $this->isBranchEnabledCache)) {
+            return $this->isBranchEnabledCache[$cacheKey];
+        }
+
         if (!$this->isRegisteredModule($moduleKey) || !$this->branchTablesReadyForSelectors()) {
-            return false;
+            return $this->isBranchEnabledCache[$cacheKey] = false;
         }
 
         $settings = $this->branchSettingsByModuleKeyPriority($moduleKey, $branchId);
@@ -1203,35 +1237,40 @@ class ModuleBranchService
 
         if ($setting) {
             if ($setting->branch_enabled && $setting->status === 'active') {
-                return true;
+                return $this->isBranchEnabledCache[$cacheKey] = true;
             }
 
             if ($this->canFallbackFromSetting($moduleKey, $setting)) {
                 $fallback = $settings->skip(1)->first(fn (BranchModuleSetting $candidate) => $candidate->branch_enabled && $candidate->status === 'active');
                 if ($fallback) {
-                    return true;
+                    return $this->isBranchEnabledCache[$cacheKey] = true;
                 }
             }
 
-            return $this->fallbackCandidateSettingEnabled($moduleKey, $branchId)
+            return $this->isBranchEnabledCache[$cacheKey] = $this->fallbackCandidateSettingEnabled($moduleKey, $branchId)
                 || $this->fallbackCandidateSettingEnabled($moduleKey);
         }
 
         if ($this->fallbackCandidateSettingEnabled($moduleKey, $branchId)) {
-            return true;
+            return $this->isBranchEnabledCache[$cacheKey] = true;
         }
 
         $global = $this->setting($moduleKey);
 
-        return (bool) ($global?->branch_enabled && $global->status === 'active')
+        return $this->isBranchEnabledCache[$cacheKey] = (bool) ($global?->branch_enabled && $global->status === 'active')
             || $this->fallbackCandidateSettingEnabled($moduleKey);
     }
 
     public function branchAllowsSwitching(string $moduleKey, int $branchId): bool
     {
         $moduleKey = $this->canonicalModuleKey($moduleKey);
+        $cacheKey = $moduleKey . ':' . $branchId;
+        if (array_key_exists($cacheKey, $this->branchAllowsSwitchingCache)) {
+            return $this->branchAllowsSwitchingCache[$cacheKey];
+        }
+
         if (!$this->isRegisteredModule($moduleKey) || !$this->isBranchEnabled($moduleKey, $branchId)) {
-            return false;
+            return $this->branchAllowsSwitchingCache[$cacheKey] = false;
         }
 
         $settings = $this->branchSettingsByModuleKeyPriority($moduleKey, $branchId);
@@ -1239,21 +1278,21 @@ class ModuleBranchService
 
         if ($setting) {
             if ($setting->branch_enabled && $setting->status === 'active' && $setting->allow_user_switching) {
-                return true;
+                return $this->branchAllowsSwitchingCache[$cacheKey] = true;
             }
 
             if ($this->canFallbackFromSetting($moduleKey, $setting)) {
                 $fallback = $settings->skip(1)->first(fn (BranchModuleSetting $candidate) => $candidate->branch_enabled && $candidate->status === 'active' && $candidate->allow_user_switching);
                 if ($fallback) {
-                    return true;
+                    return $this->branchAllowsSwitchingCache[$cacheKey] = true;
                 }
             }
 
-            return $this->fallbackCandidateSettingEnabled($moduleKey, $branchId, requireSwitching: true)
+            return $this->branchAllowsSwitchingCache[$cacheKey] = $this->fallbackCandidateSettingEnabled($moduleKey, $branchId, requireSwitching: true)
                 || $this->fallbackCandidateSettingEnabled($moduleKey, requireSwitching: true);
         }
 
-        return (bool) $this->setting($moduleKey)?->allow_user_switching
+        return $this->branchAllowsSwitchingCache[$cacheKey] = (bool) $this->setting($moduleKey)?->allow_user_switching
             || $this->fallbackCandidateSettingEnabled($moduleKey, $branchId, requireSwitching: true)
             || $this->fallbackCandidateSettingEnabled($moduleKey, requireSwitching: true);
     }
@@ -1377,8 +1416,13 @@ class ModuleBranchService
     {
         $moduleKey = $this->canonicalModuleKey($moduleKey);
         $user ??= Auth::user();
+        $cacheKey = $moduleKey . ':' . ($user?->id ?? 'guest');
+        if (array_key_exists($cacheKey, $this->shouldFilterRecordsCache)) {
+            return $this->shouldFilterRecordsCache[$cacheKey];
+        }
+
         if (!$this->branchTablesReadyForSelectors()) {
-            return false;
+            return $this->shouldFilterRecordsCache[$cacheKey] = false;
         }
 
         $setting = null;
@@ -1393,7 +1437,7 @@ class ModuleBranchService
             ? (bool) $metadata['record_filtering_enabled']
             : (bool) ($config['can_filter_records'] ?? false);
 
-        return (bool) (
+        return $this->shouldFilterRecordsCache[$cacheKey] = (bool) (
             $user
             && $this->isEnabled($moduleKey)
             && $selectedBranchId
@@ -1471,13 +1515,18 @@ class ModuleBranchService
     {
         $moduleKey = $this->canonicalModuleKey($moduleKey);
         $user ??= Auth::user();
+        $cacheKey = $moduleKey . ':' . ($user?->id ?? 'guest');
+        if (array_key_exists($cacheKey, $this->selectedBranchIdsCache)) {
+            return $this->selectedBranchIdsCache[$cacheKey];
+        }
+
         $available = $this->availableBranchesForModule($moduleKey, $user);
         if (!$user || $available->isEmpty()) {
-            return [];
+            return $this->selectedBranchIdsCache[$cacheKey] = [];
         }
 
         if (!$this->supportsMultiBranchSelector($moduleKey)) {
-            return array_values(array_filter([(int) ($this->selectedBranchIdForModule($moduleKey, $user) ?? 0)]));
+            return $this->selectedBranchIdsCache[$cacheKey] = array_values(array_filter([(int) ($this->selectedBranchIdForModule($moduleKey, $user) ?? 0)]));
         }
 
         $availableIds = $available->pluck('id')->map(fn ($id) => (int) $id)->values();
@@ -1492,7 +1541,7 @@ class ModuleBranchService
             ->intersect($availableIds)
             ->values();
 
-        return $storedIds->isNotEmpty()
+        return $this->selectedBranchIdsCache[$cacheKey] = $storedIds->isNotEmpty()
             ? $storedIds->all()
             : $availableIds->all();
     }
@@ -1601,7 +1650,7 @@ class ModuleBranchService
             ],
         );
 
-        unset($this->selectedBranchCache[$moduleKey . ':' . $user->id]);
+        unset($this->selectedBranchCache[$moduleKey . ':' . $user->id], $this->selectedBranchIdsCache[$moduleKey . ':' . $user->id]);
     }
 
     public function setMultiPreference(string $moduleKey, array $branchIds, User $user): void
@@ -1644,7 +1693,7 @@ class ModuleBranchService
             ],
         );
 
-        unset($this->selectedBranchCache[$moduleKey . ':' . $user->id]);
+        unset($this->selectedBranchCache[$moduleKey . ':' . $user->id], $this->selectedBranchIdsCache[$moduleKey . ':' . $user->id]);
     }
 
     public function applyScope(Builder $query, string $moduleKey, string $branchColumn = 'branch_id'): Builder
@@ -1654,7 +1703,7 @@ class ModuleBranchService
         }
 
         $model = $query->getModel();
-        if (!Schema::hasColumn($model->getTable(), $branchColumn)) {
+        if (!$this->schemaHasColumn($model->getTable(), $branchColumn)) {
             return $query;
         }
 
@@ -1711,7 +1760,7 @@ class ModuleBranchService
         }
 
         $model = $query->getModel();
-        if (!Schema::hasColumn($model->getTable(), $branchColumn)) {
+        if (!$this->schemaHasColumn($model->getTable(), $branchColumn)) {
             return $query;
         }
 
@@ -1725,7 +1774,7 @@ class ModuleBranchService
             return $query;
         }
 
-        $branch = Schema::hasTable('branches') ? Branch::query()->find($branchId) : null;
+        $branch = $this->schemaHasTable('branches') ? Branch::query()->find($branchId) : null;
         $qualifiedColumn = $model->getTable() . '.' . $branchColumn;
 
         return $query->where(function (Builder $scoped) use ($qualifiedColumn, $branchId, $branch) {
@@ -1796,7 +1845,7 @@ class ModuleBranchService
         }
 
         $table = method_exists($record, 'getTable') ? $record->getTable() : null;
-        if (!$table || !Schema::hasColumn($table, $branchColumn)) {
+        if (!$table || !$this->schemaHasColumn($table, $branchColumn)) {
             return;
         }
 
@@ -1939,7 +1988,7 @@ class ModuleBranchService
 
     public function grantManagerAccess(Branch $branch): void
     {
-        if (!Schema::hasTable('branch_user_access')) {
+        if (!$this->schemaHasTable('branch_user_access')) {
             return;
         }
 
@@ -1965,7 +2014,7 @@ class ModuleBranchService
 
     public function backfillManagerAccess(): void
     {
-        if (!Schema::hasTable('branches') || !Schema::hasTable('branch_user_access')) {
+        if (!$this->schemaHasTable('branches') || !$this->schemaHasTable('branch_user_access')) {
             return;
         }
 
@@ -1986,17 +2035,17 @@ class ModuleBranchService
 
     protected function moduleSettingsHaveBranchId(): bool
     {
-        return Schema::hasTable('branch_module_settings')
-            && Schema::hasColumn('branch_module_settings', 'branch_id');
+        return $this->moduleSettingsHaveBranchIdCache ??= ($this->schemaHasTable('branch_module_settings')
+            && $this->schemaHasColumn('branch_module_settings', 'branch_id'));
     }
 
     public function mainBranch(): ?Branch
     {
-        if (!Schema::hasTable('branches')) {
+        if (!$this->schemaHasTable('branches')) {
             return null;
         }
 
-        return Branch::query()->where('is_main', true)->first()
+        return $this->mainBranchCache ??= Branch::query()->where('is_main', true)->first()
             ?? Branch::query()->orderBy('id')->first();
     }
 
@@ -2038,7 +2087,7 @@ class ModuleBranchService
         }
 
         $branchId = data_get($record, 'branch_id');
-        if ($branchId && Schema::hasTable('branches')) {
+        if ($branchId && $this->schemaHasTable('branches')) {
             return Branch::query()->find($branchId);
         }
 
@@ -2100,15 +2149,19 @@ class ModuleBranchService
 
     protected function branchTablesReadyForSelectors(): bool
     {
+        if ($this->branchTablesReadyCache !== null) {
+            return $this->branchTablesReadyCache;
+        }
+
         $missing = array_values(array_filter([
             'branches',
             'branch_module_settings',
             'branch_user_access',
             'user_module_branch_preferences',
-        ], fn (string $table): bool => !Schema::hasTable($table)));
+        ], fn (string $table): bool => !$this->schemaHasTable($table)));
 
         if ($missing === []) {
-            return true;
+            return $this->branchTablesReadyCache = true;
         }
 
         if (!$this->branchReadinessWarningLogged) {
@@ -2118,6 +2171,18 @@ class ModuleBranchService
             ]);
         }
 
-        return false;
+        return $this->branchTablesReadyCache = false;
+    }
+
+    private function schemaHasTable(string $table): bool
+    {
+        return $this->schemaTableCache[$table] ??= Schema::hasTable($table);
+    }
+
+    private function schemaHasColumn(string $table, string $column): bool
+    {
+        $key = $table . '.' . $column;
+
+        return $this->schemaColumnCache[$key] ??= ($this->schemaHasTable($table) && Schema::hasColumn($table, $column));
     }
 }
