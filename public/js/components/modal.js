@@ -117,9 +117,9 @@ function createModal(data, animate = 'animate') {
         <form id="${data.id}" method="${data.method ?? 'POST'}" action="${data.action}" enctype="multipart/form-data" class="w-full h-full flex flex-col space-y-4 relative items-center justify-center ${animate == 'animate' ? 'scale-in' : ''} ${data.class}">
             <input type="hidden" name="_token" value="${document.querySelector('meta[name=\'csrf-token\']')?.content}">
             <div class="${data.class} ${data.preview ? `bg-white text-black ${isA5Preview ? "w-[calc(148mm+3rem)] max-w-[calc(100vw-2rem)]" : "max-w-4xl"} h-[35rem] py-0` : 'bg-[var(--secondary-bg-color)]'} ${data.cards ? (isMenuModal ? 'h-[42rem] max-w-6xl' : 'h-[40rem] max-w-6xl') : (explicitMaxWidth || isA5Preview ? '' : 'max-w-2xl')} rounded-2xl shadow-lg ${isA5Preview ? '' : 'w-full'} ${isMenuModal ? 'p-4 sm:p-5' : 'p-6'} flex relative">
-                <div id="modal-close" onclick="closeModal('${data.id}')"
+                <div id="modal-close" onclick="closeModal('${data.id}')" tabindex="-1"
                     class="absolute top-0 -right-4 translate-x-full bg-[var(--secondary-bg-color)] rounded-2xl shadow-lg w-auto p-3 text-sm transition-all duration-300 ease-in-out hover:scale-[0.95] cursor-pointer">
-                    <button type="button"
+                    <button type="button" tabindex="-1" data-modal-close-button="true"
                         class="z-10 text-gray-400 hover:text-gray-600 hover:scale-[0.95] transition-all duration-300 ease-in-out cursor-pointer">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
                             class="w-6 h-6" style="display: inline">
@@ -1162,6 +1162,25 @@ function createModal(data, animate = 'animate') {
         return true;
     };
 
+    const focusFirstModalControl = () => {
+        const selectors = [
+            'input:not([type="hidden"]):not([disabled])',
+            'select:not([disabled])',
+            'textarea:not([disabled])',
+            'button:not([disabled]):not([data-modal-close-button="true"])',
+            'a[href]',
+            '[role="button"]:not([data-modal-close-button="true"])',
+        ];
+        const target = modalWrapper.querySelector(selectors.join(', '));
+        if (!target) return false;
+
+        target.focus();
+        if (target.matches('input, textarea')) {
+            target.select?.();
+        }
+        return true;
+    };
+
     const focusSearchShortcut = (e) => {
         if (!e.altKey || e.ctrlKey || e.metaKey || e.key.toLowerCase() !== 'f') return;
         if (!focusModalSearchInput()) return;
@@ -1249,7 +1268,11 @@ function createModal(data, animate = 'animate') {
             }
         });
 
-        data.basicSearch ? focusModalSearchInput() : '';
+        if (data.basicSearch && focusModalSearchInput()) {
+            return;
+        }
+
+        focusFirstModalControl();
     });
 
     formatAllAmountInputs();
