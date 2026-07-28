@@ -32,9 +32,9 @@
                     <div class="card_container px-3 h-full flex flex-col">
                         <div id="table-head" class="grid grid-cols-4 bg-[var(--h-bg-color)] rounded-lg font-medium py-2 mt-4">
                             <div class="cursor-pointer" onclick="sortByThis(this)">Name</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Total Amount</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Total Payment</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Total Balance</div>
+                            <div class="cursor-pointer" onclick="sortByThis(this)">Total Program</div>
+                            <div class="cursor-pointer" onclick="sortByThis(this)">Pending Voucher Payment</div>
+                            <div class="cursor-pointer" onclick="sortByThis(this)">Not Received</div>
                         </div>
                         <p id="noItemsError" style="display: none" class="text-sm text-[var(--border-error)] mt-3 cursor-pointer" onclick="sortByThis(this)">No items found</p>
                         <div class="overflow-y-auto grow my-scrollbar-2">

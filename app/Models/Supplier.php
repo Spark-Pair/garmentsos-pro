@@ -221,6 +221,9 @@ class Supplier extends Model
             ? $this->worker->productions()->whereBetween(\Illuminate\Support\Facades\DB::raw('DATE(receive_date)'), [$start, $end])
                 ->when($hasBranchScope && Schema::hasColumn('productions', 'branch_id'), $branchScope)
             : null;
+        $pendingPaymentTotal = (clone $paymentQuery)
+            ->whereNull('voucher_id')
+            ->sum('amount') ?? 0;
 
         $normalizeDateValue = function ($value) {
             if ($value instanceof \DateTimeInterface) {
@@ -493,6 +496,7 @@ class Supplier extends Model
             'bill' => $billTotal,
             'payment' => $paymentTotal,
             'balance' => $billTotal - $paymentTotal,
+            'pending_payment' => $pendingPaymentTotal,
         ];
 
         return [

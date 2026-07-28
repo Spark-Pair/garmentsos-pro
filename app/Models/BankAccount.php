@@ -267,6 +267,9 @@ class BankAccount extends Model
             ->whereBetween(DB::raw('DATE(date)'), [$from, $to])
             ->when($hasBranchScope && Schema::hasColumn('supplier_payments', 'branch_id'), $branchScope)
             ->with('bankAccount.bank', 'cheque', 'slip');
+        $pendingPaymentTotal = (clone $supplierQuery)
+            ->whereNull('voucher_id')
+            ->sum('amount') ?? 0;
 
         // ── Adjustments ──
         $adjustments = $this->statementAdjustments()
@@ -417,6 +420,7 @@ class BankAccount extends Model
                 'bill'    => $billTotal,
                 'payment' => $paymentTotal,
                 'balance' => $billTotal - $paymentTotal,
+                'pending_payment' => $pendingPaymentTotal,
             ],
             'category' => 'account',
         ];

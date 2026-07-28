@@ -136,12 +136,41 @@
             @if (isset($data))
                 @php
                     $statements = collect($data['statements']);
+                    $hasOpeningBalanceEntryRow = $statements->contains(function ($statement) {
+                        return str_starts_with((string) ($statement['reff_no'] ?? ''), 'OB-')
+                            || strcasecmp((string) ($statement['method'] ?? ''), 'Opening Balance') === 0;
+                    });
+                    $openingBalanceRow = collect([[
+                        'type' => 'opening_balance',
+                        'date' => null,
+                        'reff_no' => '-',
+                        'method' => '-',
+                        'description' => 'Opening Balance',
+                        'bill' => 0,
+                        'payment' => 0,
+                        'source' => null,
+                    ]]);
+                    $shouldUseActualOpeningEntryOnly = ((float) ($data['opening_balance'] ?? 0)) == 0.0 && $hasOpeningBalanceEntryRow;
+                    $statementRows = $shouldUseActualOpeningEntryOnly ? $statements : $openingBalanceRow->merge($statements);
+                    $topSummaryLabel = ($data['category'] ?? null) === 'customer' ? 'Total Order Balance' : 'Total Pending Payment';
+                    $topSummaryValue = ($data['category'] ?? null) === 'customer'
+                        ? ($data['totals']['order_balance'] ?? 0)
+                        : ($data['totals']['pending_payment'] ?? 0);
+                    $datedStatementRows = $statements
+                        ->pluck('date')
+                        ->filter()
+                        ->map(fn ($date) => $date instanceof \DateTimeInterface ? \Carbon\Carbon::instance($date) : \Carbon\Carbon::parse($date))
+                        ->sort()
+                        ->values();
+                    $statementDateLabel = $datedStatementRows->isNotEmpty()
+                        ? $datedStatementRows->first()->format('d-M-Y') . ' - ' . $datedStatementRows->last()->format('d-M-Y')
+                        : $data['date'];
                     $balance = $data['opening_balance'];
 
                     // Pehle page ke liye 29 rows lo
-                    $firstPage = $statements->take(29);
+                    $firstPage = $statementRows->take(29);
 
-                    $otherPages = $statements->skip(29)->chunk(32);
+                    $otherPages = $statementRows->skip(29)->chunk(32);
                 @endphp
 
                 {{-- First Page (29 rows) --}}
@@ -181,15 +210,14 @@
                                 {{-- Header Info --}}
                                 <div id="preview-header" class="preview-header w-full flex justify-between px-5">
                                     <div class="left my-auto pr-3 text-sm text-gray-800 space-y-1.5">
-                                        <div class="date-range leading-none">Date: {{ $data['date'] }}</div>
+                                        <div class="date-range leading-none">Date: {{ $statementDateLabel }}</div>
                                         <div class="branch-scope leading-none">Branches: {{ $data['branch_scope_label'] ?? implode(', ', $selectedBranchLabels) }}</div>
-                                        <div class="total-balance leading-none">Total Order Balance: {{ \App\Support\Money::format($data['totals']['order_balance'] ?? 0) }}</div>
+                                        <div class="total-balance leading-none">{{ $topSummaryLabel }}: {{ \App\Support\Money::format($topSummaryValue) }}</div>
                                     </div>
                                     <div class="center my-auto">
                                         <div class="name capitalize font-semibold text-md">{{ $data['name'] }}</div>
                                     </div>
                                     <div class="right my-auto pr-3 text-sm text-gray-800 space-y-1.5">
-                                        <div class="opening-balance leading-none">Opening Balance: Rs.{{ \App\Support\Money::format($data['opening_balance']) }}</div>
                                         <div class="total-bill leading-none">Total Bill: {{ \App\Support\Money::format($data['totals']['bill']) }}</div>
                                         <div class="total-payment leading-none">Total Payment: {{ \App\Support\Money::format($data['totals']['payment']) }}</div>
                                         <div class="closing-balance leading-none">Closing Balance: Rs.{{ \App\Support\Money::format($data['closing_balance']) }}</div>
@@ -222,6 +250,12 @@
                                             <div id="tbody" class="tbody w-full">
                                                 @foreach ($firstPage as $statement)
                                                     @php
+                                                        $isOpeningBalanceRow = ($statement['type'] ?? null) === 'opening_balance';
+                                                        $isOpeningBalanceEntryRow = !$isOpeningBalanceRow && (
+                                                            str_starts_with((string) ($statement['reff_no'] ?? ''), 'OB-')
+                                                            || strcasecmp((string) ($statement['method'] ?? ''), 'Opening Balance') === 0
+                                                        );
+
                                                         if ($statement['type'] == 'invoice') {
                                                             $balance += $statement['bill'];
                                                         } elseif ($statement['type'] == 'payment') {
@@ -248,11 +282,11 @@
                                                             @endif
                                                         >
                                                             <div class="td font-semibold w-[2.5%]">{{ $loop->iteration }}.</div>
-                                                            <div class="td font-medium w-[11.5%]">{{ $statement['date']->format('d-M-Y') }}</div>
+                                                            <div class="td font-medium w-[11.5%]">{{ $isOpeningBalanceRow ? ($statementType === 'summarized' ? 'Opening Balance' : '-') : $statement['date']->format('d-M-Y') }}</div>
                                                             @if(in_array($statementType, ['detailed', 'general']))
                                                                 <div class="td font-medium w-[10%]">{{ $statement['reff_no'] }}</div>
-                                                                <div class="td font-medium w-[10%] capitalize">{{ $statement['method'] ?? "-" }}</div>
-                                                                <div class="td font-medium w-[33%] text-nowrap truncate">{{ $statement['description'] ?? "-" }}</div>
+                                                                <div class="td font-medium w-[10%] capitalize">{{ $isOpeningBalanceEntryRow ? 'Opening Entry' : ($statement['method'] ?? "-") }}</div>
+                                                                <div class="td font-medium w-[33%] text-nowrap truncate {{ $isOpeningBalanceRow ? 'text-left font-semibold' : '' }}">{{ $isOpeningBalanceEntryRow ? 'Opening Balance Entry' : ($statement['description'] ?? "-") }}</div>
                                                             @endif
                                                             <div class="td font-medium w-[10%]">{{ \App\Support\Money::format($statement['bill'] ?? 0) }}</div>
                                                             <div class="td font-medium w-[10%]">{{ \App\Support\Money::format($statement['payment'] ?? 0) }}</div>
@@ -335,6 +369,12 @@
                                                 <div id="tbody" class="tbody w-full">
                                                     @foreach ($chunk as $statement)
                                                         @php
+                                                            $isOpeningBalanceRow = ($statement['type'] ?? null) === 'opening_balance';
+                                                            $isOpeningBalanceEntryRow = !$isOpeningBalanceRow && (
+                                                                str_starts_with((string) ($statement['reff_no'] ?? ''), 'OB-')
+                                                                || strcasecmp((string) ($statement['method'] ?? ''), 'Opening Balance') === 0
+                                                            );
+
                                                             if ($statement['type'] == 'invoice') {
                                                                 $balance += $statement['bill'];
                                                             } elseif ($statement['type'] == 'payment') {
@@ -361,11 +401,11 @@
                                                                 @endif
                                                             >
                                                                 <div class="td font-semibold w-[2.5%]">{{ $loop->iteration + 29 + ($pageIndex * 32) }}.</div>
-                                                                <div class="td font-medium w-[11.5%]">{{ $statement['date']->format('d-M-Y') }}</div>
+                                                                <div class="td font-medium w-[11.5%]">{{ $isOpeningBalanceRow ? ($statementType === 'summarized' ? 'Opening Balance' : '-') : $statement['date']->format('d-M-Y') }}</div>
                                                                 @if(in_array($statementType, ['detailed', 'general']))
                                                                     <div class="td font-medium w-[10%]">{{ $statement['reff_no'] }}</div>
-                                                                    <div class="td font-medium w-[10%] capitalize">{{ $statement['method'] ?? "-" }}</div>
-                                                                    <div class="td font-medium w-[33%] text-nowrap overflow-hidden">{{ $statement['description'] ?? "-" }}</div>
+                                                                    <div class="td font-medium w-[10%] capitalize">{{ $isOpeningBalanceEntryRow ? 'Opening Entry' : ($statement['method'] ?? "-") }}</div>
+                                                                    <div class="td font-medium w-[33%] text-nowrap overflow-hidden {{ $isOpeningBalanceRow ? 'text-left font-semibold' : '' }}">{{ $isOpeningBalanceEntryRow ? 'Opening Balance Entry' : ($statement['description'] ?? "-") }}</div>
                                                                 @endif
                                                                 <div class="td font-medium w-[10%]">{{ \App\Support\Money::format($statement['bill'] ?? 0) }}</div>
                                                                 <div class="td font-medium w-[10%]">{{ \App\Support\Money::format($statement['payment'] ?? 0) }}</div>
