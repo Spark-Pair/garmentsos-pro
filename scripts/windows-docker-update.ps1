@@ -12,6 +12,8 @@ $script:EnvBackupCreated = $false
 $script:EnvBackupPath = ""
 $script:EnvWriteStoppedCompose = $false
 $script:LicenseStateBackupPath = ""
+$script:LauncherUpdateStatus = "not_checked"
+$script:LauncherUpdateDetail = ""
 
 function Copy-RootLaunchers($SourceDir, $TargetDir) {
     $launchers = @(
@@ -406,6 +408,9 @@ function Stage-GarmentsLauncherUpdate($SourcePath, $DestinationPath, $TargetDir)
     catch {
         Write-Warning "Launcher replacement helper could not be started."
     }
+
+    $script:LauncherUpdateStatus = "staged"
+    $script:LauncherUpdateDetail = "pending_path=$pendingPath; marker=$markerPath; destination=$DestinationPath"
 }
 
 function Update-LauncherExeFromRelease($ReleaseDir, $InstallDir) {
@@ -427,10 +432,14 @@ function Update-LauncherExeFromRelease($ReleaseDir, $InstallDir) {
 
     if (-not (Test-Path -LiteralPath $sourceLauncher)) {
         Write-Host "Launcher EXE not found in release package; continuing app update only."
+        $script:LauncherUpdateStatus = "not_in_package"
+        $script:LauncherUpdateDetail = "checked=$ReleaseDir"
         return
     }
 
     Write-Host "Launcher EXE found in release package."
+    $script:LauncherUpdateStatus = "found"
+    $script:LauncherUpdateDetail = "source=$sourceLauncher"
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 
     try {
@@ -441,6 +450,8 @@ function Update-LauncherExeFromRelease($ReleaseDir, $InstallDir) {
 
         Copy-Item -Force -LiteralPath $sourceLauncher -Destination $destLauncher
         Write-Host "Launcher EXE updated."
+        $script:LauncherUpdateStatus = "updated"
+        $script:LauncherUpdateDetail = "source=$sourceLauncher; destination=$destLauncher"
         Register-GarmentsProtocol $InstallDir
     } catch {
         Write-Warning "Could not update launcher EXE now. $($_.Exception.Message)"
@@ -448,6 +459,8 @@ function Update-LauncherExeFromRelease($ReleaseDir, $InstallDir) {
             Stage-GarmentsLauncherUpdate $sourceLauncher $destLauncher $InstallDir
         } catch {
             Write-Warning "Could not stage launcher EXE update. Continuing app update only. $($_.Exception.Message)"
+            $script:LauncherUpdateStatus = "failed"
+            $script:LauncherUpdateDetail = "source=$sourceLauncher; destination=$destLauncher; error=$($_.Exception.Message)"
         }
     }
 }
@@ -964,7 +977,86 @@ function Test-GarmentsRunningContainerContainsMigration($InstallDir, $LatestMigr
     }
 }
 
-function Verify-PostUpdateState($InstallDir, $ExpectedVersion) {
+function Add-PostUpdateCheck($Checks, [string]$Name, [bool]$Passed, [string]$Detail = "", [int]$ExitCode = 0) {
+    $Checks[$Name] = [ordered]@{
+        passed = $Passed
+        detail = $Detail
+        exit_code = $ExitCode
+    }
+}
+
+function Format-PostUpdateOutput($Output) {
+    if ($null -eq $Output) {
+        return ""
+    }
+
+    if ($Output -is [array]) {
+        return (($Output | ForEach-Object { [string]$_ }) -join " ").Trim()
+    }
+
+    return ([string]$Output).Trim()
+}
+
+function Write-PostUpdateCheckResult($InstallDir, [string]$Name, $Check) {
+    $status = if ($Check.passed) { "PASS" } else { "FAIL" }
+    $detail = [string]$Check.detail
+    $exitCode = [int]$Check.exit_code
+    $message = "post-update check [$Name] $status"
+
+    if ($exitCode -ne 0) {
+        $message += " exit=$exitCode"
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($detail)) {
+        $message += " detail=$detail"
+    }
+
+    Write-Host $message
+    Write-UpdateLog $InstallDir $message
+}
+
+function Wait-GarmentsViteManifestReady($InstallDir, [int]$TimeoutSeconds = 60) {
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $lastDetail = ""
+    $lastExitCode = 0
+
+    Push-Location $InstallDir
+    try {
+        do {
+            $shellOutput = docker compose exec -T app sh -lc 'test -f /var/www/html/public/build/manifest.json && echo manifest-present || echo manifest-missing' 2>&1
+            $shellExitCode = $LASTEXITCODE
+            $phpOutput = docker compose exec -T app php -r 'echo file_exists("/var/www/html/public/build/manifest.json") ? "asset-ok" : "asset-missing";' 2>&1
+            $phpExitCode = $LASTEXITCODE
+
+            $shellText = Format-PostUpdateOutput $shellOutput
+            $phpText = Format-PostUpdateOutput $phpOutput
+            $lastExitCode = if ($phpExitCode -ne 0) { $phpExitCode } else { $shellExitCode }
+            $lastDetail = "test=$shellText; php=$phpText"
+
+            if ($shellExitCode -eq 0 -and $shellText -match "manifest-present" -and $phpExitCode -eq 0 -and $phpText -match "asset-ok") {
+                return [ordered]@{
+                    passed = $true
+                    detail = $lastDetail
+                    exit_code = 0
+                }
+            }
+
+            Start-Sleep -Seconds 3
+        } while ((Get-Date) -lt $deadline)
+
+        $listing = docker compose exec -T app sh -lc 'pwd; ls -lah /var/www/html/public 2>&1; ls -lah /var/www/html/public/build 2>&1 || true' 2>&1
+        $listingText = Format-PostUpdateOutput $listing
+        return [ordered]@{
+            passed = $false
+            detail = "$lastDetail; listing=$listingText"
+            exit_code = $lastExitCode
+        }
+    } finally {
+        Pop-Location
+    }
+}
+
+function Verify-PostUpdateState($InstallDir, $ExpectedVersion, $ExpectedImage = "") {
     $checks = [ordered]@{}
 
     Push-Location $InstallDir
@@ -972,50 +1064,60 @@ function Verify-PostUpdateState($InstallDir, $ExpectedVersion) {
         $envPath = Join-Path $InstallDir ".env"
         $envContent = Get-Content -LiteralPath $envPath -Raw -ErrorAction Stop
         $appVersion = Read-EnvValue $envContent "APP_VERSION"
-        $checks["app_version"] = $appVersion
+        Add-PostUpdateCheck $checks "app_version" ($appVersion -eq $ExpectedVersion) "expected=$ExpectedVersion; actual=$appVersion"
+
+        $actualImage = Read-EnvValue $envContent "GARMENTSOS_IMAGE"
+        if (-not [string]::IsNullOrWhiteSpace($ExpectedImage)) {
+            Add-PostUpdateCheck $checks "garmentsos_image" ($actualImage -eq $ExpectedImage) "expected=$ExpectedImage; actual=$actualImage"
+        } else {
+            Add-PostUpdateCheck $checks "garmentsos_image" (-not [string]::IsNullOrWhiteSpace($actualImage)) "actual=$actualImage"
+        }
 
         Wait-GarmentsAppExecReady $InstallDir
         Invoke-GarmentsStorageRepair $InstallDir
 
-        $dockerHealthy = docker compose ps app 2>$null
-        $checks["docker_running"] = ($LASTEXITCODE -eq 0 -and $dockerHealthy -match "Up")
+        $dockerHealthy = docker compose ps app 2>&1
+        $dockerPsExit = $LASTEXITCODE
+        Add-PostUpdateCheck $checks "docker_running" ($dockerPsExit -eq 0 -and (Format-PostUpdateOutput $dockerHealthy) -match "Up") (Format-PostUpdateOutput $dockerHealthy) $dockerPsExit
 
-        $storageLink = docker compose exec -T app sh -lc 'test -L public/storage && echo linked' 2>$null
-        $checks["storage_link"] = ($storageLink -match "linked")
+        $storageLink = docker compose exec -T app sh -lc 'test -L /var/www/html/public/storage && echo linked || echo missing' 2>&1
+        $storageExit = $LASTEXITCODE
+        Add-PostUpdateCheck $checks "storage_link" ($storageExit -eq 0 -and (Format-PostUpdateOutput $storageLink) -match "linked") (Format-PostUpdateOutput $storageLink) $storageExit
 
-        $manifestFile = docker compose exec -T app sh -lc 'test -f public/build/manifest.json && echo manifest-present' 2>$null
-        $checks["manifest_present"] = ($manifestFile -match "manifest-present")
+        $assetCheck = Wait-GarmentsViteManifestReady $InstallDir 60
+        Add-PostUpdateCheck $checks "asset_ready" ([bool]$assetCheck.passed) ([string]$assetCheck.detail) ([int]$assetCheck.exit_code)
+        Add-PostUpdateCheck $checks "manifest_present" ([bool]$assetCheck.passed) ([string]$assetCheck.detail) ([int]$assetCheck.exit_code)
+
+        $launcherStatus = [string]$script:LauncherUpdateStatus
+        $launcherOk = $launcherStatus -in @("updated", "staged")
+        Add-PostUpdateCheck $checks "launcher_update" $launcherOk "status=$launcherStatus; $($script:LauncherUpdateDetail)"
 
         $migrationOutput = docker compose exec -T app sh -lc 'php artisan migrate --force --no-interaction' 2>&1
-        $checks["migrations"] = ($LASTEXITCODE -eq 0)
-        if (-not $checks["migrations"] -and $migrationOutput) {
-            $checks["migration_output"] = ($migrationOutput -join " ")
-        }
-
-        $appResponse = docker compose exec -T app sh -lc 'php -r "echo file_exists(\"public/build/manifest.json\") ? \"asset-ok\" : \"asset-missing\";"' 2>$null
-        $checks["asset_ready"] = ($appResponse -match "asset-ok")
+        $migrationExit = $LASTEXITCODE
+        Add-PostUpdateCheck $checks "migrations" ($migrationExit -eq 0) (Format-PostUpdateOutput $migrationOutput) $migrationExit
     } finally {
         Pop-Location
     }
 
     $failed = @()
-    if ($checks["app_version"] -ne $ExpectedVersion) {
-        $failed += "APP_VERSION mismatch: expected $ExpectedVersion, found $($checks["app_version"])"
-    }
-    if (-not $checks["docker_running"]) {
-        $failed += "Docker app container did not remain healthy after restart."
-    }
-    if (-not $checks["storage_link"]) {
-        $failed += "Storage link verification failed."
-    }
-    if (-not $checks["manifest_present"]) {
-        $failed += "public/build/manifest.json verification failed."
-    }
-    if (-not $checks["migrations"]) {
-        $failed += "Migration verification failed. $($checks["migration_output"])"
-    }
-    if (-not $checks["asset_ready"]) {
-        $failed += "Post-update asset verification failed."
+
+    foreach ($name in $checks.Keys) {
+        $check = $checks[$name]
+        Write-PostUpdateCheckResult $InstallDir $name $check
+
+        if (-not $check.passed) {
+            switch ($name) {
+                "app_version" { $failed += "APP_VERSION mismatch. $($check.detail)" }
+                "garmentsos_image" { $failed += "GARMENTSOS_IMAGE mismatch. $($check.detail)" }
+                "docker_running" { $failed += "Docker app container did not remain healthy after restart. $($check.detail)" }
+                "storage_link" { $failed += "Storage link verification failed. $($check.detail)" }
+                "manifest_present" { $failed += "public/build/manifest.json verification failed. $($check.detail)" }
+                "asset_ready" { $failed += "Post-update asset verification failed. $($check.detail)" }
+                "launcher_update" { $failed += "Launcher update was neither completed nor safely staged. $($check.detail)" }
+                "migrations" { $failed += "Migration verification failed. $($check.detail)" }
+                default { $failed += "$name verification failed. $($check.detail)" }
+            }
+        }
     }
 
     if ($failed.Count -gt 0) {
@@ -1224,7 +1326,7 @@ try {
         }
     }
 
-    Verify-PostUpdateState $InstallDir $TargetVersion
+    Verify-PostUpdateState $InstallDir $TargetVersion $TargetImage
     Invoke-GarmentsFinalSuccessPass $InstallDir
 
     try {

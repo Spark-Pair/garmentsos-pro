@@ -1959,7 +1959,7 @@ public sealed class MainForm : Form
                 }
 
                 var restartLog = await CaptureRestartServicesDiagnosticsAsync(installDirBox.Text.Trim(), updateScriptEx);
-                throw new InvalidOperationException("Restart services failed. Details were saved to: " + restartLog, updateScriptEx);
+                throw new InvalidOperationException(FriendlyUpdateScriptFailure(updateScriptEx) + " Details were saved to: " + restartLog, updateScriptEx);
             }
 
             SetStep("Opening app...", percent: 95);
@@ -2144,6 +2144,35 @@ public sealed class MainForm : Form
         }
 
         await RefreshStatusAsync();
+    }
+
+    private static string FriendlyUpdateScriptFailure(Exception ex)
+    {
+        var message = ex.ToString();
+        if (message.Contains("Post-update asset verification failed", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("public/build/manifest.json verification failed", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Post-update asset verification failed.";
+        }
+
+        if (message.Contains("Migration verification failed", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("Running app container cannot see expected migration", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("does not contain expected migration", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Post-update migration verification failed.";
+        }
+
+        if (message.Contains("APP_VERSION mismatch", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Post-update version verification failed.";
+        }
+
+        if (message.Contains("Storage link verification failed", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Post-update storage link verification failed.";
+        }
+
+        return "Restart services failed.";
     }
 
     private async Task<bool> TryRestorePreviousVersionAsync(string rollbackLogPath)
