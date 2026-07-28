@@ -266,6 +266,7 @@ Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensur
     Route::get('reports/statement/record-details', [ReportController::class, 'statementRecordDetails'])->middleware('moduleEnabled:reports')->name('reports.statement.record-details');
     Route::get('reports/pending-payments', [ReportController::class, 'pendingPayments'])->middleware('moduleEnabled:reports')->name('reports.pending-payments');
     Route::get('reports/article', [ReportController::class, 'article'])->middleware('moduleEnabled:reports')->name('reports.article');
+    Route::get('reports/fabric', [ReportController::class, 'fabric'])->middleware('moduleEnabled:reports')->name('reports.fabric');
     Route::get('reports/physical-quantity', [ReportController::class, 'physicalQuantity'])->middleware('moduleEnabled:reports')->name('reports.physical-quantity');
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
 

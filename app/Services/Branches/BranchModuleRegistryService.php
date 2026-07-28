@@ -181,6 +181,7 @@ class BranchModuleRegistryService
 
             return match ($second) {
                 'article' => 'reports_article',
+                'fabric' => 'reports_fabric',
                 'statement' => 'reports_statement',
                 'pending-payments' => 'reports_pending_payments',
                 'physical-quantity' => 'reports_physical_quantity',
@@ -299,6 +300,7 @@ class BranchModuleRegistryService
             'reports_pending_payments' => [],
             'reports_physical_quantity' => [],
             'reports_article' => [],
+            'reports_fabric' => [],
             'reports' => [],
         ][$key] ?? [$key];
 

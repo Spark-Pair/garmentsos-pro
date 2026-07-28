@@ -8,9 +8,14 @@ use App\Models\Branch;
 use App\Models\Customer;
 use App\Models\CustomerPayment;
 use App\Models\Expense;
+use App\Models\Fabric;
 use App\Models\InvoiceArticles;
 use App\Models\Invoice;
+use App\Models\InventoryTransaction;
+use App\Models\IssuedFabric;
 use App\Models\OrderArticles;
+use App\Models\ProductionTag;
+use App\Models\ReturnFabric;
 use App\Models\SupplierPayment;
 use App\Models\Supplier;
 use App\Models\Setup;
@@ -632,6 +637,314 @@ class ReportController extends Controller
         $branchContext = app(ModuleBranchService::class)->reportBranchContext('reports_article');
         $selectedBranchLabels = $branchContext['branch_names'];
         return view('reports.article', compact('authLayout', 'selectedBranchLabels'));
+    }
+
+    public function fabric(Request $request)
+    {
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'manager', 'admin', 'accountant', 'guest', 'store_keeper'])) {
+            return $resp;
+        }
+
+        if ($request->ajax()) {
+            $branchContext = app(ModuleBranchService::class)->reportBranchContext('reports_fabric');
+            $selectedBranchIds = $branchContext['branch_ids'];
+            $startDate = $request->date_range_start ? Carbon::parse($request->date_range_start)->startOfDay() : null;
+            $endDate = $request->date_range_end ? Carbon::parse($request->date_range_end)->endOfDay() : null;
+            $fabricSearch = trim((string) $request->fabric);
+            $tagSearch = trim((string) $request->tag);
+            $supplierSearch = trim((string) $request->supplier_name);
+            $workerSearch = trim((string) $request->worker_name);
+            $articleSearch = trim((string) $request->article_no);
+            $sourceSearch = trim((string) $request->source);
+
+            $fabricLots = Schema::hasTable('fabrics')
+                ? $this->applyReportBranchScope(
+                    Fabric::with(['fabric', 'supplier'])->orderByDesc('date')->orderByDesc('id'),
+                    'fabrics',
+                    $selectedBranchIds,
+                    $branchContext
+                )->get()
+                : collect();
+
+            $fabricByTag = $fabricLots->keyBy(fn ($fabric) => (string) $fabric->tag);
+            $sourceQuantity = [];
+            $workerQuantity = [];
+            $rows = collect();
+
+            $addSourceQuantity = function (string $tag, float $delta) use (&$sourceQuantity) {
+                if ($tag === '') {
+                    return;
+                }
+
+                $sourceQuantity[$tag] = ($sourceQuantity[$tag] ?? 0) + $delta;
+            };
+
+            $addWorkerQuantity = function (string $tag, ?int $workerId, float $delta) use (&$workerQuantity) {
+                if ($tag === '' || !$workerId) {
+                    return;
+                }
+
+                $key = $tag . '|' . $workerId;
+                $workerQuantity[$key] = ($workerQuantity[$key] ?? 0) + $delta;
+            };
+
+            foreach ($fabricLots as $fabric) {
+                $tag = (string) ($fabric->tag ?? '');
+                $quantity = (float) ($fabric->quantity ?? 0);
+                $addSourceQuantity($tag, $quantity);
+
+                $rows->push([
+                    'id' => 'fabric-' . $fabric->id,
+                    'source' => 'Received',
+                    'date' => $fabric->date?->format('d-M-Y, D') ?? '-',
+                    'date_raw' => $fabric->date?->format('Y-m-d') ?? $fabric->created_at?->format('Y-m-d'),
+                    'fabric' => $fabric->fabric?->title ?? '-',
+                    'tag' => $tag ?: '-',
+                    'supplier_name' => $fabric->supplier?->supplier_name ?? '-',
+                    'worker_name' => '-',
+                    'article_no' => '-',
+                    'color' => $fabric->color ?: '-',
+                    'reference' => $fabric->reff_no ?: '-',
+                    'unit' => $fabric->unit ?: '-',
+                    'received_quantity' => $quantity,
+                    'issued_quantity' => 0,
+                    'returned_quantity' => 0,
+                    'production_quantity' => 0,
+                    'source_balance' => 0,
+                    'worker_balance' => null,
+                    'remarks' => $fabric->remarks ?: '-',
+                    'created_at' => $fabric->created_at,
+                ]);
+            }
+
+            if (Schema::hasTable('inventory_transactions')) {
+                $inventoryRows = $this->applyReportBranchScope(
+                    InventoryTransaction::with(['item.fabric', 'supplier'])->orderByDesc('date')->orderByDesc('id'),
+                    'inventory_transactions',
+                    $selectedBranchIds,
+                    $branchContext
+                )->whereHas('item', function ($query) {
+                    $query->where('type', 'fabric')->orWhereNotNull('fabric_id');
+                })->get();
+
+                foreach ($inventoryRows as $transaction) {
+                    $item = $transaction->item;
+                    $tag = (string) ($item?->tag ?? $transaction->reference_no ?? '');
+                    $quantity = (float) ($transaction->quantity ?? 0);
+                    $isIn = strtolower((string) $transaction->direction) === 'in';
+                    $addSourceQuantity($tag, $isIn ? $quantity : -$quantity);
+
+                    $rows->push([
+                        'id' => 'inventory-' . $transaction->id,
+                        'source' => $isIn ? 'Inventory In' : 'Inventory Out',
+                        'date' => $transaction->date?->format('d-M-Y, D') ?? '-',
+                        'date_raw' => $transaction->date?->format('Y-m-d') ?? $transaction->created_at?->format('Y-m-d'),
+                        'fabric' => $item?->fabric?->title ?? $item?->name ?? '-',
+                        'tag' => $tag ?: '-',
+                        'supplier_name' => $transaction->supplier?->supplier_name ?? '-',
+                        'worker_name' => '-',
+                        'article_no' => '-',
+                        'color' => $item?->color ?: '-',
+                        'reference' => $transaction->reference_no ?: '-',
+                        'unit' => $transaction->unit ?: $item?->unit ?: '-',
+                        'received_quantity' => $isIn ? $quantity : 0,
+                        'issued_quantity' => $isIn ? 0 : $quantity,
+                        'returned_quantity' => 0,
+                        'production_quantity' => 0,
+                        'source_balance' => 0,
+                        'worker_balance' => null,
+                        'remarks' => $transaction->remarks ?: '-',
+                        'created_at' => $transaction->created_at,
+                    ]);
+                }
+            }
+
+            $issuedRows = Schema::hasTable('issued_fabrics')
+                ? $this->applyReportBranchScope(
+                    IssuedFabric::with('worker')->orderByDesc('date')->orderByDesc('id'),
+                    'issued_fabrics',
+                    $selectedBranchIds,
+                    $branchContext
+                )->get()
+                : collect();
+
+            foreach ($issuedRows as $issued) {
+                $tag = (string) ($issued->tag ?? '');
+                $quantity = (float) ($issued->quantity ?? 0);
+                $lot = $fabricByTag->get($tag);
+                $workerId = $issued->worker_id ? (int) $issued->worker_id : null;
+                $addSourceQuantity($tag, -$quantity);
+                $addWorkerQuantity($tag, $workerId, $quantity);
+
+                $rows->push([
+                    'id' => 'issued-' . $issued->id,
+                    'source' => 'Issued to Worker',
+                    'date' => $issued->date?->format('d-M-Y, D') ?? '-',
+                    'date_raw' => $issued->date?->format('Y-m-d') ?? $issued->created_at?->format('Y-m-d'),
+                    'fabric' => $lot?->fabric?->title ?? '-',
+                    'tag' => $tag ?: '-',
+                    'supplier_name' => $lot?->supplier?->supplier_name ?? '-',
+                    'worker_name' => $issued->worker?->employee_name ?? '-',
+                    'article_no' => '-',
+                    'color' => $lot?->color ?: '-',
+                    'reference' => '-',
+                    'unit' => $lot?->unit ?: '-',
+                    'received_quantity' => 0,
+                    'issued_quantity' => $quantity,
+                    'returned_quantity' => 0,
+                    'production_quantity' => 0,
+                    'source_balance' => 0,
+                    'worker_balance' => 0,
+                    'worker_key' => $tag . '|' . $workerId,
+                    'remarks' => $issued->remarks ?: '-',
+                    'created_at' => $issued->created_at,
+                ]);
+            }
+
+            $returnRows = Schema::hasTable('return_fabrics')
+                ? $this->applyReportBranchScope(
+                    ReturnFabric::with('worker')->orderByDesc('date')->orderByDesc('id'),
+                    'return_fabrics',
+                    $selectedBranchIds,
+                    $branchContext
+                )->get()
+                : collect();
+
+            foreach ($returnRows as $return) {
+                $tag = (string) ($return->tag ?? '');
+                $quantity = (float) ($return->quantity ?? 0);
+                $lot = $fabricByTag->get($tag);
+                $workerId = $return->worker_id ? (int) $return->worker_id : null;
+                $addSourceQuantity($tag, $quantity);
+                $addWorkerQuantity($tag, $workerId, -$quantity);
+
+                $rows->push([
+                    'id' => 'return-' . $return->id,
+                    'source' => 'Returned by Worker',
+                    'date' => $return->date?->format('d-M-Y, D') ?? '-',
+                    'date_raw' => $return->date?->format('Y-m-d') ?? $return->created_at?->format('Y-m-d'),
+                    'fabric' => $lot?->fabric?->title ?? '-',
+                    'tag' => $tag ?: '-',
+                    'supplier_name' => $lot?->supplier?->supplier_name ?? '-',
+                    'worker_name' => $return->worker?->employee_name ?? '-',
+                    'article_no' => '-',
+                    'color' => $lot?->color ?: '-',
+                    'reference' => '-',
+                    'unit' => $lot?->unit ?: '-',
+                    'received_quantity' => 0,
+                    'issued_quantity' => 0,
+                    'returned_quantity' => $quantity,
+                    'production_quantity' => 0,
+                    'source_balance' => 0,
+                    'worker_balance' => 0,
+                    'worker_key' => $tag . '|' . $workerId,
+                    'remarks' => $return->remarks ?: '-',
+                    'created_at' => $return->created_at,
+                ]);
+            }
+
+            $productionRows = Schema::hasTable('production_tags')
+                ? $this->applyReportBranchScope(
+                    ProductionTag::with(['production.article', 'production.worker'])->orderByDesc('id'),
+                    'production_tags',
+                    $selectedBranchIds,
+                    $branchContext
+                )->get()
+                : collect();
+
+            foreach ($productionRows as $productionTag) {
+                $tag = (string) ($productionTag->tag ?? '');
+                $quantity = (float) ($productionTag->quantity ?? 0);
+                $production = $productionTag->production;
+                $worker = $productionTag->worker ?: $production?->worker;
+                $lot = $fabricByTag->get($tag);
+                $workerId = $productionTag->worker_id ?: $production?->worker_id;
+                $addWorkerQuantity($tag, $workerId ? (int) $workerId : null, -$quantity);
+
+                $rows->push([
+                    'id' => 'production-tag-' . $productionTag->id,
+                    'source' => 'Used in Production',
+                    'date' => $production?->issue_date?->format('d-M-Y, D') ?? $productionTag->created_at?->format('d-M-Y, D') ?? '-',
+                    'date_raw' => $production?->issue_date?->format('Y-m-d') ?? $productionTag->created_at?->format('Y-m-d'),
+                    'fabric' => $lot?->fabric?->title ?? '-',
+                    'tag' => $tag ?: '-',
+                    'supplier_name' => $lot?->supplier?->supplier_name ?? '-',
+                    'worker_name' => $worker?->employee_name ?? '-',
+                    'article_no' => $production?->article?->article_no ?? '-',
+                    'color' => $lot?->color ?: '-',
+                    'reference' => $production?->ticket ?: '-',
+                    'unit' => $productionTag->unit ?: $lot?->unit ?: '-',
+                    'received_quantity' => 0,
+                    'issued_quantity' => 0,
+                    'returned_quantity' => 0,
+                    'production_quantity' => $quantity,
+                    'source_balance' => 0,
+                    'worker_balance' => 0,
+                    'worker_key' => $tag . '|' . ($workerId ?: ''),
+                    'remarks' => 'Production ticket: ' . ($production?->ticket ?: '-'),
+                    'created_at' => $productionTag->created_at,
+                ]);
+            }
+
+            $rows = $rows
+                ->map(function (array $row) use ($sourceQuantity, $workerQuantity) {
+                    $tag = $row['tag'] === '-' ? '' : (string) $row['tag'];
+                    $row['source_balance'] = $sourceQuantity[$tag] ?? 0;
+                    if (isset($row['worker_key'])) {
+                        $row['worker_balance'] = $workerQuantity[$row['worker_key']] ?? 0;
+                    }
+                    unset($row['worker_key']);
+
+                    return $row;
+                })
+                ->filter(function (array $row) use ($startDate, $endDate, $fabricSearch, $tagSearch, $supplierSearch, $workerSearch, $articleSearch, $sourceSearch) {
+                    $date = !empty($row['date_raw']) ? Carbon::parse($row['date_raw']) : null;
+                    if ($startDate && (!$date || $date->lt($startDate))) {
+                        return false;
+                    }
+                    if ($endDate && (!$date || $date->gt($endDate))) {
+                        return false;
+                    }
+
+                    $matches = fn (string $value, string $needle) => $needle === '' || str_contains(strtolower($value), strtolower($needle));
+
+                    return $matches((string) $row['fabric'], $fabricSearch)
+                        && $matches((string) $row['tag'], $tagSearch)
+                        && $matches((string) $row['supplier_name'], $supplierSearch)
+                        && $matches((string) $row['worker_name'], $workerSearch)
+                        && $matches((string) $row['article_no'], $articleSearch)
+                        && $matches((string) $row['source'], $sourceSearch);
+                })
+                ->sortByDesc(fn (array $row) => ($row['date_raw'] ?? '') . ' ' . ($row['created_at'] ?? ''))
+                ->values();
+
+            if ($request->limit) {
+                $rows = $rows->take((int) $request->limit)->values();
+            }
+
+            $authLayout = $this->getAuthLayout($request->route()->getName(), 'table');
+            return response()->json([
+                'data' => $rows,
+                'authLayout' => $authLayout,
+                'branch_scope' => [
+                    'mode' => $branchContext['mode'],
+                    'labels' => $branchContext['branch_names'],
+                ],
+                'calculations' => [
+                    'total_received' => $rows->sum('received_quantity'),
+                    'total_issued' => $rows->sum('issued_quantity'),
+                    'total_returned' => $rows->sum('returned_quantity'),
+                    'total_production_used' => $rows->sum('production_quantity'),
+                    'total_balance' => collect($sourceQuantity)->sum(),
+                ],
+            ]);
+        }
+
+        $authLayout = $this->getAuthLayout($request->route()->getName(), 'table');
+        $branchContext = app(ModuleBranchService::class)->reportBranchContext('reports_fabric');
+        $selectedBranchLabels = $branchContext['branch_names'];
+
+        return view('reports.fabric', compact('authLayout', 'selectedBranchLabels'));
     }
 
     public function physicalQuantity(Request $request, PhysicalQuantityReportService $physicalQuantityReportService)

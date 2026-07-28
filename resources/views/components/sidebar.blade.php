@@ -934,6 +934,7 @@
                 },
                 subMenu: [
                     {name: 'Article', href: "/reports/article"},
+                    {name: 'Fabric', href: "/reports/fabric"},
                     {name: 'Physical Quantity', href: "/reports/physical-quantity"},
                     {name: 'Statement', href: "/reports/statement"},
                     {name: 'Pending Payments', href: "/reports/pending-payments"},
