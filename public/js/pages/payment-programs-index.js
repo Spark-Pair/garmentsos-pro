@@ -360,6 +360,19 @@ function initPaymentProgramsIndex() {
             );
         }
 
+        if (isDeveloperUser()) {
+            contextMenuData.actions.push({
+                id: 'edit-payment-program',
+                text: 'Edit',
+                link: `/payment-programs/${data.id}/edit`,
+            });
+            contextMenuData.actions.push({
+                id: 'delete-payment-program',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/payment-programs/${data.id}')`,
+            });
+        }
+
         createContextMenu(contextMenuData);
     }
 
@@ -417,6 +430,19 @@ function initPaymentProgramsIndex() {
                 {id: 'update-program', text: 'Update Program', onclick: `generateUpdateProgramModal(${JSON.stringify(data)})`},
                 {id: 'mark-paid', text: 'Mark as Paid', onclick: `goToMarkPaid(${JSON.stringify(data)})`},
             );
+        }
+
+        if (isDeveloperUser()) {
+            modalData.bottomActions.push({
+                id: 'edit-payment-program',
+                text: 'Edit',
+                link: `/payment-programs/${data.id}/edit`,
+            });
+            modalData.bottomActions.push({
+                id: 'delete-payment-program',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/payment-programs/${data.id}')`,
+            });
         }
 
         createModal(modalData);

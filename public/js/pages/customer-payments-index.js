@@ -125,7 +125,7 @@ function initCustomerPaymentsIndex() {
             x: e.pageX,
             y: e.pageY,
             actions: [
-                {id: 'edit-payment', text: 'Edit Payment', dataId: data.id}
+                {id: 'edit-payment', text: 'Edit', dataId: data.id}
             ],
         };
 
@@ -147,6 +147,14 @@ function initCustomerPaymentsIndex() {
             contextMenuData.actions.push(
                 {id: 'split-payment', text: 'Split Payment', onclick: `generateSplitPaymentModal(${JSON.stringify(data)})`},
             );
+        }
+
+        if (isDeveloperUser()) {
+            contextMenuData.actions.push({
+                id: 'delete-customer-payment',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/customer-payments/${data.id}')`,
+            });
         }
 
         createContextMenu(contextMenuData);
@@ -187,6 +195,9 @@ function initCustomerPaymentsIndex() {
                 ...(data.cleared_amount && { 'Clear Amount': data.cleared_amount }),
                 ...((data.data.method == 'cheque' || data.data.method == 'slip') && (data.clear_date ? { 'Clear Date': data.clear_date } : { 'Clear Date': 'Pending'} )),
                 ...((data.data.method == 'cheque' || data.data.method == 'slip' || data.data.method == 'program') && { 'Issued': data.issued }),
+                ...(data.voucher_no && data.voucher_no !== '-' && { 'Voucher / CR No.': data.voucher_no }),
+                ...(data.cr_no && { 'CR No.': data.cr_no }),
+                ...(data.d_r_no && data.d_r_no !== '-' && { 'DR No.': data.d_r_no }),
                 'Remarks': data.data.remarks || 'No Remarks',
             },
             ...(clearTableBody.length > 0 ? {
@@ -206,7 +217,7 @@ function initCustomerPaymentsIndex() {
                 }
             } : {}),
             bottomActions: [
-                {id: 'edit-payment', text: 'Edit Payment', dataId: data.id}
+                {id: 'edit-payment', text: 'Edit', dataId: data.id}
             ],
         }
 
@@ -228,6 +239,14 @@ function initCustomerPaymentsIndex() {
             modalData.bottomActions.push(
                 {id: 'split-payment', text: 'Split Payment', onclick: `generateSplitPaymentModal(${JSON.stringify(data)})`},
             );
+        }
+
+        if (isDeveloperUser()) {
+            modalData.bottomActions.push({
+                id: 'delete-customer-payment',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/customer-payments/${data.id}')`,
+            });
         }
 
         createModal(modalData);

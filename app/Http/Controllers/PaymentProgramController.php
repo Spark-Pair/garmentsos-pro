@@ -241,16 +241,106 @@ class PaymentProgramController extends Controller
     public function edit(PaymentProgram $paymentProgram)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($paymentProgram, 'payment_programs');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $branches = app(ModuleBranchService::class);
+        $paymentProgram->load('customer.city', 'subCategory', 'customerPayments', 'supplierPayments');
+
+        $customers = $branches->applyRelatedScope(Customer::with('city:id,title'), 'customers', 'payment_programs')
+            ->whereHas('user', function ($query) {
+                $query->where('status', 'active');
+            })
+            ->select('id', 'customer_name', 'date', 'city_id')
+            ->get();
+
+        $customerPayloads = $this->customerOptionPayloads($customers, 'payment_programs');
+        $customers_options = [];
+        foreach ($customers as $customer) {
+            $customerPayload = $customerPayloads[(int) $customer->id];
+            $customers_options[(int) $customer->id] = [
+                'text' => $customer->customer_name . ' | ' . ($customer->city->title ?? 'N/A') . ' | Balance: ' . $customerPayload['balance_formatted'],
+                'data_option' => $customerPayload,
+            ];
+        }
+
+        return view('payment-programs.edit', compact('paymentProgram', 'customers_options'));
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request)
+    public function update(Request $request, PaymentProgram $paymentProgram)
     {
-        if ($request->filled('program_id')) {
-            app(ModuleBranchService::class)->assertRecordInAllowedBranch(PaymentProgram::findOrFail($request->program_id), 'payment_programs');
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($paymentProgram, 'payment_programs');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
         }
+
+        $validator = Validator::make($request->all(), [
+            'date'=> 'required|date',
+            'customer_id'=> 'required|integer|exists:customers,id',
+            'category'=> 'required|in:supplier,self_account,customer,waiting',
+            'sub_category'=> 'nullable|integer',
+            'amount'=> 'required|numeric|min:1',
+            'remarks'=> 'nullable|string',
+        ]);
+
+        $validator->after(function ($validator) use ($request) {
+            if ($request->category === 'waiting') {
+                return;
+            }
+
+            if (blank($request->sub_category)) {
+                $validator->errors()->add('sub_category', 'Please select a valid category account.');
+                return;
+            }
+
+            if (! $this->resolveSubCategoryModel((string) $request->category, (int) $request->sub_category)) {
+                $validator->errors()->add('sub_category', 'The selected category account is not available.');
+            }
+        });
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator)->withInput();
+        }
+
+        $hasPayments = $paymentProgram->customerPayments()->exists() || $paymentProgram->supplierPayments()->exists();
+        $restrictedChanged = (int) $paymentProgram->customer_id !== (int) $request->customer_id
+            || (string) $paymentProgram->category !== (string) $request->category
+            || (int) ($paymentProgram->sub_category_id ?? 0) !== (int) ($request->sub_category ?? 0)
+            || (float) $paymentProgram->amount !== (float) $request->amount;
+
+        if ($hasPayments && $restrictedChanged) {
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'This payment program has connected payments. Edit remarks/date only, or remove connected payments first.');
+        }
+
+        $customer = app(ModuleBranchService::class)->applyRelatedScope(Customer::query(), 'customers', 'payment_programs')->find($request->customer_id);
+        if (!$customer) {
+            return redirect()->back()->withErrors(['customer_id' => 'Selected customer is not available for this branch.'])->withInput();
+        }
+
+        $subCategoryModel = $this->resolveSubCategoryModel($request->category, $request->sub_category);
+        $paymentProgram->date = $request->date;
+        $paymentProgram->customer_id = $request->customer_id;
+        $paymentProgram->category = $request->category;
+        $paymentProgram->amount = $request->amount;
+        $paymentProgram->remarks = $request->remarks;
+
+        if ($subCategoryModel) {
+            $subCategoryModel->paymentPrograms()->save($paymentProgram);
+        } else {
+            $paymentProgram->sub_category_type = null;
+            $paymentProgram->sub_category_id = null;
+            $paymentProgram->save();
+        }
+
+        return redirect()->route('payment-programs.index')->with('success', 'Payment program updated successfully.');
     }
 
     /**
@@ -259,6 +349,23 @@ class PaymentProgramController extends Controller
     public function destroy(PaymentProgram $paymentProgram)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($paymentProgram, 'payment_programs');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $dependencies = $this->dependencyCounts([
+            'customer payments' => ['customer_payments', 'program_id', $paymentProgram->id],
+            'supplier payments' => ['supplier_payments', 'program_id', $paymentProgram->id],
+        ]);
+
+        if ($dependencies !== []) {
+            return redirect()->back()->with('error', $this->dependencyBlockMessage('Payment program', $dependencies));
+        }
+
+        $paymentProgram->delete();
+
+        return redirect()->route('payment-programs.index')->with('success', 'Payment program deleted successfully.');
     }
     public function updateProgram(Request $request)
     {

@@ -2,6 +2,7 @@
 
 namespace App\Traits;
 
+use App\Models\CR;
 use App\Models\SupplierPayment;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 
@@ -10,11 +11,11 @@ trait SupplierPaymentComputed
     public function issued(): Attribute
     {
         return Attribute::get(function () {
-            if (strtolower((string) $this->method) !== 'program') {
+            if (!str_contains(strtolower((string) $this->method), 'program')) {
                 return null;
             }
 
-            return $this->voucher_id ? 'Issued' : 'Not Issued';
+            return ($this->voucher_id || $this->linkedCrReference()) ? 'Issued' : 'Not Issued';
         });
     }
 
@@ -29,6 +30,40 @@ trait SupplierPaymentComputed
             'reff_no' => $record?->reff_no ?? '-',
             'remarks' => $record?->remarks ?: '-',
         ];
+    }
+
+    public function linkedCrReference(): ?CR
+    {
+        if ($this->cr) {
+            return $this->cr;
+        }
+
+        static $crBySupplierPaymentId = null;
+
+        if ($crBySupplierPaymentId === null) {
+            $crBySupplierPaymentId = [];
+
+            CR::query()
+                ->select(['id', 'c_r_no', 'date', 'new_payments'])
+                ->get()
+                ->each(function (CR $cr) use (&$crBySupplierPaymentId) {
+                    foreach ((array) $cr->new_payments as $payment) {
+                        $paymentId = null;
+
+                        if (is_array($payment)) {
+                            $paymentId = $payment['payment_id'] ?? $payment['data_value'] ?? null;
+                        } elseif (is_object($payment)) {
+                            $paymentId = $payment->payment_id ?? $payment->data_value ?? null;
+                        }
+
+                        if ($paymentId) {
+                            $crBySupplierPaymentId[(int) $paymentId] = $cr;
+                        }
+                    }
+                });
+        }
+
+        return $crBySupplierPaymentId[(int) $this->id] ?? null;
     }
 
     /**
@@ -76,7 +111,7 @@ trait SupplierPaymentComputed
         }
 
         $program = $this->program;
-        $cr = $this->cr;
+        $cr = $this->linkedCrReference();
         $dr = $this->cheque?->dr ?? $this->slip?->dr;
         $clearDetails = collect();
 
@@ -126,7 +161,7 @@ trait SupplierPaymentComputed
             'date' => $this->slip_date ? $this->slip_date->format('d-M-Y, D') : ($this->cheque_date ? $this->cheque_date->format('d-M-Y, D') : $this->date->format('d-M-Y, D')),
             'amount' => \App\Support\Money::format($this->amount),
             'reff_no' => $this->new_reff_no,
-            'voucher_no' => $this->voucher->voucher_no ?? $this->cr?->c_r_no ?? '-',
+            'voucher_no' => $this->voucher->voucher_no ?? $cr?->c_r_no ?? '-',
             'issued' => $this->issued,
             'source_name' => $sourceName,
             'source_type' => $sourceType,
@@ -165,12 +200,18 @@ trait SupplierPaymentComputed
                 $issuedValueRaw = strtolower(trim((string) $value));
                 $issuedValue = str_replace('_', ' ', explode(':', $issuedValueRaw, 2)[0]);
 
-                return $query->whereRaw('LOWER(method) = ?', ['program'])
+                return $query->whereRaw('LOWER(method) LIKE ?', ['%program%'])
                     ->when($issuedValue === 'issued', function ($q) {
-                        $q->whereNotNull('voucher_id');
+                        $q->where(function ($sq) {
+                            $sq->whereNotNull('voucher_id')
+                                ->orWhereNotNull('c_r_id')
+                                ->orWhereRaw('LOWER(method) LIKE ?', ['%cr%']);
+                        });
                     })
                     ->when($issuedValue === 'not issued', function ($q) {
-                        $q->whereNull('voucher_id');
+                        $q->whereNull('voucher_id')
+                            ->whereNull('c_r_id')
+                            ->whereRaw('LOWER(method) NOT LIKE ?', ['%cr%']);
                     })
                     ->when(!in_array($issuedValue, ['issued', 'not issued'], true), function ($q) {
                         $q->whereRaw('1=0');
@@ -194,8 +235,13 @@ trait SupplierPaymentComputed
 
 
             case 'voucher_no':
-                return $query->whereHas('voucher', function ($q) use ($value) {
-                    $q->where('voucher_no', 'like', "%$value%");
+                return $query->where(function ($q) use ($value) {
+                    $q->whereHas('voucher', function ($sq) use ($value) {
+                        $sq->where('voucher_no', 'like', "%$value%");
+                    })
+                    ->orWhereHas('cr', function ($sq) use ($value) {
+                        $sq->where('c_r_no', 'like', "%$value%");
+                    });
                 });
 
             default:

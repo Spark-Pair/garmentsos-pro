@@ -24,7 +24,7 @@ trait CustomerPaymentComputed
 
     protected static function addMatchingProgramSupplierPaymentConstraints($query): void
     {
-        $query->whereRaw('LOWER(supplier_payments.method) = ?', ['program'])
+        $query->whereRaw('LOWER(supplier_payments.method) LIKE ?', ['%program%'])
             ->whereColumn('supplier_payments.program_id', 'customer_payments.program_id')
             ->where(function ($matchQ) {
                 $matchQ->where(function ($exactQ) {
@@ -50,7 +50,7 @@ trait CustomerPaymentComputed
     protected function matchingProgramSupplierPaymentQuery()
     {
         return SupplierPayment::query()
-            ->whereRaw('LOWER(method) = ?', ['program'])
+            ->whereRaw('LOWER(method) LIKE ?', ['%program%'])
             ->where('program_id', $this->program_id)
             ->where('bank_account_id', $this->bank_account_id)
             ->where('transaction_id', $this->transaction_id)
@@ -68,16 +68,25 @@ trait CustomerPaymentComputed
 
         $supplierPayments = $this->program?->relationLoaded('supplierPayments')
             ? $this->program->supplierPayments
-                ->filter(fn ($payment) => strtolower((string) $payment->method) === 'program' && $payment->voucher_id)
+                ->filter(function ($payment) {
+                    $method = strtolower((string) $payment->method);
+
+                    return str_contains($method, 'program')
+                        && ($payment->voucher_id || $payment->c_r_id || str_contains($method, 'cr'));
+                })
                 ->values()
             : null;
 
         if (!$supplierPayments) {
             if ($programVoucherPayments === null) {
-                $programVoucherPayments = SupplierPayment::with('voucher')
-                    ->whereRaw('LOWER(method) = ?', ['program'])
+                $programVoucherPayments = SupplierPayment::with(['voucher', 'cr'])
+                    ->whereRaw('LOWER(method) LIKE ?', ['%program%'])
                     ->whereNotNull('program_id')
-                    ->whereNotNull('voucher_id')
+                    ->where(function ($query) {
+                        $query->whereNotNull('voucher_id')
+                            ->orWhereNotNull('c_r_id')
+                            ->orWhereRaw('LOWER(method) LIKE ?', ['%cr%']);
+                    })
                     ->get()
                     ->groupBy('program_id');
             }
@@ -331,7 +340,10 @@ trait CustomerPaymentComputed
 
                 $supplierPayment = $this->findMatchingProgramSupplierPayment();
 
-                $voucherNoCache[$cacheKey] = $supplierPayment?->voucher?->voucher_no ?? null;
+                $voucherNoCache[$cacheKey] = $supplierPayment?->voucher?->voucher_no
+                    ?? $supplierPayment?->cr?->c_r_no
+                    ?? $supplierPayment?->linkedCrReference()?->c_r_no
+                    ?? null;
                 return $voucherNoCache[$cacheKey];
             }
 
@@ -598,6 +610,11 @@ trait CustomerPaymentComputed
             'date' => $this->slip_date ? $this->slip_date->format('d-M-Y, D') : ($this->cheque_date ? $this->cheque_date->format('d-M-Y, D') : $this->date->format('d-M-Y, D')),
             'program_date' => $this->program?->date ? $this->program?->date->format('d-M-Y, D') : null,
             'voucher_no' => $this->voucher_no ?? '-',
+            'cr_no' => $this->cheque?->cr?->c_r_no
+                ?? $this->slip?->cr?->c_r_no
+                ?? $this->returnedCheque?->cr?->c_r_no
+                ?? $this->returnedSlip?->cr?->c_r_no
+                ?? null,
             'supplier_name' => $this->supplier_name,
             'reff_no' => $this->reff_no,
             'beneficiary' => $this->beneficiary,
@@ -659,13 +676,22 @@ trait CustomerPaymentComputed
                             $sq->where('c_r_no', 'like', "%$value%")
                         )
 
-                    // 🔥 PROGRAM BASED SUPPLIER VOUCHER (FIX)
+                    // Program based supplier voucher/CR reference.
                     ->orWhereExists(function ($sq) use ($value) {
                             $sq->selectRaw(1)
                                 ->from('supplier_payments')
                                 ->join('vouchers', 'vouchers.id', '=', 'supplier_payments.voucher_id')
                                 ->whereRaw('LOWER(customer_payments.method) = ?', ['program'])
                                 ->where('vouchers.voucher_no', 'like', "%$value%");
+
+                            self::addMatchingProgramSupplierPaymentConstraints($sq);
+                        })
+                    ->orWhereExists(function ($sq) use ($value) {
+                            $sq->selectRaw(1)
+                                ->from('supplier_payments')
+                                ->join('c_r_s', 'c_r_s.id', '=', 'supplier_payments.c_r_id')
+                                ->whereRaw('LOWER(customer_payments.method) = ?', ['program'])
+                                ->where('c_r_s.c_r_no', 'like', "%$value%");
 
                             self::addMatchingProgramSupplierPaymentConstraints($sq);
                         });
@@ -753,7 +779,11 @@ trait CustomerPaymentComputed
                                       ->whereExists(function ($sub) {
                                           $sub->selectRaw(1)->from('supplier_payments');
                                           self::addMatchingProgramSupplierPaymentConstraints($sub);
-                                          $sub->whereNotNull('supplier_payments.voucher_id');
+                                          $sub->where(function ($sourceQ) {
+                                              $sourceQ->whereNotNull('supplier_payments.voucher_id')
+                                                  ->orWhereNotNull('supplier_payments.c_r_id')
+                                                  ->orWhereRaw('LOWER(supplier_payments.method) LIKE ?', ['%cr%']);
+                                          });
                                       });
                               });
                           });
@@ -790,7 +820,11 @@ trait CustomerPaymentComputed
                                       ->whereNotExists(function ($sub) {
                                           $sub->selectRaw(1)->from('supplier_payments');
                                           self::addMatchingProgramSupplierPaymentConstraints($sub);
-                                          $sub->whereNotNull('supplier_payments.voucher_id');
+                                          $sub->where(function ($sourceQ) {
+                                              $sourceQ->whereNotNull('supplier_payments.voucher_id')
+                                                  ->orWhereNotNull('supplier_payments.c_r_id')
+                                                  ->orWhereRaw('LOWER(supplier_payments.method) LIKE ?', ['%cr%']);
+                                          });
                                       });
                               });
                           });

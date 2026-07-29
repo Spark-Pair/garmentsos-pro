@@ -136,11 +136,31 @@
         const customerSelect = document.getElementById('customer_id');
         const categorySelectDom = document.getElementById('category');
         const remarksInputDom = document.getElementById('remarks');
+        const editConfig = window.__paymentProgramsEdit || null;
 
-        if (customerSelect) customerSelect.disabled = true;
-        if (categorySelectDom) categorySelectDom.disabled = true;
-        if (remarksInputDom?.parentElement?.parentElement) {
+        if (!editConfig && customerSelect) customerSelect.disabled = true;
+        if (!editConfig && categorySelectDom) categorySelectDom.disabled = true;
+        if (!editConfig && remarksInputDom?.parentElement?.parentElement) {
             remarksInputDom.parentElement.parentElement.classList.add('hidden');
+        }
+
+        if (editConfig) {
+            if (customerSelect) customerSelect.disabled = false;
+            if (categorySelectDom) categorySelectDom.disabled = false;
+
+            const selectedCustomer = document.querySelector(`li[data-for="customer_id"][data-value="${editConfig.customer_id}"]`);
+            if (selectedCustomer) selectThisOption(selectedCustomer);
+
+            const selectedCategory = document.querySelector(`li[data-for="category"][data-value="${editConfig.category}"]`);
+            if (selectedCategory) {
+                selectThisOption(selectedCategory);
+                getCategoryData(editConfig.category);
+            }
+
+            setTimeout(() => {
+                const selectedSubCategory = document.querySelector(`li[data-for="subCategory"][data-value="${editConfig.sub_category}"]`);
+                if (selectedSubCategory) selectThisOption(selectedSubCategory);
+            }, 250);
         }
     }
 

@@ -35,6 +35,14 @@ function initSupplierPaymentsIndex() {
             actions: [],
         };
 
+        if (isDeveloperUser()) {
+            contextMenuData.actions.push({
+                id: 'delete-supplier-payment',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/supplier-payments/${data.id}')`,
+            });
+        }
+
         createContextMenu(contextMenuData);
     };
 
@@ -59,7 +67,7 @@ function initSupplierPaymentsIndex() {
             'Source': data.source_type || '-',
             ...(String(data.method || '').toLowerCase() === 'program' && { 'Issued': data.issued || 'Not Issued' }),
             'Reff No.': data.reff_no ?? '-',
-            'Voucher No.': data.voucher_no ?? '-',
+            'Voucher / CR No.': data.voucher_no ?? '-',
         };
 
         if (data.program_no || data.program_date || data.program_customer) {
@@ -105,6 +113,14 @@ function initSupplierPaymentsIndex() {
             } : {}),
             bottomActions: [],
         };
+
+        if (isDeveloperUser()) {
+            modalData.bottomActions.push({
+                id: 'delete-supplier-payment',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/supplier-payments/${data.id}')`,
+            });
+        }
 
         createModal(modalData);
     }

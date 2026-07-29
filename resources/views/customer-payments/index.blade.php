@@ -100,7 +100,7 @@
                     ],
             "dataFilterPath" => "status",
         ],
-        "Voucher No." => [
+        "Voucher / CR No." => [
             "type" => "text",
             "id" => "voucher_no",
             "placeholder" => "Enter voucher no.",
@@ -141,7 +141,7 @@
                             <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">Reff. No.</div>
                             <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">Clear Date</div>
                             <div class="text-center w-1/9 cursor-pointer" onclick="sortByThis(this)">Cleared Amount</div>
-                            <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">Voucher No.</div>
+                            <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">Voucher / CR No.</div>
                             <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">DR No.</div>
                         </div>
                         <p id="noItemsError" style="display: none" class="text-sm text-[var(--border-error)] mt-3">No items found</p>

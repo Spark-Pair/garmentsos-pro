@@ -96,6 +96,7 @@
         window.__customerPaymentsEdit = {
             customerPayment: @json($customerPaymentPayload),
             banksOptions: @json($banks_options),
+            isDeveloper: @json(Auth::user()?->role === 'developer'),
         };
     </script>
 @endpush

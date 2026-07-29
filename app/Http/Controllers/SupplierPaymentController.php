@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\SupplierPayment;
 use App\Models\Customer;
 use App\Models\Setup;
+use App\Services\Branches\ModuleBranchService;
 use Illuminate\Http\Request;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
@@ -87,6 +89,28 @@ class SupplierPaymentController extends Controller
      */
     public function destroy(SupplierPayment $supplierPayment)
     {
-        //
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($supplierPayment, 'supplier-payments');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $dependencies = [];
+        if ($supplierPayment->voucher_id) {
+            $dependencies['voucher'] = 1;
+        }
+        if ($supplierPayment->c_r_id) {
+            $dependencies['credit return'] = 1;
+        }
+
+        if (!empty($dependencies)) {
+            return redirect()->back()->with('error', $this->dependencyBlockMessage('Supplier payment', $dependencies));
+        }
+
+        DB::transaction(function () use ($supplierPayment) {
+            $supplierPayment->delete();
+        });
+
+        return redirect()->route('supplier-payments.index')->with('success', 'Supplier payment deleted successfully.');
     }
 }

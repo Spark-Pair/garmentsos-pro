@@ -47,7 +47,7 @@
             "placeholder" => "Enter reff no.",
             "dataFilterPath" => "reff_no",
         ],
-        "Voucher No." => [
+        "Voucher / CR No." => [
             "type" => "text",
             "id" => "voucher_no",
             "placeholder" => "Enter voucher no.",
@@ -76,7 +76,7 @@
                             <div class="text-center w-1/6 cursor-pointer" onclick="sortByThis(this)">Customer/Self Acc.</div>
                             <div class="text-center w-1/8 cursor-pointer" onclick="sortByThis(this)">Source</div>
                             <div class="text-center w-1/8 cursor-pointer" onclick="sortByThis(this)">Reff No.</div>
-                            <div class="text-center w-1/8 cursor-pointer" onclick="sortByThis(this)">Voucher No.</div>
+                            <div class="text-center w-1/8 cursor-pointer" onclick="sortByThis(this)">Voucher / CR No.</div>
                         </div>
                         <p id="noItemsError" style="display: none" class="text-sm text-[var(--border-error)] mt-3">No items found</p>
                         <div class="overflow-y-auto grow my-scrollbar-2">

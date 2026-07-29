@@ -29,6 +29,14 @@
                 actions: [],
             };
 
+            if (isDeveloperUser()) {
+                contextMenuData.actions.push({
+                    id: 'delete-dr',
+                    text: 'Delete',
+                    onclick: `submitResourceDelete('/dr/${data.id}')`,
+                });
+            }
+
             createContextMenu(contextMenuData);
         };
 
@@ -82,6 +90,14 @@
                 ],
                 bottomActions: [],
             };
+
+            if (isDeveloperUser()) {
+                modalData.bottomActions.push({
+                    id: 'delete-dr',
+                    text: 'Delete',
+                    onclick: `submitResourceDelete('/dr/${data.id}')`,
+                });
+            }
 
             createModal(modalData);
         };

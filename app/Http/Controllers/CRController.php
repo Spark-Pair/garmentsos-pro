@@ -244,7 +244,10 @@ class CRController extends Controller
             if ($payment->method == 'Payment Program') {
                 $branches->applyRelatedScope(SupplierPayment::query(), 'supplier_payments', 'cr')
                     ->find($payment->data_value)
-                    ?->update(['method' => $payment->method . ' | CR']);
+                    ?->update([
+                        'method' => $payment->method . ' | CR',
+                        'c_r_id' => $cr->id,
+                    ]);
                 $payment->payment_id = (int) $payment->data_value;
             } else {
                 $columnMap = [
