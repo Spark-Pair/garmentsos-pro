@@ -424,7 +424,6 @@ class PaymentProgramController extends Controller
                 return $q->where(function ($qq) {
                     $qq->where('status', 'Unpaid')
                         ->orWhereHas('supplierPayments', fn($sq) => $sq
-                            ->whereIn('method', ['program', 'Program'])
                             ->whereNull('voucher_id'));
                 });
             };
@@ -447,7 +446,6 @@ class PaymentProgramController extends Controller
                         // ONLY pending supplier payments
                         ->withSum([
                             'supplierPayments as voucher_pending_payment' => fn($sq) => $sq
-                                ->whereIn('method', ['program', 'Program'])
                                 ->whereNull('voucher_id'),
                         ], 'amount'),
                 ])
@@ -463,8 +461,8 @@ class PaymentProgramController extends Controller
                     $balance = max(0, $originalAmount - $paidAmount);
 
                     $program->setAttribute('program_amount', $originalAmount);
-                    $program->setAttribute('payment', $pendingPayment);
-                    $program->setAttribute('balance', $balance);
+                    $program->setAttribute('pending_voucher_payment', $pendingPayment);
+                    $program->setAttribute('not_received', $balance);
 
                     return $program;
                 });
@@ -476,8 +474,8 @@ class PaymentProgramController extends Controller
                         'payment_programs' => $supplier->paymentPrograms->map(fn($program) => [
                             'id' => $program->id,
                             'amount' => (float) $program->program_amount,
-                            'payment' => (float) $program->payment,
-                            'balance' => (float) $program->balance,
+                            'pending_voucher_payment' => (float) $program->pending_voucher_payment,
+                            'not_received' => (float) $program->not_received,
                             'status' => $program->status,
                         ])->values(),
                     ],
