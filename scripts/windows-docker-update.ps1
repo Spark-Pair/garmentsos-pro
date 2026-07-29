@@ -1026,7 +1026,7 @@ function Wait-GarmentsViteManifestReady($InstallDir, [int]$TimeoutSeconds = 60) 
         do {
             $shellOutput = docker compose exec -T app sh -lc 'test -f /var/www/html/public/build/manifest.json && echo manifest-present || echo manifest-missing' 2>&1
             $shellExitCode = $LASTEXITCODE
-            $phpOutput = docker compose exec -T app php -r 'echo file_exists("/var/www/html/public/build/manifest.json") ? "asset-ok" : "asset-missing";' 2>&1
+            $phpOutput = docker compose exec -T app php -r "echo file_exists('/var/www/html/public/build/manifest.json') ? 'asset-ok' : 'asset-missing';" 2>&1
             $phpExitCode = $LASTEXITCODE
 
             $shellText = Format-PostUpdateOutput $shellOutput
