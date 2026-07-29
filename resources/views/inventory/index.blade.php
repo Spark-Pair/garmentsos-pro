@@ -49,6 +49,8 @@
 <script>
     window.__inventoryIndex = {
         authLayout: @json($authLayout),
+        currentUserRole: @json(Auth::user()->role),
+        csrfToken: @json(csrf_token()),
     };
 </script>
 @endpush

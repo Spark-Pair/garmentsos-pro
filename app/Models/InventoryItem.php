@@ -75,6 +75,7 @@ class InventoryItem extends Model
             'status' => $this->is_active ? 'Active' : 'Inactive',
             'remarks' => $this->remarks ?? '-',
             'onclick' => 'generateModal(this)',
+            'oncontextmenu' => 'generateContextMenu(event)',
             'data' => [
                 'id' => $this->id,
                 'name' => $this->name,

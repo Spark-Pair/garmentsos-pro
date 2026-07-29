@@ -198,6 +198,44 @@ class FabricController extends Controller
     public function edit(Fabric $fabric)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($fabric, 'fabrics');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $fabric->load('supplier', 'fabric');
+        $branches = app(ModuleBranchService::class);
+
+        $fabricCategory = $branches->applyRelatedScope(Setup::where('title', 'Fabric'), 'setups', 'fabrics')->first();
+        $suppliers = $branches->applyRelatedScope(Supplier::whereHas('user', function ($query) {
+            $query->where('status', 'active');
+        }), 'suppliers', 'fabrics')->get();
+
+        if ($fabricCategory) {
+            $suppliers = $suppliers->filter(function ($supplier) use ($fabricCategory) {
+                $ids = json_decode($supplier->categories_array, true);
+                return is_array($ids) && in_array($fabricCategory->id, $ids);
+            });
+        }
+
+        $supplierPayloads = $this->supplierOptionPayloads($suppliers, 'fabrics');
+        $suppliers_options = [];
+        foreach ($suppliers as $supplier) {
+            $supplierPayload = $supplierPayloads[(int) $supplier->id];
+            $supplierPayload['categories_array'] = $supplier->categories_array;
+            $suppliers_options[$supplier->id] = [
+                'text' => $supplier->supplier_name,
+                'data_option' => $supplierPayload,
+            ];
+        }
+
+        $fabrics_options = [];
+        $fabrics = $branches->applyRelatedScope(Setup::where('type', 'fabric'), 'setups', 'fabrics')->get();
+        foreach ($fabrics as $fabricSetup) {
+            $fabrics_options[$fabricSetup->id] = ['text' => $fabricSetup->title, 'data_option' => $fabricSetup];
+        }
+
+        return view('fabrics.edit', compact('fabric', 'suppliers_options', 'fabrics_options'));
     }
 
     /**
@@ -206,6 +244,57 @@ class FabricController extends Controller
     public function update(Request $request, Fabric $fabric)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($fabric, 'fabrics');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $request->validate([
+            'date' => 'required|date',
+            'supplier_id' => 'required|exists:suppliers,id',
+            'fabric_id' => 'required|exists:setups,id',
+            'color' => 'required|string',
+            'unit' => 'required|string|max:255',
+            'quantity' => 'required|numeric|min:1',
+            'reff_no' => 'nullable|string',
+            'remarks' => 'nullable|string|max:255',
+            'tag' => 'required|string|max:255',
+        ]);
+
+        $branches = app(ModuleBranchService::class);
+        $supplier = $branches->applyRelatedScope(Supplier::query(), 'suppliers', 'fabrics')->find($request->supplier_id);
+        $fabricSetup = $branches->applyRelatedScope(Setup::where('type', 'fabric'), 'setups', 'fabrics')->find($request->fabric_id);
+        if (!$supplier || !$fabricSetup) {
+            return redirect()->back()->withErrors(['supplier_id' => 'Selected supplier/fabric is not available for this branch.'])->withInput();
+        }
+
+        $criticalChanged = $fabric->tag !== $request->tag
+            || $fabric->unit !== $request->unit
+            || (float) $fabric->quantity !== (float) $request->quantity;
+        if ($criticalChanged) {
+            $dependencies = $this->dependencyCounts([
+                'issued fabric records' => ['issued_fabrics', 'tag', $fabric->tag],
+                'returned fabric records' => ['return_fabrics', 'tag', $fabric->tag],
+            ]);
+
+            if ($dependencies !== []) {
+                return redirect()->back()->with('error', $this->dependencyBlockMessage('Fabric quantity/tag/unit', $dependencies))->withInput();
+            }
+        }
+
+        $fabric->update([
+            'date' => $request->date,
+            'supplier_id' => $request->supplier_id,
+            'fabric_id' => $request->fabric_id,
+            'color' => $request->color,
+            'unit' => $request->unit,
+            'quantity' => $request->quantity,
+            'reff_no' => $request->reff_no,
+            'remarks' => $request->remarks,
+            'tag' => $request->tag,
+        ]);
+
+        return redirect()->route('fabrics.index')->with('success', 'Fabric updated successfully.');
     }
 
     /**
@@ -213,7 +302,24 @@ class FabricController extends Controller
      */
     public function destroy(Fabric $fabric)
     {
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($fabric, 'fabrics');
+
+        $dependencies = $this->dependencyCounts([
+            'issued fabric records' => ['issued_fabrics', 'tag', $fabric->tag],
+            'returned fabric records' => ['return_fabrics', 'tag', $fabric->tag],
+        ]);
+
+        if ($dependencies !== []) {
+            return redirect()->back()->with('error', $this->dependencyBlockMessage('Fabric', $dependencies));
+        }
+
+        $fabric->delete();
+
+        return redirect()->route('fabrics.index')->with('success', 'Fabric deleted successfully.');
     }
 
     public function issue()
@@ -285,6 +391,73 @@ class FabricController extends Controller
         ], 'fabrics'));
 
         return redirect()->route('fabrics.issue')->with('success', 'Fabric added successfully.');
+    }
+
+    public function editIssued(IssuedFabric $issuedFabric)
+    {
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($issuedFabric, 'fabrics');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $tags_options = $this->issueTagOptions($issuedFabric);
+        $workers_options = $this->workerOptions();
+
+        return view('fabrics.edit-issued', compact('issuedFabric', 'tags_options', 'workers_options'));
+    }
+
+    public function updateIssued(Request $request, IssuedFabric $issuedFabric)
+    {
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($issuedFabric, 'fabrics');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $request->validate([
+            'date' => 'required|date',
+            'tag' => 'required|string|max:255',
+            'worker_id' => 'required|exists:employees,id',
+            'quantity' => 'required|numeric|min:1',
+            'remarks' => 'nullable|string|max:255',
+        ]);
+
+        $branches = app(ModuleBranchService::class);
+        $worker = $branches->applyRelatedScope(Employee::query(), 'employees', 'fabrics')->find($request->worker_id);
+        if (!$worker) {
+            return redirect()->back()->withErrors(['worker_id' => 'Selected worker is not available for this branch.'])->withInput();
+        }
+
+        $available = $this->availableFabricForIssue($request->tag, $issuedFabric);
+        if ((float) $request->quantity > $available) {
+            return redirect()->back()
+                ->withErrors(['quantity' => 'Quantity is greater than available fabric stock.'])
+                ->withInput();
+        }
+
+        $issuedFabric->update([
+            'date' => $request->date,
+            'tag' => $request->tag,
+            'worker_id' => $request->worker_id,
+            'quantity' => $request->quantity,
+            'remarks' => $request->remarks,
+        ]);
+
+        return redirect()->route('fabrics.index')->with('success', 'Issued fabric updated successfully.');
+    }
+
+    public function destroyIssued(IssuedFabric $issuedFabric)
+    {
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($issuedFabric, 'fabrics');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $issuedFabric->delete();
+
+        return redirect()->route('fabrics.index')->with('success', 'Issued fabric deleted successfully.');
     }
 
     public function return(Request $request)
@@ -465,5 +638,232 @@ class FabricController extends Controller
         ], 'fabrics'));
 
         return redirect()->route('fabrics.return')->with('success', 'Fabric added successfully.');
+    }
+
+    public function editReturn(ReturnFabric $returnFabric)
+    {
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($returnFabric, 'fabrics');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $tags_options = $this->returnTagOptions((int) $returnFabric->worker_id, $returnFabric->date?->format('Y-m-d'), $returnFabric);
+        $workers_options = $this->workerOptions();
+
+        return view('fabrics.edit-return', compact('returnFabric', 'tags_options', 'workers_options'));
+    }
+
+    public function updateReturn(Request $request, ReturnFabric $returnFabric)
+    {
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($returnFabric, 'fabrics');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $request->validate([
+            'worker_id' => 'required|exists:employees,id',
+            'date' => 'required|date',
+            'tag' => 'required|string|max:255',
+            'quantity' => 'required|numeric|min:1',
+            'remarks' => 'nullable|string|max:255',
+        ]);
+
+        $branches = app(ModuleBranchService::class);
+        $worker = $branches->applyRelatedScope(Employee::query(), 'employees', 'fabrics')->find($request->worker_id);
+        if (!$worker) {
+            return redirect()->back()->withErrors(['worker_id' => 'Selected worker is not available for this branch.'])->withInput();
+        }
+
+        $remaining = $this->remainingFabricForReturn((int) $request->worker_id, $request->date, $request->tag, $returnFabric);
+        if ((float) $request->quantity > $remaining) {
+            return redirect()->back()
+                ->withErrors(['quantity' => 'Quantity is greater than remaining worker fabric.'])
+                ->withInput();
+        }
+
+        $returnFabric->update([
+            'worker_id' => $request->worker_id,
+            'date' => $request->date,
+            'tag' => $request->tag,
+            'quantity' => $request->quantity,
+            'remarks' => $request->remarks,
+        ]);
+
+        return redirect()->route('fabrics.index')->with('success', 'Returned fabric updated successfully.');
+    }
+
+    public function destroyReturn(ReturnFabric $returnFabric)
+    {
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($returnFabric, 'fabrics');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $returnFabric->delete();
+
+        return redirect()->route('fabrics.index')->with('success', 'Returned fabric deleted successfully.');
+    }
+
+    private function workerOptions(): array
+    {
+        $workers = app(ModuleBranchService::class)->applyRelatedScope(Employee::whereHas('type', function ($query) {
+                $query->whereIn('title', ['Cutting', 'Cut to Pack']);
+            }), 'employees', 'fabrics')
+            ->get();
+
+        $options = [];
+        foreach ($workers as $worker) {
+            $options[$worker->id] = ['text' => $worker->employee_name];
+        }
+
+        return $options;
+    }
+
+    private function issueTagOptions(?IssuedFabric $editing = null): array
+    {
+        $branches = app(ModuleBranchService::class);
+        $fabrics = $branches->applyScope(Fabric::query(), 'fabrics')->get()
+            ->groupBy('tag')
+            ->map(function ($items) use ($branches, $editing) {
+                $tag = $items->first()->tag;
+                $totalIssued = $branches->applyScope(IssuedFabric::where('tag', $tag), 'fabrics')->sum('quantity') ?? 0;
+                $available = $items->sum('quantity') - $totalIssued;
+                if ($editing && $editing->tag === $tag) {
+                    $available += (float) $editing->quantity;
+                }
+
+                return [
+                    'tag' => $tag,
+                    'unit' => $items->first()->unit,
+                    'quantity' => $items->sum('quantity'),
+                    'avalaible_sock' => $available,
+                ];
+            })
+            ->values();
+
+        $options = [];
+        foreach ($fabrics as $fabric) {
+            if ($fabric['avalaible_sock'] > 0 || ($editing && $editing->tag === $fabric['tag'])) {
+                $options[$fabric['tag']] = ['text' => $fabric['tag'], 'data_option' => json_encode($fabric)];
+            }
+        }
+
+        return $options;
+    }
+
+    private function availableFabricForIssue(string $tag, ?IssuedFabric $editing = null): float
+    {
+        $branches = app(ModuleBranchService::class);
+        $received = (float) $branches->applyScope(Fabric::where('tag', $tag), 'fabrics')->sum('quantity');
+        $issued = (float) $branches->applyScope(IssuedFabric::where('tag', $tag), 'fabrics')->sum('quantity');
+
+        if ($editing && $editing->tag === $tag) {
+            $issued -= (float) $editing->quantity;
+        }
+
+        return max(0, $received - $issued);
+    }
+
+    private function returnTagOptions(?int $workerId, ?string $date, ?ReturnFabric $editing = null): array
+    {
+        if (!$workerId || !$date) {
+            return [];
+        }
+
+        $branches = app(ModuleBranchService::class);
+        $issued = $branches->applyScope(IssuedFabric::where('worker_id', $workerId), 'fabrics')
+            ->whereDate('date', '<=', $date)
+            ->get()
+            ->groupBy('tag')
+            ->map(fn ($items) => [
+                'tag' => $items->first()->tag,
+                'quantity' => $items->sum('quantity'),
+            ])
+            ->values()
+            ->toArray();
+
+        $cuttingId = $branches->applyRelatedScope(Setup::where('type', 'worker_type'), 'setups', 'fabrics')
+            ->where('title', 'Cutting')
+            ->value('id');
+
+        $productionQuantities = [];
+        if ($cuttingId) {
+            $allTags = $branches->applyRelatedScope(Production::where('worker_id', $workerId), 'productions', 'fabrics')
+                ->where('work_id', $cuttingId)
+                ->where(function ($query) use ($date) {
+                    $query->whereDate('issue_date', '<=', $date)
+                        ->orWhereDate('receive_date', '<=', $date);
+                })
+                ->pluck('tags');
+
+            foreach ($allTags as $tags) {
+                $decoded = is_string($tags) ? json_decode($tags, true) : $tags;
+                if (!is_array($decoded)) {
+                    continue;
+                }
+
+                foreach ($decoded as $item) {
+                    $tag = $item['tag'] ?? null;
+                    if (!$tag) {
+                        continue;
+                    }
+                    $productionQuantities[$tag] = ($productionQuantities[$tag] ?? 0) + (float) ($item['quantity'] ?? 0);
+                }
+            }
+        }
+
+        $returned = $branches->applyScope(ReturnFabric::where('worker_id', $workerId), 'fabrics')
+            ->whereDate('date', '<=', $date)
+            ->get()
+            ->groupBy('tag')
+            ->map(fn ($items) => [
+                'tag' => $items->first()->tag,
+                'quantity' => $items->sum('quantity'),
+            ])
+            ->values()
+            ->toArray();
+
+        $returnQuantities = [];
+        foreach ($returned as $fabric) {
+            $returnQuantities[$fabric['tag']] = (float) ($fabric['quantity'] ?? 0);
+        }
+
+        if ($editing && (int) $editing->worker_id === $workerId && $editing->date?->format('Y-m-d') <= $date) {
+            $returnQuantities[$editing->tag] = max(0, ($returnQuantities[$editing->tag] ?? 0) - (float) $editing->quantity);
+        }
+
+        $options = [];
+        foreach ($issued as $fabric) {
+            $tag = $fabric['tag'];
+            $remaining = (float) $fabric['quantity']
+                - (float) ($productionQuantities[$tag] ?? 0)
+                - (float) ($returnQuantities[$tag] ?? 0);
+
+            $fabric['remaining'] = $remaining;
+            $fabric['issued_quantity'] = (float) $fabric['quantity'];
+            $fabric['produced_quantity'] = (float) ($productionQuantities[$tag] ?? 0);
+            $fabric['returned_quantity'] = (float) ($returnQuantities[$tag] ?? 0);
+
+            if ($remaining > 0 || ($editing && $editing->tag === $tag)) {
+                $options[$tag] = ['text' => $tag, 'data_option' => json_encode($fabric)];
+            }
+        }
+
+        return $options;
+    }
+
+    private function remainingFabricForReturn(int $workerId, string $date, string $tag, ?ReturnFabric $editing = null): float
+    {
+        $options = $this->returnTagOptions($workerId, $date, $editing);
+        if (!isset($options[$tag]['data_option'])) {
+            return 0;
+        }
+
+        $payload = json_decode((string) $options[$tag]['data_option'], true);
+
+        return (float) ($payload['remaining'] ?? 0);
     }
 }
