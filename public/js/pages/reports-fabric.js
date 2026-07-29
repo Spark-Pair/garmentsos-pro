@@ -39,9 +39,9 @@
                 class="item row relative group flex items-center border-b border-[var(--h-bg-color)] py-2.5 cursor-pointer hover:bg-[var(--h-secondary-bg-color)] transition-all fade-in ease-in-out text-[13px] text-left"
                 data-json='${jsonAttr(data)}'>
 
-                <span class="w-[9%] ${wrapCell}">${data.date || "-"}</span>
+                <span class="w-[11%] ${wrapCell}">${data.date || "-"}</span>
                 <span class="w-[15%] ${wrapCell}">${party}</span>
-                <span class="w-[11%] ${wrapCell}">${badge(data.source)}</span>
+                <span class="w-[10%] ${wrapCell}">${badge(data.source)}</span>
                 <span class="w-[12%] font-semibold ${wrapCell}">${data.fabric || "-"}</span>
                 <span class="w-[8%] ${wrapCell}">${data.color || "-"}</span>
                 <span class="w-[7%] ${wrapCell}">${unit || "-"}</span>
@@ -58,7 +58,6 @@
 
             setText(".total-received", parseFormattedNumber(data.total_received) + parseFormattedNumber(data.total_returned));
             setText(".total-out", parseFormattedNumber(data.total_issued) + parseFormattedNumber(data.total_production_used));
-            setText(".total-balance", data.total_balance);
         };
     }
 

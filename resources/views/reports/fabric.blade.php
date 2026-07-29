@@ -62,9 +62,9 @@
                 <div class="container-parent h-full">
                     <div class="card_container px-3 pb-3 h-full flex flex-col">
                         <div id="table-head" class="flex items-center bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4 text-xs">
-                            <div class="w-[9%] cursor-pointer text-left px-3" onclick="sortByThis(this)">Date</div>
+                            <div class="w-[11%] cursor-pointer text-left px-3" onclick="sortByThis(this)">Date</div>
                             <div class="w-[15%] cursor-pointer text-left px-3" onclick="sortByThis(this)">Supplier / Worker</div>
-                            <div class="w-[11%] cursor-pointer text-left px-3" onclick="sortByThis(this)">Type</div>
+                            <div class="w-[10%] cursor-pointer text-left px-3" onclick="sortByThis(this)">Type</div>
                             <div class="w-[12%] cursor-pointer text-left px-3" onclick="sortByThis(this)">Fabric</div>
                             <div class="w-[8%] cursor-pointer text-left px-3" onclick="sortByThis(this)">Color</div>
                             <div class="w-[7%] cursor-pointer text-left px-3" onclick="sortByThis(this)">Unit</div>
@@ -83,10 +83,6 @@
                             </div>
                             <div class="total-out flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full cursor-not-allowed">
                                 <div>Total Out</div>
-                                <div class="text-right">0</div>
-                            </div>
-                            <div class="total-balance flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full cursor-not-allowed">
-                                <div>Available Stock</div>
                                 <div class="text-right">0</div>
                             </div>
                         </div>
