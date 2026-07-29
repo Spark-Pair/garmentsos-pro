@@ -28,7 +28,12 @@ function initEmployeePaymentsIndex() {
                 data: data,
                 x: e.pageX,
                 y: e.pageY,
-                actions: [],
+                actions: window.authLayout === "developer"
+                    ? [
+                        { id: "edit-employee-payment", text: "Edit", link: `/employee-payments/${data.id}/edit` },
+                        { id: "delete-employee-payment", text: "Delete", onclick: `submitResourceDelete('/employee-payments/${data.id}')` },
+                    ]
+                    : [],
             };
 
             createContextMenu(contextMenuData);
@@ -47,7 +52,12 @@ function initEmployeePaymentsIndex() {
                     Method: data.details["Method"],
                     Amount: data.details["Amount"],
                 },
-                bottomActions: [],
+                bottomActions: window.authLayout === "developer"
+                    ? [
+                        { id: "edit-employee-payment", text: "Edit", link: `/employee-payments/${data.id}/edit` },
+                        { id: "delete-employee-payment", text: "Delete", onclick: `submitResourceDelete('/employee-payments/${data.id}')` },
+                    ]
+                    : [],
             };
 
             createModal(modalData);

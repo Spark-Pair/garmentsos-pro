@@ -35,10 +35,18 @@ function initSuppliersIndex() {
             y: e.pageY,
             action: updateUserStatusUrl,
             actions: [
-                {id: 'edit', text: 'Edit Supplier'},
+                {id: 'edit', text: 'Edit'},
                 {id: 'manage-category', text: 'Manage Category', onclick: `generateManageCategoryModal(${JSON.stringify(data)})`},
             ],
         };
+
+        if (isDeveloperUser()) {
+            contextMenuData.actions.push({
+                id: 'delete-supplier',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/suppliers/${data.id}')`,
+            });
+        }
 
         if ((currentUserRole == 'admin' || currentUserRole == 'developer' || currentUserRole == 'owner') && currentUserRole != data.details['Role']) {
             contextMenuData.actions.push(
@@ -68,9 +76,17 @@ function initSuppliersIndex() {
             user: data.user,
             profile: true,
             bottomActions: [
-                {id: 'edit', text: 'Edit Supplier', dataId: data.id},
+                {id: 'edit', text: 'Edit', dataId: data.id},
                 {id: 'manage-category', text: 'Manage Category', onclick: `generateManageCategoryModal(${JSON.stringify(data)})`},
             ],
+        }
+
+        if (isDeveloperUser()) {
+            modalData.bottomActions.push({
+                id: 'delete-supplier',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/suppliers/${data.id}')`,
+            });
         }
 
         if (currentUserRole == 'admin' || currentUserRole == 'developer' || currentUserRole == 'owner') {

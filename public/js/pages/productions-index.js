@@ -26,18 +26,28 @@
             const rowData = JSON.parse(item.dataset.json);
             const data = rowData.data || rowData;
 
+            const actions = [
+                {
+                    id: "print-ticket",
+                    text: "Print Ticket",
+                    onclick: `printProductionTicket(${JSON.stringify(data)})`,
+                },
+            ];
+
+            if (isDeveloperUser()) {
+                actions.push({
+                    id: "delete-production",
+                    text: "Delete",
+                    onclick: `submitResourceDelete('/productions/${data.id}')`,
+                });
+            }
+
             createContextMenu({
                 item,
                 data,
                 x: e.pageX,
                 y: e.pageY,
-                actions: [
-                    {
-                        id: "print-ticket",
-                        text: "Print Ticket",
-                        onclick: `printProductionTicket(${JSON.stringify(data)})`,
-                    },
-                ],
+                actions,
             });
         };
 
@@ -47,6 +57,27 @@
             const article = data.article || {};
             const worker = data.worker || {};
             const work = data.work || {};
+
+            const bottomActions = [
+                {
+                    id: "preview-ticket",
+                    text: "Preview Ticket",
+                    onclick: `showProductionTicket(${JSON.stringify(data)})`,
+                },
+                {
+                    id: "print-ticket",
+                    text: "Print Ticket",
+                    onclick: `printProductionTicket(${JSON.stringify(data)})`,
+                },
+            ];
+
+            if (isDeveloperUser()) {
+                bottomActions.push({
+                    id: "delete-production",
+                    text: "Delete",
+                    onclick: `submitResourceDelete('/productions/${data.id}')`,
+                });
+            }
 
             createModal({
                 id: "modalForm",
@@ -61,18 +92,7 @@
                     Rate: data.rate ? formatMoney(data.rate) : "-",
                     Amount: data.amount ? formatMoney(data.amount) : "-",
                 },
-                bottomActions: [
-                    {
-                        id: "preview-ticket",
-                        text: "Preview Ticket",
-                        onclick: `showProductionTicket(${JSON.stringify(data)})`,
-                    },
-                    {
-                        id: "print-ticket",
-                        text: "Print Ticket",
-                        onclick: `printProductionTicket(${JSON.stringify(data)})`,
-                    },
-                ],
+                bottomActions,
             });
         };
     }

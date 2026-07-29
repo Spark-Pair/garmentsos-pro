@@ -87,6 +87,7 @@
             authLayout: @json($authLayout),
             updateUserStatusUrl: @json(route('update-user-status')),
             resetPasswordUrl: @json(route('users.reset-password')),
+            csrfToken: @json(csrf_token()),
         };
     </script>
 @endpush

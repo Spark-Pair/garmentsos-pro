@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Services\Branches\BranchSerialService;
 use App\Services\Branches\ModuleBranchService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class BiltyController extends Controller
 {
@@ -148,5 +149,15 @@ class BiltyController extends Controller
     public function destroy(Bilty $bilty)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($bilty, 'bilties');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        DB::transaction(function () use ($bilty) {
+            $bilty->delete();
+        });
+
+        return redirect()->route('bilties.index')->with('success', 'Bilty deleted successfully.');
     }
 }

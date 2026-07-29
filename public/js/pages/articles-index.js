@@ -35,7 +35,7 @@
                         text: "Update Image",
                         onclick: `generateUpdateImageModal(${JSON.stringify(data)})`,
                     },
-                    { id: "edit", text: "Edit Article" },
+                    { id: "edit", text: "Edit" },
                 ],
             };
 
@@ -50,7 +50,7 @@
             if (config.currentUserRole === "developer") {
                 contextMenuData.actions.push({
                     id: "delete",
-                    text: "Delete Article",
+                    text: "Delete",
                     onclick: `submitDeveloperArticleDelete(${data.id})`,
                 });
             }
@@ -107,7 +107,7 @@
             if (data.ordered_quantity == 0 || config.currentUserRole === "developer") {
                 modalData.bottomActions.push({
                     id: "edit",
-                    text: "Edit Article",
+                    text: "Edit",
                     dataId: data.id,
                 });
             }

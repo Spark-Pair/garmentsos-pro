@@ -145,7 +145,7 @@ Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensur
 Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensureLicense', 'readonly', 'blockWhenUpdating', 'dbTransaction']], function () {
     Route::get('home', [Controller::class, 'home'])->name('home');
 
-    Route::resource('users', UserController::class)->only(['index', 'create', 'store']);
+    Route::resource('users', UserController::class)->except(['show']);
     Route::post('update-user-status', [UserController::class, 'updateStatus'])->name('update-user-status');
     Route::post('users.reset-password', [UserController::class, 'resetPassword'])->name('users.reset-password');
 
@@ -175,7 +175,7 @@ Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensur
 
     Route::resource('physical-quantities', PhysicalQuantityController::class);
 
-    Route::resource('inventory', InventoryController::class)->only(['index', 'create', 'store'])->middleware('moduleEnabled:inventory');
+    Route::resource('inventory', InventoryController::class)->except(['show'])->middleware('moduleEnabled:inventory');
 
     Route::resource('invoices', InvoiceController::class);
     Route::get('print-invoices', [InvoiceController::class, 'print'])->name('invoices.print');
@@ -207,8 +207,14 @@ Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensur
 
     Route::get('fabrics/issue', [FabricController::class, 'issue'])->name('fabrics.issue');
     Route::post('fabrics/issuePost', [FabricController::class, 'issuePost'])->name('fabrics.issuePost');
+    Route::get('fabrics/issued/{issuedFabric}/edit', [FabricController::class, 'editIssued'])->name('fabrics.issued.edit');
+    Route::put('fabrics/issued/{issuedFabric}', [FabricController::class, 'updateIssued'])->name('fabrics.issued.update');
+    Route::delete('fabrics/issued/{issuedFabric}', [FabricController::class, 'destroyIssued'])->name('fabrics.issued.destroy');
     Route::get('fabrics/return', [FabricController::class, 'return'])->name('fabrics.return');
     Route::post('fabrics/returnPost', [FabricController::class, 'returnPost'])->name('fabrics.returnPost');
+    Route::get('fabrics/returned/{returnFabric}/edit', [FabricController::class, 'editReturn'])->name('fabrics.returned.edit');
+    Route::put('fabrics/returned/{returnFabric}', [FabricController::class, 'updateReturn'])->name('fabrics.returned.update');
+    Route::delete('fabrics/returned/{returnFabric}', [FabricController::class, 'destroyReturn'])->name('fabrics.returned.destroy');
     Route::resource('fabrics', FabricController::class);
 
     Route::resource('rates', RateController::class)->middleware('moduleEnabled:rates');
@@ -229,7 +235,7 @@ Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensur
 
     Route::resource('sales-returns', SalesReturnController::class);
     Route::post('sales-returns/get-details', [SalesReturnController::class, 'getDetails'])->name('sales-returns.get-details');
-    Route::resource('statement-adjustments', StatementAdjustmentController::class)->only(['index', 'create', 'store', 'edit', 'update']);
+    Route::resource('statement-adjustments', StatementAdjustmentController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
     Route::post('statement-adjustments/first-transaction-date', [StatementAdjustmentController::class, 'firstTransactionDate'])->name('statement-adjustments.first-transaction-date');
 
     Route::get('attendances/create', [AttendanceController::class, 'create'])->name('attendances.create');
@@ -239,7 +245,7 @@ Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensur
     Route::get('attendances/generate-slip', [AttendanceController::class, 'generateSlip'])->name('attendances.generate-slip');
     Route::post('attendances/generate-slip', [AttendanceController::class, 'generateSlipPost'])->name('attendances.generate-slip-post');
 
-    Route::resource('utility-bills', UtilityBillController::class)->only(['index', 'create', 'store', 'edit', 'update']);
+    Route::resource('utility-bills', UtilityBillController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
     Route::put('utility-bills/{utilityBill}/mark-paid', [UtilityBillController::class, 'markPaid'])->name('utility-bills.mark-paid');
 
     Route::resource('utility-accounts', UtilityAccountController::class);

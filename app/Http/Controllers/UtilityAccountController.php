@@ -143,7 +143,23 @@ class UtilityAccountController extends Controller
      */
     public function destroy(UtilityAccount $utilityAccount)
     {
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($utilityAccount, 'utility_accounts');
+
+        $dependencies = $this->dependencyCounts([
+            'utility bills' => ['utility_bills', 'account_id', $utilityAccount->id],
+        ]);
+
+        if ($dependencies !== []) {
+            return redirect()->back()->with('error', $this->dependencyBlockMessage('Utility account', $dependencies));
+        }
+
+        $utilityAccount->delete();
+
+        return redirect()->route('utility-accounts.index')->with('success', 'Utility account deleted successfully.');
     }
 
     private function utilityAccountFormOptions(): array

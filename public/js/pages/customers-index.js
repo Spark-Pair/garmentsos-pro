@@ -36,9 +36,17 @@ function initCustomersIndex() {
             y: e.pageY,
             action: updateUserStatusUrl,
             actions: [
-                {id: 'edit', text: 'Edit Customer'}
+                {id: 'edit', text: 'Edit'}
             ],
         };
+
+        if (isDeveloperUser()) {
+            contextMenuData.actions.push({
+                id: 'delete-customer',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/customers/${data.id}')`,
+            });
+        }
 
         if ((currentUserRole == 'admin' || currentUserRole == 'developer' || currentUserRole == 'owner') && currentUserRole != data.details['Role']) {
             contextMenuData.actions.push(
@@ -70,8 +78,16 @@ function initCustomersIndex() {
             user: data.user,
             profile: true,
             bottomActions: [
-                {id: 'edit', text: 'Edit Customer', dataId: data.id}
+                {id: 'edit', text: 'Edit', dataId: data.id}
             ],
+        }
+
+        if (isDeveloperUser()) {
+            modalData.bottomActions.push({
+                id: 'delete-customer',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/customers/${data.id}')`,
+            });
         }
 
         if (currentUserRole == 'admin' || currentUserRole == 'developer' || currentUserRole == 'owner') {

@@ -39,10 +39,18 @@
                 y: e.pageY,
                 action: updateStatusUrl,
                 actions: [
-                    { id: "edit", text: "Edit Employee", dataId: data.id },
+                    { id: "edit", text: "Edit", dataId: data.id },
                     { id: "emp-form-in-modal", text: "Show Form", onclick: `showEmployeeForm(${JSON.stringify(data)})` },
                 ],
             };
+
+            if (isDeveloperUser()) {
+                contextMenuData.actions.push({
+                    id: "delete-employee",
+                    text: "Delete",
+                    onclick: `submitResourceDelete('/employees/${data.id}')`,
+                });
+            }
 
             createContextMenu(contextMenuData);
         };
@@ -71,10 +79,18 @@
                 },
                 profile: true,
                 bottomActions: [
-                    { id: "edit-in-modal", text: "Edit Employee", dataId: data.id },
+                    { id: "edit-in-modal", text: "Edit", dataId: data.id },
                     { id: "emp-form-in-modal", text: "Show Form", onclick: `showEmployeeForm(${JSON.stringify(data)})` },
                 ],
             };
+
+            if (isDeveloperUser()) {
+                modalData.bottomActions.push({
+                    id: "delete-employee",
+                    text: "Delete",
+                    onclick: `submitResourceDelete('/employees/${data.id}')`,
+                });
+            }
 
             createModal(modalData);
         };

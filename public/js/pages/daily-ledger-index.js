@@ -45,12 +45,12 @@ function initDailyLedgerIndex() {
         if (isDeveloper) {
             bottomActions.push({
                 id: "daily-ledger-change",
-                text: "Edit Record",
+                text: "Edit",
                 link: `/daily-ledger/${data.id}/edit?type=${encodeURIComponent(data.ledger_type)}`,
             });
             bottomActions.push({
                 id: "delete-daily-ledger",
-                text: "Delete Record",
+                text: "Delete",
                 onclick: `deleteDailyLedgerRecord(${data.id}, '${data.ledger_type}')`,
             });
         }
@@ -76,12 +76,12 @@ function initDailyLedgerIndex() {
         if (isDeveloper) {
             actions.push({
                 id: "daily-ledger-change",
-                text: "Edit Record",
+                text: "Edit",
                 link: `/daily-ledger/${data.id}/edit?type=${encodeURIComponent(data.ledger_type)}`,
             });
             actions.push({
                 id: "delete-daily-ledger",
-                text: "Delete Record",
+                text: "Delete",
                 onclick: `deleteDailyLedgerRecord(${data.id}, '${data.ledger_type}')`,
             });
         }

@@ -152,7 +152,7 @@ class VoucherController extends Controller
                 })->values()->toArray();
             } else if ($paymentMethod === 'program') {
                 $payments = SupplierPayment::where('supplier_id', $supplier_id)
-                    ->where('method', 'program')
+                    ->whereRaw('LOWER(method) LIKE ?', ['%program%'])
                     ->whereNull('voucher_id')
                     ->select(
                         'id',
@@ -473,7 +473,7 @@ class VoucherController extends Controller
         $voucher->load([
             'supplier' => fn ($q) => $q->with([
                 'payments' => fn ($q) =>
-                    $q->where('method', 'program')
+                    $q->whereRaw('LOWER(method) LIKE ?', ['%program%'])
                     ->whereNull('voucher_id')
                     ->with('program.customer.city:id,title'),
                 'expenses',

@@ -35,9 +35,17 @@ function initExpensesIndex() {
             x: e.pageX,
             y: e.pageY,
             actions: [
-                {id: 'edit', text: 'Edit Expense'}
+                {id: 'edit', text: 'Edit'}
             ],
         };
+
+        if (isDeveloperUser()) {
+            contextMenuData.actions.push({
+                id: 'delete-expense',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/expenses/${data.id}')`,
+            });
+        }
 
         createContextMenu(contextMenuData);
     }
@@ -57,8 +65,16 @@ function initExpensesIndex() {
                 'Remarks': data.remarks,
             },
             bottomActions: [
-                {id: 'edit', text: 'Edit Expense', dataId: data.id}
+                {id: 'edit', text: 'Edit', dataId: data.id}
             ],
+        }
+
+        if (isDeveloperUser()) {
+            modalData.bottomActions.push({
+                id: 'delete-expense',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/expenses/${data.id}')`,
+            });
         }
 
         createModal(modalData);

@@ -108,6 +108,14 @@ class RateController extends Controller
      */
     public function destroy(Rate $rate)
     {
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($rate, 'rates');
+
+        $rate->delete();
+
+        return redirect()->route('rates.index')->with('success', 'Rate deleted successfully.');
     }
 }

@@ -1,5 +1,8 @@
 (() => {
     function initStatementAdjustmentsIndex() {
+        const config = window.__statementAdjustmentsIndex || {};
+        const canDeveloperManage = config.currentUserRole === 'developer';
+
         window.createRow = function createRow(data) {
             return `
                 <div id="${data.id}" oncontextmenu='${htmlAttr(data.oncontextmenu || "")}' onclick='${htmlAttr(data.onclick || "")}'
@@ -33,20 +36,41 @@
             e.preventDefault();
             const item = e.target.closest('.item');
             const data = JSON.parse(item.dataset.json);
+            const actions = [
+                { id: 'edit', text: 'Edit' },
+            ];
+
+            if (canDeveloperManage) {
+                actions.push({
+                    id: 'delete-balance-entry',
+                    text: 'Delete',
+                    onclick: `submitStatementAdjustmentDelete(${data.id})`,
+                });
+            }
 
             createContextMenu({
                 item,
                 data,
                 x: e.pageX,
                 y: e.pageY,
-                actions: [
-                    { id: 'edit', text: 'Edit Balance Entry' },
-                ],
+                actions,
             });
         };
 
         window.generateModal = function generateModal(item) {
             const data = JSON.parse(item.dataset.json);
+
+            const bottomActions = [
+                { id: 'edit', text: 'Edit', dataId: data.id },
+            ];
+
+            if (canDeveloperManage) {
+                bottomActions.push({
+                    id: 'delete-balance-entry',
+                    text: 'Delete',
+                    onclick: `submitStatementAdjustmentDelete(${data.id})`,
+                });
+            }
 
             createModal({
                 id: 'modalForm',
@@ -59,10 +83,20 @@
                     Amount: data.amount,
                     Remarks: data.remarks,
                 },
-                bottomActions: [
-                    { id: 'edit', text: 'Edit Balance Entry', dataId: data.id },
-                ],
+                bottomActions,
             });
+        };
+
+        window.submitStatementAdjustmentDelete = function submitStatementAdjustmentDelete(id) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/statement-adjustments/${id}`;
+            form.innerHTML = `
+                <input type="hidden" name="_token" value="${config.csrfToken || document.querySelector('meta[name="csrf-token"]')?.content || ''}">
+                <input type="hidden" name="_method" value="DELETE">
+            `;
+            document.body.appendChild(form);
+            form.submit();
         };
     }
 

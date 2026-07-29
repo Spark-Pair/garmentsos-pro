@@ -80,4 +80,10 @@
 
 @push('page-scripts')
 <script defer src="{{ asset('js/pages/statement-adjustments-index.js') }}"></script>
+<script>
+    window.__statementAdjustmentsIndex = {
+        currentUserRole: @json(Auth::user()->role),
+        csrfToken: @json(csrf_token()),
+    };
+</script>
 @endpush

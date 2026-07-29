@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -64,7 +65,7 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255|unique:users,username',
             'password' => 'required|string|min:4',
-            'role' => 'required|string|in:admin,accountant,guest,owner,store_keeper',
+            'role' => ['required', 'string', Rule::in($this->assignableRoles())],
             'profile_picture' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
         ]);
 
@@ -109,7 +110,15 @@ class UserController extends Controller
      */
     public function edit(User $user)
     {
-        //
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($user, 'users');
+
+        $usernames = User::whereKeyNot($user->id)->pluck('username')->toArray();
+
+        return view('user.create', compact('usernames', 'user'));
     }
 
     /**
@@ -117,7 +126,50 @@ class UserController extends Controller
      */
     public function update(Request $request, User $user)
     {
-        //
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($user, 'users');
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'username' => ['required', 'string', 'max:255', Rule::unique('users', 'username')->ignore($user->id)],
+            'password' => 'nullable|string|min:4',
+            'role' => ['required', 'string', Rule::in($this->assignableRoles())],
+            'status' => 'required|string|in:active,in_active',
+            'profile_picture' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator)->withInput();
+        }
+
+        $data = $validator->validated();
+
+        if ($request->hasFile('profile_picture')) {
+            $file = $request->file('profile_picture');
+            $fileName = time() . '_' . $file->getClientOriginalName();
+            $file->storeAs('uploads/images', $fileName, 'public');
+            $data['profile_picture'] = $fileName;
+        }
+
+        if (!empty($data['password'])) {
+            $data['password'] = Hash::make($data['password']);
+        } else {
+            unset($data['password']);
+        }
+
+        $user->update($data);
+
+        if ($user->status !== 'active') {
+            UserSession::where('user_id', $user->id)->update([
+                'is_active' => false,
+                'last_activity' => now(),
+            ]);
+        }
+
+        return redirect()->route('users.index')->with('success', 'User updated successfully.');
     }
 
     /**
@@ -125,7 +177,20 @@ class UserController extends Controller
      */
     public function destroy(User $user)
     {
-        //
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        if ($user->id === Auth::id()) {
+            return redirect()->back()->with('error', 'You cannot delete your own account while logged in.');
+        }
+
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($user, 'users');
+
+        UserSession::where('user_id', $user->id)->delete();
+        $user->delete();
+
+        return redirect()->route('users.index')->with('success', 'User deleted successfully.');
     }
 
     public function updateStatus(Request $request)
@@ -228,5 +293,10 @@ class UserController extends Controller
         }
 
         return redirect()->back()->with('success', 'Password reset successfully!');
+    }
+
+    private function assignableRoles(): array
+    {
+        return ['admin', 'accountant', 'guest', 'owner', 'store_keeper'];
     }
 }

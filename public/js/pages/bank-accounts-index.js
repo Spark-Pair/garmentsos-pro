@@ -45,15 +45,26 @@
             let contextMenuData = {
                 item: item,
                 data: data,
+                actions: [
+                    { id: 'edit', text: 'Edit', link: `/bank-accounts/${data.id}/edit` },
+                ],
                 action: statusUrl,
                 x: e.pageX,
                 y: e.pageY,
             };
 
             if (data.details['Category'] === 'self') {
-                contextMenuData.actions = [
+                contextMenuData.actions.push(
                     {id: 'update-cheque-book-serial', text: 'Update Serial', onclick: `generateUpdateChequeBookSerialModel(${JSON.stringify(data)})`},
-                ];
+                );
+            }
+
+            if (isDeveloperUser()) {
+                contextMenuData.actions.push({
+                    id: 'delete-bank-account',
+                    text: 'Delete',
+                    onclick: `submitResourceDelete('/bank-accounts/${data.id}')`,
+                });
             }
 
             createContextMenu(contextMenuData);
@@ -75,14 +86,25 @@
                     'Date': data.date,
                     'Balance': formatMoney(data.details['Balance']),
                 },
+                bottomActions: [
+                    { id: 'edit', text: 'Edit', link: `/bank-accounts/${data.id}/edit` },
+                ],
             }
 
             if (data.details['Category'] === 'self') {
                 modalData.details['Account No'] = data.account_no;
                 modalData.details['Cheque Book Serial'] = data.chqbkSerialStart + ' - ' + data.chqbkSerialEnd;
-                modalData.bottomActions = [
+                modalData.bottomActions.push(
                     {id: 'update-cheque-book-serial', text: 'Update Serial', onclick: `generateUpdateChequeBookSerialModel(${JSON.stringify(data)})`},
-                ];
+                );
+            }
+
+            if (isDeveloperUser()) {
+                modalData.bottomActions.push({
+                    id: 'delete-bank-account',
+                    text: 'Delete',
+                    onclick: `submitResourceDelete('/bank-accounts/${data.id}')`,
+                });
             }
 
             createModal(modalData);

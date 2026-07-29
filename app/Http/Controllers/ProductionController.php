@@ -18,6 +18,7 @@ use App\Services\Production\ProductionItemSyncService;
 use App\Support\Money;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 
@@ -397,5 +398,24 @@ class ProductionController extends Controller
     public function destroy(Production $production)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($production, 'productions');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $dependencies = $this->dependencyCounts([
+            'production tags' => ['production_tags', 'production_id', $production->id],
+            'production materials' => ['production_materials', 'production_id', $production->id],
+        ]);
+
+        if (!empty($dependencies)) {
+            return redirect()->back()->with('error', $this->dependencyBlockMessage('Production', $dependencies));
+        }
+
+        DB::transaction(function () use ($production) {
+            $production->delete();
+        });
+
+        return redirect()->route('productions.index')->with('success', 'Production deleted successfully.');
     }
 }

@@ -228,7 +228,18 @@ class SalesReturnController extends Controller
      */
     public function destroy(SalesReturn $salesReturn)
     {
-        //
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($salesReturn, 'sales_returns');
+
+        DB::transaction(function () use ($salesReturn) {
+            PhysicalQuantity::where('sales_return_id', $salesReturn->id)->delete();
+            $salesReturn->delete();
+        });
+
+        return redirect()->route('sales-returns.index')->with('success', 'Sales return deleted successfully.');
     }
 
     public function getDetails(Request $request)

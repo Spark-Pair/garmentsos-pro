@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\Setup;
 use App\Services\Branches\ModuleBranchService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class EmployeeController extends Controller
@@ -211,7 +212,28 @@ class EmployeeController extends Controller
      */
     public function destroy(Employee $employee)
     {
-        //
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($employee, 'employees');
+
+        $dependencies = $this->dependencyCounts([
+            'productions' => ['productions', 'worker_id', $employee->id],
+            'employee payments' => ['employee_payments', 'employee_id', $employee->id],
+            'salaries' => ['salaries', 'employee_id', $employee->id],
+            'attendance' => ['attendances', 'employee_id', $employee->id],
+            'issued fabrics' => ['issued_fabrics', 'worker_id', $employee->id],
+            'linked supplier' => fn () => $employee->supplier()->count(),
+        ]);
+
+        if ($dependencies !== []) {
+            return redirect()->back()->with('error', $this->dependencyBlockMessage('Employee', $dependencies));
+        }
+
+        DB::transaction(fn () => $employee->delete());
+
+        return redirect()->route('employees.index')->with('success', 'Employee deleted successfully.');
     }
 
     public function updateStatus(Request $request)

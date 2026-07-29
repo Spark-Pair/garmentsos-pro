@@ -132,8 +132,16 @@ function initVouchersIndex() {
             y: e.pageY,
             actions: [
                 {id: 'print', text: 'Print Voucher', onclick: 'printVoucher(this)'},
-                {id: 'edit', text: 'Edit Voucher'}
+                {id: 'edit', text: 'Edit'}
             ]
+        }
+
+        if (isDeveloperUser()) {
+            contextMenuData.actions.push({
+                id: 'delete-voucher',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/vouchers/${data.id}')`,
+            });
         }
 
         createContextMenu(contextMenuData);
@@ -150,8 +158,16 @@ function initVouchersIndex() {
             preview: {type: 'voucher', data: data.data, document: 'Voucher'},
             bottomActions: [
                 {id: 'print', text: 'Print Voucher', onclick: 'printVoucher(this)'},
-                {id: 'edit', text: 'Edit Voucher', dataId: data.id}
+                {id: 'edit', text: 'Edit', dataId: data.id}
             ],
+        }
+
+        if (isDeveloperUser()) {
+            modalData.bottomActions.push({
+                id: 'delete-voucher',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/vouchers/${data.id}')`,
+            });
         }
 
         createModal(modalData);

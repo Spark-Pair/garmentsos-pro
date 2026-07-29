@@ -161,6 +161,14 @@
             actions: [{ id: 'print', text: 'Print Cargo List', onclick: 'printCargoList(this)' }],
         };
 
+        if (isDeveloperUser()) {
+            contextMenuData.actions.push({
+                id: 'delete-cargo',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/cargos/${data.id}')`,
+            });
+        }
+
         createContextMenu(contextMenuData);
     };
 
@@ -172,6 +180,14 @@
             preview: { type: 'cargo_list', data: data.data, document: 'Cargo List' },
             bottomActions: [{ id: 'print', text: 'Print Cargo List', onclick: 'printCargoList(this)' }],
         };
+
+        if (isDeveloperUser()) {
+            modalData.bottomActions.push({
+                id: 'delete-cargo',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/cargos/${data.id}')`,
+            });
+        }
 
         createModal(modalData);
     };

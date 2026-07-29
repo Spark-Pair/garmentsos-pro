@@ -158,5 +158,24 @@ class CargoController extends Controller
     public function destroy(Cargo $cargo)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($cargo, 'cargo');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        DB::transaction(function () use ($cargo) {
+            $invoiceIds = collect(json_decode($cargo->invoices_array, true) ?: [])
+                ->pluck('id')
+                ->filter()
+                ->values();
+
+            if ($invoiceIds->isNotEmpty()) {
+                Invoice::whereIn('id', $invoiceIds)->update(['cargo_name' => null]);
+            }
+
+            $cargo->delete();
+        });
+
+        return redirect()->route('cargos.index')->with('success', 'Cargo record deleted successfully.');
     }
 }

@@ -225,6 +225,14 @@ class PhysicalQuantityController extends Controller
     public function edit(PhysicalQuantity $physicalQuantity)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($physicalQuantity, 'physical_quantities');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $physicalQuantity->load('article');
+
+        return view('physical-quantities.edit', compact('physicalQuantity'));
     }
 
     /**
@@ -233,6 +241,37 @@ class PhysicalQuantityController extends Controller
     public function update(Request $request, PhysicalQuantity $physicalQuantity)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($physicalQuantity, 'physical_quantities');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $validator = Validator::make($request->all(), [
+            'date' => 'required|date',
+            'processed_by' => 'required|string',
+            'pcs_per_packet' => 'required|integer|min:1',
+            'packets' => 'required|integer|min:1',
+            'category' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator)->withInput();
+        }
+
+        $data = $validator->validated();
+
+        Article::where('id', $physicalQuantity->article_id)->update([
+            'pcs_per_packet' => $data['pcs_per_packet'],
+            'processed_by' => $data['processed_by'],
+        ]);
+
+        $physicalQuantity->update([
+            'date' => $data['date'],
+            'packets' => $data['packets'],
+            'category' => $data['category'],
+        ]);
+
+        return redirect()->route('physical-quantities.index')->with('success', 'Physical quantity updated successfully.');
     }
 
     /**
@@ -240,6 +279,14 @@ class PhysicalQuantityController extends Controller
      */
     public function destroy(PhysicalQuantity $physicalQuantity)
     {
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($physicalQuantity, 'physical_quantities');
+
+        $physicalQuantity->delete();
+
+        return redirect()->route('physical-quantities.index')->with('success', 'Physical quantity deleted successfully.');
     }
 }

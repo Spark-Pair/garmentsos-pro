@@ -9,6 +9,7 @@ use App\Models\Supplier;
 use App\Services\Branches\ModuleBranchService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
@@ -164,7 +165,20 @@ class BankAccountController extends Controller
      */
     public function edit(BankAccount $bankAccount)
     {
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($bankAccount, 'bank_accounts');
+
+        $bank_options = app(ModuleBranchService::class)->applyRelatedScope(Setup::where('type', 'bank_name'), 'setups', 'bank_accounts')
+            ->get()
+            ->mapWithKeys(fn ($item) => [
+                $item->id => ['text' => $item->title]
+            ])
+            ->toArray();
+
+        return view('bank-accounts.create', compact('bankAccount', 'bank_options'));
     }
 
     /**
@@ -172,7 +186,60 @@ class BankAccountController extends Controller
      */
     public function update(Request $request, BankAccount $bankAccount)
     {
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($bankAccount, 'bank_accounts');
+
+        $validated = $request->validate([
+            'category' => ['required', Rule::in(['self', 'customer', 'supplier'])],
+            'sub_category' => ['nullable', 'integer'],
+            'bank_id' => ['required', 'integer', 'exists:setups,id'],
+            'account_title' => ['required', 'string', 'max:255'],
+            'date' => ['required', 'date'],
+            'account_no' => ['nullable', 'string', 'max:255'],
+            'remarks' => ['nullable', 'string'],
+            'cheque_book_serial' => ['nullable', 'array'],
+            'cheque_book_serial.start' => ['nullable', 'integer', 'min:1'],
+            'cheque_book_serial.end' => ['nullable', 'integer', 'min:1', 'gte:cheque_book_serial.start'],
+            'status' => ['nullable', Rule::in(['active', 'in_active'])],
+        ]);
+
+        $branches = app(ModuleBranchService::class);
+        $bank = $branches->applyRelatedScope(Setup::where('type', 'bank_name'), 'setups', 'bank_accounts')->find($validated['bank_id']);
+        if (!$bank) {
+            return redirect()->back()->withErrors(['bank_id' => 'Selected bank is not available for this branch.'])->withInput();
+        }
+
+        $subCategoryModel = null;
+        if ($validated['category'] === 'supplier') {
+            $subCategoryModel = $branches->applyRelatedScope(Supplier::query(), 'suppliers', 'bank_accounts')->find($validated['sub_category'] ?? null);
+        } elseif ($validated['category'] === 'customer') {
+            $subCategoryModel = $branches->applyRelatedScope(Customer::query(), 'customers', 'bank_accounts')->find($validated['sub_category'] ?? null);
+        }
+
+        if ($validated['category'] !== 'self' && !$subCategoryModel) {
+            return redirect()->back()->withErrors(['sub_category' => 'Invalid sub category'])->withInput();
+        }
+
+        $bankAccount->forceFill([
+            'category' => $validated['category'],
+            'sub_category_type' => $subCategoryModel ? get_class($subCategoryModel) : null,
+            'sub_category_id' => $subCategoryModel?->id,
+            'bank_id' => $validated['bank_id'],
+            'account_title' => $validated['account_title'],
+            'date' => $validated['date'],
+            'account_no' => $validated['account_no'] ?? null,
+            'remarks' => $validated['remarks'] ?? null,
+            'chqbk_serial_start' => $request->input('cheque_book_serial.start'),
+            'chqbk_serial_end' => $request->input('cheque_book_serial.end'),
+            'status' => $validated['status'] ?? $bankAccount->status,
+        ])->save();
+
+        Cache::forget('category_data:self_account');
+
+        return redirect()->route('bank-accounts.index')->with('success', 'Bank account updated successfully.');
     }
 
     /**
@@ -180,7 +247,29 @@ class BankAccountController extends Controller
      */
     public function destroy(BankAccount $bankAccount)
     {
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($bankAccount, 'bank_accounts');
+
+        $dependencies = $this->dependencyCounts([
+            'customer payments' => ['customer_payments', 'bank_account_id', $bankAccount->id],
+            'supplier payments' => ['supplier_payments', 'bank_account_id', $bankAccount->id],
+            'payment clears' => ['payment_clears', 'bank_account_id', $bankAccount->id],
+            'statement adjustments' => fn () => $bankAccount->statementAdjustments()->count(),
+            'payment programs' => fn () => $bankAccount->paymentPrograms()->count(),
+        ]);
+
+        if ($dependencies !== []) {
+            return redirect()->back()->with('error', $this->dependencyBlockMessage('Bank account', $dependencies));
+        }
+
+        DB::transaction(fn () => $bankAccount->delete());
+
+        Cache::forget('category_data:self_account');
+
+        return redirect()->route('bank-accounts.index')->with('success', 'Bank account deleted successfully.');
     }
 
     public function updateStatus(Request $request)

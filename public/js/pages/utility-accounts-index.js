@@ -21,16 +21,54 @@ function initUtilityAccountsIndex() {
         if (!item) return;
         const data = JSON.parse(item.dataset.json);
 
+        const actions = [
+            { id: 'edit', text: 'Edit' },
+        ];
+
+        if (isDeveloperUser()) {
+            actions.push({
+                id: 'delete-utility-account',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/utility-accounts/${data.id}')`,
+            });
+        }
+
         createContextMenu({
             item,
             data,
             x: e.pageX,
             y: e.pageY,
-            actions: [
-                { id: 'edit', text: 'Edit' },
-            ],
+            actions,
             onlyThisActions: true,
         });
+    }
+
+    window.generateModal = function(item) {
+        const data = JSON.parse(item.dataset.json);
+
+        const modalData = {
+            id: 'modalForm',
+            name: data.account_title,
+            details: {
+                'Bill Type': data.bill_type,
+                'Location': data.location,
+                'Account Title': data.account_title,
+                'Account No.': data.account_no,
+            },
+            bottomActions: [
+                { id: 'edit', text: 'Edit', dataId: data.id },
+            ],
+        };
+
+        if (isDeveloperUser()) {
+            modalData.bottomActions.push({
+                id: 'delete-utility-account',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/utility-accounts/${data.id}')`,
+            });
+        }
+
+        createModal(modalData);
     }
 }
 

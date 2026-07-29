@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\Branches\ModuleBranchService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
@@ -296,7 +297,37 @@ class SupplierController extends Controller
      */
     public function destroy(Supplier $supplier)
     {
-        //
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($supplier, 'suppliers');
+
+        $dependencies = $this->dependencyCounts([
+            'expenses' => ['expenses', 'supplier_id', $supplier->id],
+            'supplier payments' => ['supplier_payments', 'supplier_id', $supplier->id],
+            'vouchers' => ['vouchers', 'supplier_id', $supplier->id],
+            'inventory transactions' => ['inventory_transactions', 'supplier_id', $supplier->id],
+            'fabrics' => ['fabrics', 'supplier_id', $supplier->id],
+            'credit records' => ['cr', 'supplier_id', $supplier->id],
+            'statement adjustments' => fn () => $supplier->statementAdjustments()->count(),
+            'payment programs' => fn () => $supplier->paymentPrograms()->count(),
+            'bank accounts' => fn () => $supplier->bankAccounts()->count(),
+        ]);
+
+        if ($dependencies !== []) {
+            return redirect()->back()->with('error', $this->dependencyBlockMessage('Supplier', $dependencies));
+        }
+
+        DB::transaction(function () use ($supplier) {
+            $user = $supplier->user;
+            $supplier->delete();
+            $user?->delete();
+        });
+
+        Cache::forget('category_data:supplier');
+
+        return redirect()->route('suppliers.index')->with('success', 'Supplier deleted successfully.');
     }
     public function updateSupplierCategory(Request $request)
     {

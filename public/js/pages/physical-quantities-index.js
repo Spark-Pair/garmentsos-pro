@@ -26,6 +26,89 @@
                 <span>${data.shipment}</span>
             </div>`;
         };
+
+        window.generateContextMenu = function generateContextMenu(e) {
+            e.preventDefault();
+            const item = e.target.closest(".item");
+            if (!item) return;
+            const data = JSON.parse(item.dataset.json);
+
+            const actions = [];
+            if (isDeveloperUser()) {
+                actions.push({
+                    id: "edit-physical-quantity",
+                    text: "Edit",
+                    link: `/physical-quantities/${data.id}/edit`,
+                });
+                actions.push({
+                    id: "delete-physical-quantity",
+                    text: "Delete",
+                    onclick: `submitResourceDelete('/physical-quantities/${data.id}')`,
+                });
+            }
+
+            createContextMenu({
+                item,
+                data,
+                x: e.pageX,
+                y: e.pageY,
+                actions,
+            });
+        };
+
+        window.generateModal = function generateModal(item) {
+            const data = JSON.parse(item.dataset.json);
+
+            const modalData = {
+                id: "modalForm",
+                name: data.article_no,
+                details: {
+                    "Processed By": data.processed_by,
+                    Unit: data.unit,
+                    "Total Qty.": `${data.total_quantity}`,
+                    "Received Qty.": `${data.received_quantity} - Pkts.`,
+                    "Ordered Qty.": `${data.ordered_quantity} - Pkts.`,
+                    "Invoiced Qty.": `${data.invoiced_quantity} - Pkts.`,
+                    "Return Qty.": `${data.return_quantity} - Pkts.`,
+                    "Adjustment Qty.": `${data.adjustment_quantity} - Pkts.`,
+                    "Current Stock": `${data.current_stock} - Pkts.`,
+                    "Remaining Qty.": `${data.remaining_quantity} - Pkts.`,
+                    Shipment: data.shipment,
+                },
+                bottomActions: [],
+            };
+
+            if (isDeveloperUser()) {
+                modalData.bottomActions.push({
+                    id: "edit-physical-quantity",
+                    text: "Edit",
+                    link: `/physical-quantities/${data.id}/edit`,
+                });
+                modalData.bottomActions.push({
+                    id: "delete-physical-quantity",
+                    text: "Delete",
+                    onclick: `submitResourceDelete('/physical-quantities/${data.id}')`,
+                });
+            }
+
+            createModal(modalData);
+        };
+
+        const listContainer = document.querySelector(".search_container");
+        if (listContainer) {
+            listContainer.addEventListener("click", (e) => {
+                const row = e.target.closest(".item");
+                if (!row || !row.dataset.json) return;
+                window.generateModal(row);
+            });
+
+            listContainer.addEventListener("contextmenu", (e) => {
+                const row = e.target.closest(".item");
+                if (!row || !row.dataset.json) return;
+                e.preventDefault();
+                window.generateContextMenu(e);
+            });
+        }
     }
 
     window.initPhysicalQuantitiesIndex = initPhysicalQuantitiesIndex;

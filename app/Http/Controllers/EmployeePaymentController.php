@@ -112,6 +112,14 @@ class EmployeePaymentController extends Controller
     public function edit(EmployeePayment $employeePayment)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($employeePayment, 'employee_payments');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $employeePayment->load('employee.type');
+
+        return view('employee-payments.edit', compact('employeePayment'));
     }
 
     /**
@@ -120,6 +128,31 @@ class EmployeePaymentController extends Controller
     public function update(Request $request, EmployeePayment $employeePayment)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($employeePayment, 'employee_payments');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $request->validate([
+            'employee_id' => 'required|integer|exists:employees,id',
+            'date' => 'required|date',
+            'method' => 'required|string|in:cash,adjustment',
+            'amount' => 'required|integer|min:1',
+        ]);
+
+        $employee = app(ModuleBranchService::class)->applyRelatedScope(Employee::query(), 'employees', 'employee_payments')->find($request->employee_id);
+        if (!$employee) {
+            return redirect()->back()->withErrors(['employee_id' => 'Selected employee is not available for this branch.'])->withInput();
+        }
+
+        $employeePayment->update([
+            'employee_id' => $request->employee_id,
+            'date' => $request->date,
+            'method' => $request->method,
+            'amount' => $request->amount,
+        ]);
+
+        return redirect()->route('employee-payments.index')->with('success', 'Payment updated successfully.');
     }
 
     /**
@@ -128,5 +161,13 @@ class EmployeePaymentController extends Controller
     public function destroy(EmployeePayment $employeePayment)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($employeePayment, 'employee_payments');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $employeePayment->delete();
+
+        return redirect()->route('employee-payments.index')->with('success', 'Payment deleted successfully.');
     }
 }

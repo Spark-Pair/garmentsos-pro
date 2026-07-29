@@ -175,11 +175,48 @@ class Controller extends BaseController
 
     protected function checkRole($roles)
     {
-        if (!in_array(Auth::user()->role, $roles)) {
+        $user = Auth::user();
+
+        if (!$user) {
             return false;
         }
 
-        return true;
+        if ($user->role === 'developer') {
+            return true;
+        }
+
+        return in_array($user->role, $roles, true);
+    }
+
+    protected function dependencyCounts(array $dependencies): array
+    {
+        $counts = [];
+
+        foreach ($dependencies as $label => $dependency) {
+            if (is_callable($dependency)) {
+                $count = (int) $dependency();
+            } else {
+                [$table, $column, $value] = $dependency;
+                $count = Schema::hasTable($table) && Schema::hasColumn($table, $column)
+                    ? (int) DB::table($table)->where($column, $value)->count()
+                    : 0;
+            }
+
+            if ($count > 0) {
+                $counts[$label] = $count;
+            }
+        }
+
+        return $counts;
+    }
+
+    protected function dependencyBlockMessage(string $recordLabel, array $counts): string
+    {
+        $summary = collect($counts)
+            ->map(fn ($count, $label) => "{$label}: {$count}")
+            ->implode(', ');
+
+        return "{$recordLabel} has connected records and was not deleted. Review these first: {$summary}.";
     }
 
     protected function denyIfNoRole(array $roles, string $message = 'You do not have permission to access this page.', string $redirectRoute = 'home')
@@ -260,7 +297,8 @@ class Controller extends BaseController
             return response()->json(["error" => "Order not found."]);
         }
 
-        if ($order->status === 'invoiced') {
+        $allowInvoiced = $request->boolean('allow_invoiced') && Auth::user()?->role === 'developer';
+        if ($order->status === 'invoiced' && !$allowInvoiced) {
             return response()->json(["error" => "This order has already been invoiced."]);
         }
 

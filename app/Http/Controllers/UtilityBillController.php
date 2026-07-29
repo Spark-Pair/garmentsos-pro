@@ -170,6 +170,19 @@ class UtilityBillController extends Controller
         ]);
     }
 
+    public function destroy(UtilityBill $utilityBill)
+    {
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($utilityBill, 'utility_bills');
+
+        $utilityBill->delete();
+
+        return redirect()->route('utility-bills.index')->with('success', 'Utility Bill deleted successfully.');
+    }
+
     private function utilityBillFormOptions(): array
     {
         $bill_type_options = [];

@@ -202,6 +202,19 @@ class StatementAdjustmentController extends Controller
         return redirect()->route('statement-adjustments.index')->with('success', 'Balance entry updated successfully.');
     }
 
+    public function destroy(StatementAdjustment $statementAdjustment)
+    {
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($statementAdjustment, 'statement_adjustments');
+
+        $statementAdjustment->delete();
+
+        return redirect()->route('statement-adjustments.index')->with('success', 'Balance entry deleted successfully.');
+    }
+
     private function categoryOptions(): array
     {
         return [

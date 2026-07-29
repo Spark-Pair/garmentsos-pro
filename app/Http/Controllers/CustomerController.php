@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\Branches\ModuleBranchService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -249,12 +250,35 @@ class CustomerController extends Controller
      */
     public function destroy(Customer $customer)
     {
-        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin'])) {
+        if ($resp = $this->denyIfNoRole(['developer'])) {
             return $resp;
         }
 
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($customer, 'customers');
 
-        return redirect()->route('customers.index')->with('error', 'Customer delete is not available from this screen.');
+        $dependencies = $this->dependencyCounts([
+            'orders' => ['orders', 'customer_id', $customer->id],
+            'shipments' => ['shipments', 'customer_id', $customer->id],
+            'invoices' => ['invoices', 'customer_id', $customer->id],
+            'customer payments' => ['customer_payments', 'customer_id', $customer->id],
+            'payment programs' => ['payment_programs', 'customer_id', $customer->id],
+            'debit records' => ['dr', 'customer_id', $customer->id],
+            'statement adjustments' => fn () => $customer->statementAdjustments()->count(),
+            'bank accounts' => fn () => $customer->bankAccounts()->count(),
+        ]);
+
+        if ($dependencies !== []) {
+            return redirect()->back()->with('error', $this->dependencyBlockMessage('Customer', $dependencies));
+        }
+
+        DB::transaction(function () use ($customer) {
+            $user = $customer->user;
+            $customer->delete();
+            $user?->delete();
+        });
+
+        Cache::forget('category_data:customer');
+
+        return redirect()->route('customers.index')->with('success', 'Customer deleted successfully.');
     }
 }

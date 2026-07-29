@@ -143,6 +143,14 @@
             contextMenuData.actions.push({ id: 'edit', text: 'Edit', dataId: data.id });
         }
 
+        if (isDeveloperUser()) {
+            contextMenuData.actions.push({
+                id: 'delete-shipment',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/shipments/${data.id}')`,
+            });
+        }
+
         createContextMenu(contextMenuData);
     };
 
@@ -157,6 +165,14 @@
 
         if (!data.isInvoiceHas) {
             modalData.bottomActions.push({ id: 'edit', text: 'Edit', dataId: data.id });
+        }
+
+        if (isDeveloperUser()) {
+            modalData.bottomActions.push({
+                id: 'delete-shipment',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/shipments/${data.id}')`,
+            });
         }
 
         createModal(modalData);

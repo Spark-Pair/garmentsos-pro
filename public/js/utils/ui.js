@@ -73,6 +73,25 @@ function appAlert(message = '', type = 'error') {
     console.error(message);
 }
 
+function submitResourceDelete(action, token = null) {
+    if (!action) return;
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = action;
+    form.innerHTML = `
+        <input type="hidden" name="_token" value="${token || document.querySelector('meta[name="csrf-token"]')?.content || ''}">
+        <input type="hidden" name="_method" value="DELETE">
+    `;
+    document.body.appendChild(form);
+    form.submit();
+}
+
+function isDeveloperUser() {
+    return window.__appConfig?.authUserRole === 'developer'
+        || window.__currentUserRole === 'developer';
+}
+
 function hideNotification(notificationElem) {
     notificationElem.classList.add('fade-out');
     notificationElem.addEventListener('animationend', () => {

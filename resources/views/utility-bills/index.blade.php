@@ -93,6 +93,7 @@
 <script>
         window.__utilityBillsIndex = {
             csrfToken: @json(csrf_token()),
+            currentUserRole: @json(Auth::user()->role),
         };
     </script>
 @endpush

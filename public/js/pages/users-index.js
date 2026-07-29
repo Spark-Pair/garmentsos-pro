@@ -5,6 +5,7 @@
         const authLayout = config?.authLayout;
         const updateUserStatusUrl = config?.updateUserStatusUrl;
         const resetPasswordUrl = config?.resetPasswordUrl;
+        const csrfToken = config?.csrfToken;
 
         if (authLayout) {
             window.authLayout = authLayout;
@@ -50,6 +51,7 @@
             let data = JSON.parse(item.dataset.json);
 
             let contextMenuData = {
+                item: item,
                 data: data,
                 x: e.pageX,
                 y: e.pageY,
@@ -64,6 +66,14 @@
                 contextMenuData.actions = [
                     {id: 'reset-password', text: 'Reset Password', onclick: `generateResetPasswordModel(${JSON.stringify(data)})`},
                 ];
+            }
+
+            if (currentUserRole === 'developer') {
+                contextMenuData.actions = contextMenuData.actions || [];
+                contextMenuData.actions.unshift({ id: 'edit', text: 'Edit' });
+                if (Number(data.id) !== currentUserId) {
+                    contextMenuData.actions.push({ id: 'delete-user', text: 'Delete', onclick: `submitUserDelete(${data.id})` });
+                }
             }
 
             createContextMenu(contextMenuData);
@@ -97,8 +107,28 @@
                 ];
             }
 
+            if (currentUserRole === 'developer') {
+                modalData.bottomActions = modalData.bottomActions || [];
+                modalData.bottomActions.unshift({ id: 'edit', text: 'Edit', dataId: data.id });
+                if (Number(data.id) !== currentUserId) {
+                    modalData.bottomActions.push({ id: 'delete-user', text: 'Delete', onclick: `submitUserDelete(${data.id})` });
+                }
+            }
+
             createModal(modalData);
         }
+
+        window.submitUserDelete = function submitUserDelete(id) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/users/${id}`;
+            form.innerHTML = `
+                <input type="hidden" name="_token" value="${csrfToken || document.querySelector('meta[name="csrf-token"]')?.content || ''}">
+                <input type="hidden" name="_method" value="DELETE">
+            `;
+            document.body.appendChild(form);
+            form.submit();
+        };
 
         window.generateResetPasswordModel = function(data) {
             let modalData = {

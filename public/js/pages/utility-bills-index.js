@@ -2,6 +2,7 @@
 function initUtilityBillsIndex() {
     const config = window.__utilityBillsIndex || {};
     const csrfToken = config.csrfToken;
+    const canDeveloperManage = config.currentUserRole === 'developer';
     let authLayout = 'table';
     let today = formatDate(new Date(), false, true);
 
@@ -45,6 +46,14 @@ function initUtilityBillsIndex() {
             },
         ];
 
+        if (canDeveloperManage) {
+            bottomActions.push({
+                id: "delete-utility-bill",
+                text: "Delete",
+                onclick: `submitUtilityBillDelete(${data.id})`,
+            });
+        }
+
         if (!data.is_paid) {
             bottomActions.push({
                 id: "mark-paid",
@@ -75,7 +84,7 @@ function initUtilityBillsIndex() {
             x: e.pageX,
             y: e.pageY,
             actions: [
-                { id: 'edit', text: 'Edit', href: `/utility-bills/${data.id}/edit` },
+                { id: 'edit', text: 'Edit', link: `/utility-bills/${data.id}/edit` },
             ],
             onlyThisActions: true,
         };
@@ -83,7 +92,14 @@ function initUtilityBillsIndex() {
         if (!data.is_paid) {
             contextMenuData.actions.push({id: 'mark-paid', text: 'Mark Paid', onclick: `markThisPaid(${data.id})`})
         }
+        if (canDeveloperManage) {
+            contextMenuData.actions.push({ id: 'delete-utility-bill', text: 'Delete', onclick: `submitUtilityBillDelete(${data.id})` });
+        }
         createContextMenu(contextMenuData);
+    }
+
+    window.submitUtilityBillDelete = function(id) {
+        submitDeleteForm(`/utility-bills/${id}`, csrfToken);
     }
 
     window.markThisPaid = function(id) {
@@ -120,6 +136,18 @@ function initUtilityBillsIndex() {
         }
 
         console.error(message);
+    }
+
+    function submitDeleteForm(action, token) {
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = action;
+        form.innerHTML = `
+            <input type="hidden" name="_token" value="${token || document.querySelector('meta[name="csrf-token"]')?.content || ""}">
+            <input type="hidden" name="_method" value="DELETE">
+        `;
+        document.body.appendChild(form);
+        form.submit();
     }
 }
 
