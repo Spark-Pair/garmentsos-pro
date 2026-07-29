@@ -40,6 +40,20 @@
 
                             selectThisOption(employeeUL.querySelector("li"));
                             employeeSelectDom.disabled = false;
+
+                            const editConfig = window.__employeePaymentEdit || null;
+                            if (editConfig && elem.value === editConfig.category) {
+                                const selectedEmployeeOption = employeeUL.querySelector(`li[data-value="${editConfig.employee_id}"]`);
+                                if (selectedEmployeeOption) {
+                                    selectThisOption(selectedEmployeeOption);
+                                }
+                                const selectedMethodOption = methodSelectDom
+                                    ?.closest(".selectParent")
+                                    ?.querySelector(`ul li[data-value="${editConfig.method}"]`);
+                                if (selectedMethodOption) {
+                                    selectThisOption(selectedMethodOption);
+                                }
+                            }
                         }
                     },
                     error: function (xhr, status, error) {

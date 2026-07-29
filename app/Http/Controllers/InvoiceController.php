@@ -15,6 +15,7 @@ use App\Services\Branches\BranchSerialService;
 use App\Services\Branches\ModuleBranchService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -455,6 +456,71 @@ class InvoiceController extends Controller
     public function edit(invoice $invoice)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($invoice, 'invoices');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $invoice->load(['customer.city', 'invoiceArticles.article', 'order', 'shipment']);
+
+        $customers = Customer::with('city')
+            ->orderBy('customer_name')
+            ->get()
+            ->mapWithKeys(fn (Customer $customer) => [
+                $customer->id => [
+                    'text' => trim($customer->customer_name . ' | ' . ($customer->city?->title ?? '-')),
+                    'data_option' => [
+                        'id' => $customer->id,
+                        'customer_name' => $customer->customer_name,
+                        'city' => $customer->city ? [
+                            'id' => $customer->city->id,
+                            'title' => $customer->city->title,
+                            'short_title' => $customer->city->short_title,
+                        ] : null,
+                    ],
+                ],
+            ])
+            ->all();
+
+        $articles = Article::orderBy('article_no')
+            ->get()
+            ->mapWithKeys(fn (Article $article) => [
+                $article->id => [
+                    'text' => trim($article->article_no . ' | ' . ($article->description ?? '')),
+                    'data_option' => [
+                        'id' => $article->id,
+                        'article_no' => $article->article_no,
+                        'description' => $article->description,
+                        'pcs_per_packet' => $article->pcs_per_packet,
+                        'sales_rate' => $article->sales_rate,
+                    ],
+                ],
+            ])
+            ->all();
+
+        $branches = app(ModuleBranchService::class);
+        $ordersOptions = $branches->applyRelatedScope(Order::query(), 'orders', 'invoices')
+            ->where(function ($query) use ($invoice) {
+                $query->where('status', '!=', 'invoiced');
+
+                if ($invoice->order_no) {
+                    $query->orWhere('order_no', $invoice->order_no);
+                }
+            })
+            ->orderByDesc('id')
+            ->pluck('order_no', 'order_no')
+            ->map(fn ($orderNo) => ['text' => $orderNo])
+            ->toArray();
+
+        $shipmentsOptions = $branches->applyRelatedScope(Shipment::query(), 'shipments', 'invoices')
+            ->orderByDesc('id')
+            ->pluck('shipment_no', 'shipment_no')
+            ->map(fn ($shipmentNo) => ['text' => $shipmentNo])
+            ->toArray();
+
+        $branchBranding = app(ModuleBranchService::class)->documentBranding('invoices');
+
+        return view('invoices.edit', compact('invoice', 'customers', 'articles', 'branchBranding', 'ordersOptions', 'shipmentsOptions'));
     }
 
     /**
@@ -463,6 +529,79 @@ class InvoiceController extends Controller
     public function update(Request $request, invoice $invoice)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($invoice, 'invoices');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $dependencies = $this->dependencyCounts([
+            'bilty' => ['bilties', 'invoice_id', $invoice->id],
+            'sales returns' => ['sales_returns', 'invoice_id', $invoice->id],
+            'cargo lists' => function () use ($invoice) {
+                return DB::table('cargos')
+                    ->where('invoices_array', 'like', '%"id":' . $invoice->id . '%')
+                    ->orWhere('invoices_array', 'like', '%"id":"' . $invoice->id . '"%')
+                    ->count();
+            },
+        ]);
+
+        if (!empty($dependencies)) {
+            return redirect()->back()
+                ->withInput()
+                ->with('error', $this->dependencyBlockMessage('Invoice', $dependencies));
+        }
+
+        $validated = $request->validate([
+            'invoice_no' => ['required', 'string', 'max:255'],
+            'order_no' => ['nullable', 'string', 'max:255'],
+            'shipment_no' => ['nullable', 'string', 'max:255'],
+            'customer_id' => ['required', 'exists:customers,id'],
+            'date' => ['required', 'date'],
+            'netAmount' => ['required'],
+            'cotton_count' => ['nullable', 'integer', 'min:0'],
+            'articles' => ['required', 'array', 'min:1'],
+            'articles.*.id' => ['nullable', 'integer', 'exists:invoice_articles,id'],
+            'articles.*.article_id' => ['required', 'integer', 'exists:articles,id'],
+            'articles.*.description' => ['nullable', 'string', 'max:255'],
+            'articles.*.invoice_pcs' => ['required', 'integer', 'min:1'],
+        ]);
+
+        DB::transaction(function () use ($invoice, $validated) {
+            $invoice->update([
+                'invoice_no' => $validated['invoice_no'],
+                'order_no' => $validated['order_no'] ?: null,
+                'shipment_no' => $validated['shipment_no'] ?: null,
+                'customer_id' => $validated['customer_id'],
+                'date' => $validated['date'],
+                'netAmount' => (int) str_replace(',', '', (string) $validated['netAmount']),
+                'cotton_count' => $validated['cotton_count'] ?? null,
+            ]);
+
+            $keptIds = [];
+            foreach ($validated['articles'] as $line) {
+                $lineData = [
+                    'article_id' => (int) $line['article_id'],
+                    'description' => $line['description'] ?? null,
+                    'invoice_pcs' => (int) $line['invoice_pcs'],
+                ];
+
+                if (!empty($line['id'])) {
+                    $invoiceArticle = $invoice->invoiceArticles()->whereKey($line['id'])->firstOrFail();
+                    $invoiceArticle->update($lineData);
+                    $keptIds[] = (int) $invoiceArticle->id;
+                    continue;
+                }
+
+                $created = $invoice->invoiceArticles()->create($lineData);
+                $keptIds[] = (int) $created->id;
+            }
+
+            $invoice->invoiceArticles()
+                ->when(!empty($keptIds), fn ($query) => $query->whereNotIn('id', $keptIds))
+                ->delete();
+        });
+
+        return redirect()->route('invoices.index')->with('success', 'Invoice updated successfully.');
     }
 
     /**
@@ -471,6 +610,32 @@ class InvoiceController extends Controller
     public function destroy(invoice $invoice)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($invoice, 'invoices');
+
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $dependencies = $this->dependencyCounts([
+            'bilty' => ['bilties', 'invoice_id', $invoice->id],
+            'sales returns' => ['sales_returns', 'invoice_id', $invoice->id],
+            'cargo lists' => function () use ($invoice) {
+                return DB::table('cargos')
+                    ->where('invoices_array', 'like', '%"id":' . $invoice->id . '%')
+                    ->orWhere('invoices_array', 'like', '%"id":"' . $invoice->id . '"%')
+                    ->count();
+            },
+        ]);
+
+        if (!empty($dependencies)) {
+            return redirect()->back()->with('error', $this->dependencyBlockMessage('Invoice', $dependencies));
+        }
+
+        DB::transaction(function () use ($invoice) {
+            $invoice->invoiceArticles()->delete();
+            $invoice->delete();
+        });
+
+        return redirect()->route('invoices.index')->with('success', 'Invoice deleted successfully.');
     }
 
     public function print()

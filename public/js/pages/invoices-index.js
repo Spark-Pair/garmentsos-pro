@@ -173,6 +173,20 @@
             ],
         };
 
+        if (isDeveloperUser()) {
+            contextMenuData.actions.push({
+                id: 'edit-invoice',
+                text: 'Edit',
+                link: `/invoices/${data.id}/edit`,
+            });
+
+            contextMenuData.actions.push({
+                id: 'delete-invoice',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/invoices/${data.id}')`,
+            });
+        }
+
         createContextMenu(contextMenuData);
     };
 
@@ -186,6 +200,20 @@
                 { id: 'print', text: 'Print Invoice', onclick: 'printInvoice(this)' },
             ],
         };
+
+        if (isDeveloperUser()) {
+            modalData.bottomActions.push({
+                id: 'edit-invoice',
+                text: 'Edit',
+                link: `/invoices/${data.id}/edit`,
+            });
+
+            modalData.bottomActions.push({
+                id: 'delete-invoice',
+                text: 'Delete',
+                onclick: `submitResourceDelete('/invoices/${data.id}')`,
+            });
+        }
 
         createModal(modalData);
     };

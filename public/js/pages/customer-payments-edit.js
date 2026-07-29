@@ -1,6 +1,7 @@
 (() => {
 function initCustomerPaymentsEdit() {
     const config = window.__customerPaymentsEdit || {};
+    const isDeveloper = config.isDeveloper === true;
     let customerPayment = config.customerPayment;
     window.__cpBanksOptions = config.banksOptions || {};
     customerPayment.remarks = customerPayment.remarks || '';
@@ -287,7 +288,7 @@ function initCustomerPaymentsEdit() {
             safeSelect(document.querySelector(`li[data-for="bank"][data-value="${customerPayment.bank_id}"]`));
         } else if (elem.value == 'slip') {
             detailsDom.innerHTML = [
-                buildInput({ label: 'Customer', name: 'customer', id: 'customer', placeholder: 'Enter Customer', value: selectedCustomer?.customer_name || '', disabled: true, required: true }),
+                buildInput({ label: 'Customer', name: 'customer', id: 'customer', placeholder: 'Enter Customer', value: selectedCustomer?.customer_name || '', disabled: !isDeveloper, required: true }),
                 buildInput({ label: 'Amount', name: 'amount', id: 'amount', type: 'amount', placeholder: 'Enter amount', value: customerPayment.amount, dataValidate: 'required|amount', oninput: 'validateInput(this)', required: true }),
                 buildInput({ label: 'Slip Date', name: 'slip_date', id: 'slip_date', type: 'date', value: formatDate(customerPayment.slip_date, false, true), required: true }),
                 buildInput({ label: 'Slip No', name: 'slip_no', id: 'slip_no', placeholder: 'Enter slip no', value: customerPayment.slip_no, dataValidate: 'required|friendly', oninput: 'validateInput(this)', required: true }),
@@ -320,10 +321,10 @@ function initCustomerPaymentsEdit() {
                 }
 
                 detailsDom.innerHTML = [
-                    buildInput({ label: 'Category', name: 'category', id: 'category', value: selectedProgramData.category, disabled: true }),
-                    buildInput({ label: 'Beneficiary', name: 'beneficiary', id: 'beneficiary', value: selectedProgramData.beneficiary, disabled: true }),
-                    buildInput({ label: 'Program Date', name: 'program_date', id: 'program_date', value: selectedProgramData.date, disabled: true }),
-                    buildInput({ label: 'Program Balance', name: 'program_balance', id: 'program_balance', type: 'number', value: selectedProgramData.balance, disabled: true }),
+                    buildInput({ label: 'Category', name: 'category', id: 'category', value: selectedProgramData.category, disabled: !isDeveloper }),
+                    buildInput({ label: 'Beneficiary', name: 'beneficiary', id: 'beneficiary', value: selectedProgramData.beneficiary, disabled: !isDeveloper }),
+                    buildInput({ label: 'Program Date', name: 'program_date', id: 'program_date', value: selectedProgramData.date, disabled: !isDeveloper }),
+                    buildInput({ label: 'Program Balance', name: 'program_balance', id: 'program_balance', type: 'number', value: selectedProgramData.balance, disabled: !isDeveloper }),
                     buildInput({ label: 'Amount', name: 'amount', id: 'amount', type: 'amount', placeholder: 'Enter amount', value: customerPayment.amount, dataValidate: 'required|amount', oninput: 'validateInput(this)', required: true }),
                     buildSelect({ label: 'Bank Accounts', name: 'bank_account_id', id: 'bank_accounts', required: true, showDefault: true }),
                     buildInput({ label: 'Transaction Id', name: 'transaction_id', id: 'transaction_id', placeholder: 'Enter Transaction Id', value: customerPayment.transaction_id, dataValidate: 'required|friendly', oninput: 'validateInput(this)', required: true }),

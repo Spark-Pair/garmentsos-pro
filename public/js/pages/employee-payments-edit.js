@@ -1,6 +1,7 @@
 (() => {
     function initEmployeePaymentsEdit() {
         const config = window.__employeePaymentsEdit || {};
+        const isDeveloper = config.isDeveloper === true;
         const templates = config.templates || {};
 
         window.chequeNos = config.chequeNos || '';
@@ -25,6 +26,18 @@
                 html = html.replaceAll(`__${key}__`, value);
             });
             return html;
+        }
+
+        function unlockDeveloperEditFields(scope = document) {
+            if (!isDeveloper) return;
+
+            scope.querySelectorAll('input[disabled], select[disabled], textarea[disabled]').forEach((input) => {
+                input.disabled = false;
+            });
+            scope.querySelectorAll('input[readonly], textarea[readonly]').forEach((input) => {
+                input.readOnly = false;
+                input.removeAttribute('readonly');
+            });
         }
 
         function setOptionOnNthLi(triggerDom, index, key, value = '') {
@@ -199,6 +212,7 @@
                 }
             }
 
+            unlockDeveloperEditFields(detailsDom);
             formatAllAmountInputs();
         };
 

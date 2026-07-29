@@ -1,6 +1,7 @@
 (() => {
 function initVouchersEdit() {
     const config = window.__vouchersEdit || {};
+    const isDeveloper = config.isDeveloper === true;
     const voucherType = config.voucherType;
     const voucher = config.voucher;
     const companyData = config.branchBranding || config.companyData;
@@ -273,7 +274,7 @@ function initVouchersEdit() {
                     data_validate: 'required|amount',
                     required: true,
                     placeholder: 'Enter amount',
-                    readonly: true,
+                    readonly: !isDeveloper,
                     oninput: 'validateInput(this)'
                 },
                 {
@@ -310,7 +311,7 @@ function initVouchersEdit() {
                     data_validate: 'required|amount',
                     required: true,
                     placeholder: 'Enter amount',
-                    readonly: true,
+                    readonly: !isDeveloper,
                     oninput: 'validateInput(this)'
                 },
                 {
@@ -336,7 +337,7 @@ function initVouchersEdit() {
                     data_validate: 'required|amount',
                     required: true,
                     placeholder: 'Enter amount',
-                    readonly: true,
+                    readonly: !isDeveloper,
                     oninput: 'validateInput(this)'
                 },
                 {
