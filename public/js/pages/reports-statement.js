@@ -195,7 +195,7 @@
                     Remarks: data.remarks,
                 },
                 bottomActions: [
-                    { id: "edit", text: "Edit Balance Entry", dataId: data.id, link: `/statement-adjustments/${data.id}/edit` },
+                    { id: "edit", text: "Edit", dataId: data.id, link: `/statement-adjustments/${data.id}/edit` },
                 ],
             });
         }

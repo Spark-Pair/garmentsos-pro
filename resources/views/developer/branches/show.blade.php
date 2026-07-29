@@ -413,7 +413,7 @@
                                             @foreach (['can_view' => 'View', 'can_create' => 'Create', 'can_update' => 'Update', 'can_delete' => 'Delete', 'can_switch' => 'Switch', 'can_manage' => 'Manage'] as $field => $label)
                                                 <label class="flex items-center justify-between gap-3 rounded-xl border border-[var(--h-bg-color)] bg-[var(--h-bg-color)]/35 px-3 py-2 text-xs text-[var(--secondary-text)] transition hover:border-[var(--primary-color)]/40">
                                                     <span>{{ $label }}</span>
-                                                    <x-toggle-switch :name="$field" :checked="in_array($field, ['can_view', 'can_switch'], true)" />
+                                                    <x-toggle-switch :name="$field" :checked="true" />
                                                 </label>
                                             @endforeach
                                         </div>

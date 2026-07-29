@@ -1,6 +1,8 @@
 (() => {
     function initBankAccountsCreate(config) {
         const csrfToken = config?.csrfToken;
+        const selectedCategory = config?.selectedCategory || "";
+        const selectedSubCategory = config?.selectedSubCategory ? String(config.selectedSubCategory) : "";
 
     const serialEnd = document.getElementById('cheque_book_serial_end');
     if (serialEnd) {
@@ -110,9 +112,19 @@
                             break;
                     }
                     subCategorySelectOptionsDom.innerHTML = clutter;
+                    if (selectedSubCategory && (value === 'supplier' || value === 'customer')) {
+                        const option = subCategorySelectOptionsDom.querySelector(`[data-value="${CSS.escape(selectedSubCategory)}"]`);
+                        if (option) {
+                            selectThisOption(option);
+                        }
+                    }
                 }
             });
         }
+    }
+
+    if (selectedCategory && selectedCategory !== "waiting") {
+        getCategoryData(selectedCategory);
     }
 }
 
