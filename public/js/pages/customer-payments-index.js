@@ -12,17 +12,17 @@ function initCustomerPaymentsIndex() {
                 class="item row relative group flex justify-between border-b border-[var(--h-bg-color)] items-center py-2 cursor-pointer hover:bg-[var(--h-secondary-bg-color)] transition-all fade-in ease-in-out"
                 data-json='${jsonAttr(data)}'>
 
-                <span class="text-center w-1/10">${data.details['Date']}</span>
-                <span class="text-center w-1/7">${data.name}</span>
-                <span class="text-center w-1/7">${data.supplier_name ?? '-'}</span>
-                <span class="text-center w-1/7">${data.beneficiary}</span>
-                <span class="text-center w-1/11 capitalize">${data.details["Method"]}</span>
-                <span class="text-center w-1/10">${data.details['Amount']}</span>
-                <span class="text-center w-1/10">${data.reff_no}</span>
-                <span class="text-center w-1/10">${data.clear_date ?? '-'}</span>
-                <span class="text-center w-1/9">${data.cleared_amount ?? '-'}</span>
-                <span class="text-center w-1/10">${data.voucher_no}</span>
-                <span class="text-center w-1/10">${data.d_r_no}</span>
+                <span class="text-center w-1/8">${data.details['Date']}</span>
+                <span class="text-center w-1/4">${data.name}</span>
+                <span class="text-center w-1/6">${data.supplier_name ?? '-'}</span>
+                <span class="text-center w-1/6">${data.beneficiary}</span>
+                <span class="text-center w-1/12 capitalize">${data.details["Method"]}</span>
+                <span class="text-center w-1/12">${data.details['Amount']}</span>
+                <span class="text-center w-1/12">${data.reff_no}</span>
+                <span class="text-center w-1/8">${data.clear_date ?? '-'}</span>
+                <span class="text-center w-1/10">${data.cleared_amount ?? '-'}</span>
+                <span class="text-center w-1/11">${data.voucher_no}</span>
+                <span class="text-center w-1/12">${data.d_r_no}</span>
             </div>
         `;
     }
