@@ -21,7 +21,7 @@ trait ProductionComputed
             'ticket' => $this->ticket,
             'issue_date' => $this->issue_date?->format('d-M-Y, D') ?? '-',
             'receive_date' => $this->receive_date?->format('d-M-Y, D') ?? '-',
-            'quantity' => $this->quantity,
+            'quantity' => $this->article?->quantity,
             'rate' => $this->rate,
             'amount' => $this->amount,
             'title' => $this->title,
