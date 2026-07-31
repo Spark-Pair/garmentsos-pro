@@ -64,7 +64,7 @@
                 />
 
                 {{-- c_r_no --}}
-                <x-input label="CR No." name="c_r_no" id="c_r_no" required value="CR-"/>
+                <x-input label="CR No." name="c_r_no" id="c_r_no" required value=""/>
             </div>
             <input type="hidden" name="returnPayments" id="selectedPaymentsArray">
             {{-- show-payment-table --}}
