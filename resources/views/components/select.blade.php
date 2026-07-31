@@ -41,20 +41,30 @@
 
     // Highlight default if not disabled and no selection
     $showDefaultSelected = !$isDisabled && $resolvedValue === '' && $showDefault;
+
+    $hasServerError = $errors->has($name);
 @endphp
 
 <style>
+    /*
+     * Original select dropdown behaviour.
+     * DOM structure and all JS hooks remain unchanged.
+     */
     .dropDownParent {
         opacity: 0;
         pointer-events: none;
-        transition: opacity 0.3s ease-in-out, translate 0.3s ease-in-out;
+        transition:
+            opacity 0.3s ease-in-out,
+            translate 0.3s ease-in-out;
         translate: 0 -10px;
     }
+
     .selectParent:has(input:focus) .dropDownParent {
         opacity: 1;
         pointer-events: all;
         translate: 0;
     }
+
     .selected {
         background-color: var(--h-bg-color);
     }
@@ -63,11 +73,20 @@
 <div class="{{ $class }} form-group">
     @if ($label)
         <span class="flex items-center justify-between mb-2">
-            <label for="{{ $name }}" class="block font-medium text-[var(--secondary-text)]">
+            <label
+                for="{{ $name }}"
+                class="block font-medium text-[var(--secondary-text)]"
+            >
                 {{ $label }}
             </label>
+
             @if ($addBtnLink !== '')
-                <a class='text-lg px-2 leading-none' href="{{ $addBtnLink }}">+</a>
+                <a
+                    class="text-lg px-2 leading-none"
+                    href="{{ $addBtnLink }}"
+                >
+                    +
+                </a>
             @endif
         </span>
     @endif
@@ -78,18 +97,15 @@
             id="{{ $id }}"
             name="{{ $id }}_name"
             parentGrow
-            {{-- oninput="searchSelect(this)" --}}
-            {{-- onblur="validateSelectInput(this)" --}}
             autocomplete="off"
             :disabled="$isDisabled"
             :value="$isDisabled ? '' : $selectedText"
             :placeholder="$placeholderText"
             onfocus="selectClicked(this)"
-            {{-- onkeydown="selectKeyDown(event, this)" --}}
             :dataClearable="$dataClearable"
             :dataValidate="$required ? 'required' : ''"
             data-error-for="{{ $name }}"
-            isSelect
+            :showError="true"
         />
 
         {{-- Hidden Input --}}
@@ -101,11 +117,15 @@
             value="{{ $isDisabled ? '' : $resolvedValue }}"
             {!! $onchange ? 'onchange="' . $onchange . '"' : '' !!}
             {!! $dataFilterPath ? 'data-filter-path="' . $dataFilterPath . '"' : '' !!}
-            @if ($dataClearable) data-clearable @endif
+            @if ($dataClearable)
+                data-clearable
+            @endif
         >
 
         {{-- Dropdown List --}}
-        <div class="dropDownParent flex flex-col gap-2 fixed z-50 mt-2 w-full rounded-xl bg-[var(--secondary-bg-color)] border-gray-600 text-[var(--text-color)] p-1.5 border appearance-none focus:ring-2 focus:ring-primary focus:border-transparent max-h-[13rem]">
+        <div
+            class="dropDownParent flex flex-col gap-2 fixed z-50 mt-2 w-full rounded-xl bg-[var(--secondary-bg-color)] border-gray-600 text-[var(--text-color)] p-1.5 border appearance-none focus:ring-2 focus:ring-primary focus:border-transparent max-h-[13rem]"
+        >
             <x-input
                 data-for="{{ $id }}"
                 oninput="searchSelect(this)"
@@ -115,7 +135,9 @@
                 :placeholder="$placeholderText"
                 onkeydown="selectKeyDown(event, this)"
                 :dataClearable="$dataClearable"
+                :showError="false"
             />
+
             <ul
                 class="optionsDropdown overflow-auto my-scrollbar-2 space-y-0.5 grow"
                 data-for="{{ $id }}"
@@ -134,22 +156,54 @@
                 @foreach ($options as $optionValue => $option)
                     @php
                         $dataOptionAttr = null;
+
                         if (isset($option['data_option'])) {
                             $rawDataOption = $option['data_option'];
-                            if ($rawDataOption instanceof \Illuminate\Database\Eloquent\Model) {
-                                $dataOptionAttr = json_encode($rawDataOption->attributesToArray(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                            } elseif ($rawDataOption instanceof \Illuminate\Support\Collection) {
+
+                            if (
+                                $rawDataOption instanceof
+                                \Illuminate\Database\Eloquent\Model
+                            ) {
+                                $dataOptionAttr = json_encode(
+                                    $rawDataOption->attributesToArray(),
+                                    JSON_UNESCAPED_UNICODE |
+                                    JSON_UNESCAPED_SLASHES
+                                );
+                            } elseif (
+                                $rawDataOption instanceof
+                                \Illuminate\Support\Collection
+                            ) {
                                 $safeCollection = $rawDataOption
-                                    ->map(fn ($item) => $item instanceof \Illuminate\Database\Eloquent\Model ? $item->attributesToArray() : $item)
+                                    ->map(
+                                        fn ($item) =>
+                                            $item instanceof
+                                            \Illuminate\Database\Eloquent\Model
+                                                ? $item->attributesToArray()
+                                                : $item
+                                    )
                                     ->all();
-                                $dataOptionAttr = json_encode($safeCollection, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                            } elseif (is_array($rawDataOption) || is_object($rawDataOption)) {
-                                $dataOptionAttr = json_encode($rawDataOption, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+                                $dataOptionAttr = json_encode(
+                                    $safeCollection,
+                                    JSON_UNESCAPED_UNICODE |
+                                    JSON_UNESCAPED_SLASHES
+                                );
+                            } elseif (
+                                is_array($rawDataOption) ||
+                                is_object($rawDataOption)
+                            ) {
+                                $dataOptionAttr = json_encode(
+                                    $rawDataOption,
+                                    JSON_UNESCAPED_UNICODE |
+                                    JSON_UNESCAPED_SLASHES
+                                );
                             } else {
-                                $dataOptionAttr = (string) $rawDataOption;
+                                $dataOptionAttr =
+                                    (string) $rawDataOption;
                             }
                         }
                     @endphp
+
                     <li
                         data-for="{{ $id }}"
                         data-value="{{ $optionValue }}"
@@ -157,14 +211,20 @@
                         @if (!is_null($dataOptionAttr))
                             data-option="{{ $dataOptionAttr }}"
                         @endif
-                        @if (isset($option['selected'])) data-auto-select="true" @endif
+                        @if (isset($option['selected']))
+                            data-auto-select="true"
+                        @endif
                         class="py-2 px-3 cursor-pointer rounded-lg transition hover:bg-[var(--h-bg-color)] text-nowrap overflow-x-auto scrollbar-hidden {{ !$isDisabled && $optionValue == $resolvedValue ? 'selected' : '' }}"
                     >
                         {{ $option['text'] }}
                     </li>
+
                     @if (isset($option['selected']))
                         @once
-                            <script defer src="{{ asset('js/components/select-autoselect.js') }}"></script>
+                            <script
+                                defer
+                                src="{{ asset('js/components/select-autoselect.js') }}"
+                            ></script>
                         @endonce
                     @endif
                 @endforeach
@@ -173,20 +233,14 @@
 
         {{-- Optional Button --}}
         @if ($withButton)
-            <button onclick="{{ $btnOnclick }}" id="{{ $btnId }}" type="button"
-                class="bg-[var(--primary-color)] px-4 rounded-lg hover:bg-[var(--h-primary-color)] transition-all duration-300 ease-in-out cursor-pointer {{ $btnText === '+' ? 'text-lg font-bold' : 'text-nowrap' }} disabled:opacity-50 disabled:cursor-not-allowed">
+            <button
+                onclick="{{ $btnOnclick }}"
+                id="{{ $btnId }}"
+                type="button"
+                class="bg-[var(--primary-color)] px-4 rounded-lg hover:bg-[var(--h-primary-color)] transition-all duration-300 ease-in-out cursor-pointer {{ $btnText === '+' ? 'text-lg font-bold' : 'text-nowrap' }} disabled:opacity-50 disabled:cursor-not-allowed"
+            >
                 {{ $btnText }}
             </button>
         @endif
     </div>
-
-    {{-- Validation --}}
-    @error($name)
-        <div class="text-[var(--border-error)] text-xs mt-1 transition-all duration-300 ease-in-out">
-            {{ $message }}
-        </div>
-    @enderror
-
-    <div id="{{ $name }}-error"
-        class="text-[var(--border-error)] text-xs mt-1 hidden transition-all duration-300 ease-in-out"></div>
 </div>

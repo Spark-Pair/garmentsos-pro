@@ -1,14 +1,14 @@
 @props([
-    'label' => '',          // Label text for the input
-    'name' => '',           // Input name
-    'type' => 'text',       // Input type (text, password, etc.)
-    'placeholder' => '',    // Placeholder text
-    'value' => '',          // Default value
-    'required' => false,     // If the input is required
-    'disabled' => false,     // If the input is disabled
-    'uppercased' => false,     // If the input is uppercased
-    'capitalized' => false,     // If the input is uppercased
-    'class' => '',     // If the input is uppercased
+    'label' => '',
+    'name' => '',
+    'type' => 'text',
+    'placeholder' => '',
+    'value' => '',
+    'required' => false,
+    'disabled' => false,
+    'uppercased' => false,
+    'capitalized' => false,
+    'class' => '',
     'id' => '',
     'list' => '',
     'autocomplete' => 'on',
@@ -22,7 +22,7 @@
     'imgUrl' => '',
     'withButton' => false,
     'btnId' => '',
-    'btnText' => "+",
+    'btnText' => '+',
     'btnClass' => '',
     'onchange' => '',
     'oninput' => '',
@@ -39,76 +39,70 @@
     'withCheckbox' => false,
     'checkBoxes' => [],
     'addBtnLink' => '',
-    'isSelect' => false,
+    'showError' => true,
 ])
 
 @if ($uppercased)
     <style>
-        input#{{ $id }} {
-            text-transform: uppercase;
-        }
-
-        input#{{ $id }}::placeholder {
-            text-transform: none;
-        }
+        input#{{ $id }} { text-transform: uppercase; }
+        input#{{ $id }}::placeholder { text-transform: none; }
     </style>
 @endif
 
 @if ($capitalized)
     <style>
-        input#{{ $id }} {
-            text-transform: capitalize;
-        }
-
-        input#{{ $id }}::placeholder {
-            text-transform: none;
-        }
+        input#{{ $id }} { text-transform: capitalize; }
+        input#{{ $id }}::placeholder { text-transform: none; }
     </style>
 @endif
 
-@if ($type == 'username')
+@if ($type === 'username')
     @php
         $type = 'text';
         $oninput = 'formatUsername(this)';
         $minlength = '6';
     @endphp
-
 @endif
 
-<div class="form-group relative {{$parentGrow ? "grow" : ""}}">
-    @if($label)
-        <span class="flex items-center justify-between mb-2">
-            <label for="{{ $name }}" class="block font-medium text-[var(--secondary-text)]">
-                {{ $label }}{{ !$required && !$required && !$readonly && !$disabled ? ' (optional)' : '' }}
+@php
+    // For custom selects, data-error-for is the real hidden database field name.
+    $errorTargetName = $attributes->get('data-error-for') ?: $name;
+    $hasServerError = $showError && $errors->has($errorTargetName);
+    $hasRightAccessory = $withImg;
+    $inputRightPadding = $showError
+        ? ($hasRightAccessory ? 'pr-14' : 'pr-3')
+        : ($hasRightAccessory ? 'pr-3' : '');
+    $errorIconRight = $hasRightAccessory ? 'right-8' : 'right-3';
+@endphp
+
+<div class="form-group relative {{ $parentGrow ? 'grow' : '' }} {{ $hasServerError ? 'has-field-error' : '' }}">
+    @if ($label)
+        <span class="mb-2 flex items-center justify-between">
+            <label for="{{ $id ?: $name }}" class="block font-medium text-[var(--secondary-text)]">
+                {{ $label }}{{ !$required && !$readonly && !$disabled ? ' (optional)' : '' }}
             </label>
             @if ($addBtnLink !== '')
-                <a class='text-lg px-2 leading-none' href="{{ $addBtnLink }}">+</a>
+                <a class="px-2 text-lg leading-none" href="{{ $addBtnLink }}">+</a>
             @endif
         </span>
     @endif
 
-    <div class="relative flex gap-4">
+    <div class="field-control relative flex gap-4">
         @if ($withCheckbox)
-            <div
-                {{ $attributes->merge([
-                    'class' => $class . ' w-full rounded-lg ' .
-                        ($errors->has($name) ? 'border-[var(--border-error)]' : 'border-gray-600') .
-                        ' text-[var(--text-color)] px-1 py-1 ' .
-                        ' border focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out disabled:bg-transparent placeholder:capitalize'
-                ]) }}
-            >
-                <div class="checkboxes_container grid gap-1 grid-cols-4">
+            <div {{ $attributes->merge([
+                'class' => $class . ' w-full rounded-lg border px-1 py-1 text-[var(--text-color)] ' .
+                    ($hasServerError ? 'border-[var(--border-error)]' : 'border-gray-600')
+            ]) }}>
+                <div class="checkboxes_container grid grid-cols-4 gap-1">
                     @foreach ($checkBoxes as $checkbox)
-                        <label class="flex items-center gap-2 cursor-pointer rounded-md border border-[var(--h-bg-color)] bg-[var(--h-bg-color)] px-2 py-[0.1875rem] shadow-sm transition hover:shadow-md hover:border-primary">
+                        <label class="flex cursor-pointer items-center gap-2 rounded-md border border-[var(--h-bg-color)] bg-[var(--h-bg-color)] px-2 py-[0.1875rem] shadow-sm transition hover:border-primary hover:shadow-md">
                             <input
                                 type="checkbox"
                                 onchange="toggleThisCheckbox(this)"
                                 data-checkbox="{{ $checkbox }}"
-                                class="checkbox appearance-none bg-[var(--secondary-bg-color)] w-4 h-4 border border-gray-600 rounded-sm checked:bg-[var(--primary-color)] transition"
+                                class="checkbox h-4 w-4 appearance-none rounded-sm border border-gray-600 bg-[var(--secondary-bg-color)] transition checked:bg-[var(--primary-color)]"
                             />
-                            <span class="text-sm font-medium text-[var(--secondary-text)] capitalize">
-                                {{ ucfirst($checkbox) }}
-                            </span>
+                            <span class="text-sm font-medium capitalize text-[var(--secondary-text)]">{{ ucfirst($checkbox) }}</span>
                         </label>
                     @endforeach
                 </div>
@@ -118,36 +112,34 @@
                 id="{{ $id }}"
                 type="{{ $type }}"
                 name="{{ $name }}"
-                @if ($value != '')
-                    value="{{ old($name, $value) }}"
-                @endif
+                @if ($value !== '') value="{{ old($name, $value) }}" @endif
                 placeholder="{{ $placeholder }}"
                 autocomplete="{{ $autocomplete }}"
-                list="{{ $list }}"
-                {{ $required ? 'required' : '' }}
-                {{ $readonly ? 'readonly' : '' }}
-                {{ $disabled ? 'disabled' : '' }}
+                @if ($list !== '') list="{{ $list }}" @endif
+                @if ($required) required @endif
+                @if ($readonly) readonly @endif
+                @if ($disabled) disabled @endif
+                @if ($minlength !== '') minlength="{{ $minlength }}" @endif
                 {{ $attributes->merge([
-                    'class' => $class . ' w-full rounded-lg bg-[var(--h-bg-color)] ' .
-                        ($errors->has($name) ? 'border-[var(--border-error)]' : 'border-gray-600') .
-                        ' text-[var(--text-color)] px-3 ' .
-                        ($type == 'date' ? 'py-[7px]' : 'py-2') .
-                        ' border focus:ring-1 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out disabled:bg-transparent disabled:opacity-70 placeholder:capitalize'
+                    'class' => trim(
+                        $class . ' w-full rounded-lg border bg-[var(--h-bg-color)] px-3 text-[var(--text-color)] ' .
+                        ($type === 'date' ? 'py-[7px] ' : 'py-2 ') .
+                        $inputRightPadding . ' ' .
+                        ($hasServerError ? 'border-[var(--border-error)]' : 'border-gray-600') .
+                        ' transition-all duration-200 ease-out placeholder:capitalize disabled:bg-transparent disabled:opacity-70'
+                    )
                 ]) }}
-                {{ $dataValidate ? 'data-validate='.$dataValidate : '' }}
-                {{ $dataClean ? 'data-clean='.$dataClean : '' }}
-                {{ $validateMax ? 'max='.$max : '' }}
-                {{ $validateMin ? 'min='.$min : '' }}
-                {{ $onchange ? 'onchange='.$onchange : '' }}
-                {!! $oninput ? 'oninput="'.$oninput.'"' : '' !!}
-                {!! $dataFilterPath ? 'data-filter-path="' . $dataFilterPath . '"' : '' !!}
+                @if ($dataValidate) data-validate="{{ $dataValidate }}" @endif
+                @if ($dataClean) data-clean="{{ $dataClean }}" @endif
+                @if ($validateMax) max="{{ $max }}" @endif
+                @if ($validateMin) min="{{ $min }}" @endif
+                @if ($onchange) onchange="{{ $onchange }}" @endif
+                @if ($oninput) oninput="{{ $oninput }}" @endif
+                @if ($dataFilterPath) data-filter-path="{{ $dataFilterPath }}" @endif
                 @if ($dataClearable) data-clearable @endif
+                @if ($showError) aria-describedby="{{ $errorTargetName }}-error" @endif
+                @if ($hasServerError) aria-invalid="true" @endif
             />
-            @if ($isSelect)
-                <div class="selectDropdownIcon absolute right-2 top-1/2 -translate-y-1/2">
-                    <svg class="size-4 fill-[var(--secondary-text)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640"><path d="M300.3 440.8C312.9 451 331.4 450.3 343.1 438.6L471.1 310.6C480.3 301.4 483 287.7 478 275.7C473 263.7 461.4 256 448.5 256L192.5 256C179.6 256 167.9 263.8 162.9 275.8C157.9 287.8 160.7 301.5 169.9 310.6L297.9 438.6L300.3 440.8z"/></svg>
-                </div>
-            @endif
         @endif
 
         @if ($dualInput)
@@ -155,37 +147,46 @@
                 id="{{ $id2 }}"
                 type="{{ $type2 }}"
                 value="{{ $value2 }}"
-                {{ $attributes->merge([
-                    'class' => $class . ' w-full rounded-lg bg-[var(--h-bg-color)] ' .
-                        ($errors->has($name) ? 'border-[var(--border-error)]' : 'border-gray-600') .
-                        ' text-[var(--text-color)] px-3 ' .
-                        ($type == 'date' ? 'py-[7px]' : 'py-2') .
-                        ' border focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out disabled:bg-transparent placeholder:capitalize'
-                ]) }}
-                {!! $oninput ? 'oninput="'.$oninput.'"' : '' !!}
-                {!! $dataFilterPath ? 'data-filter-path="' . $dataFilterPath . '"' : '' !!}
+                class="{{ $class }} w-full rounded-lg border border-gray-600 bg-[var(--h-bg-color)] px-3 py-2 text-[var(--text-color)] transition-all duration-200"
+                @if ($oninput) oninput="{{ $oninput }}" @endif
+                @if ($dataFilterPath) data-filter-path="{{ $dataFilterPath }}" @endif
                 @if ($dataClearable) data-clearable @endif
             />
         @endif
+
         @if ($withImg)
-            <img id="img-{{ $id }}" src="{{ $imgUrl }}" alt="image" class="absolute right-2 top-1/2 transform -translate-y-1/2 w-6 h-6 cursor-pointer object-cover rounded {{ $imgUrl == '' ? 'opacity-0' : '' }}" onclick="openArticleModal()">
+            <img id="img-{{ $id }}" src="{{ $imgUrl }}" alt="image"
+                class="absolute right-2 top-1/2 h-6 w-6 -translate-y-1/2 cursor-pointer rounded object-cover {{ $imgUrl === '' ? 'opacity-0' : '' }}"
+                onclick="openArticleModal()">
         @endif
+
         @if ($withButton)
-            <button id="{{$btnId}}" type="button" class="{{ $btnClass }} bg-[var(--primary-color)] px-4 rounded-lg hover:bg-[var(--h-primary-color)] transition-all duration-300 ease-in-out cursor-pointer {{ $btnText === '+' ? 'text-lg font-bold' : 'text-nowrap' }} disabled:opacity-50 disabled:cursor-not-allowed">{!! $btnText !!}</button>
+            <button id="{{ $btnId }}" type="button"
+                class="{{ $btnClass }} cursor-pointer rounded-lg bg-[var(--primary-color)] px-4 transition-all duration-300 hover:bg-[var(--h-primary-color)] disabled:cursor-not-allowed disabled:opacity-50 {{ $btnText === '+' ? 'text-lg font-bold' : 'text-nowrap' }}">
+                {!! $btnText !!}
+            </button>
+        @endif
+
+        @if ($showError)
+            <div class="errorIconWrap absolute {{ $errorIconRight }} top-1/2 z-20 -translate-y-1/2">
+                <button type="button" tabindex="-1" aria-label="Validation error"
+                    class="errorIcon peer flex size-[20px] items-center justify-center rounded-full border border-[var(--border-error)] bg-[color-mix(in_srgb,var(--border-error)_10%,var(--secondary-bg-color))] text-[13px] font-bold leading-none text-[var(--border-error)] opacity-0 pointer-events-none transition-all duration-200">
+                    !
+                </button>
+
+                <div id="{{ $errorTargetName }}-error" role="alert"
+                    class="field-error-msg {{ $hasServerError ? '' : 'hidden' }} absolute bottom-[calc(100%+8px)] right-0 z-50 w-max min-w-[9rem] max-w-[230px] rounded-md border border-[color-mix(in_srgb,var(--border-error)_35%,transparent)] bg-[var(--secondary-bg-color)] px-3 py-2 text-xs font-medium leading-4 text-[var(--text-color)] shadow-[0_10px_30px_rgba(15,23,42,0.16)] opacity-0 pointer-events-none translate-y-1 transition-all duration-150 peer-hover:translate-y-0 peer-hover:opacity-100 peer-focus:translate-y-0 peer-focus:opacity-100">
+                    @error($errorTargetName){{ $message }}@enderror
+                </div>
+            </div>
         @endif
     </div>
 
-    @if($list != '')
+    @if ($list !== '')
         <datalist id="{{ $list }}">
             @foreach ($listOptions as $option)
                 <option value="{{ $option }}"></option>
             @endforeach
         </datalist>
     @endif
-
-    @error($name)
-        <div class="text-[var(--border-error)] text-xs mt-1 transition-all duration-300 ease-in-out">{{ $message }}</div>
-    @enderror
-
-    <div id="{{ $name }}-error" class="text-[var(--border-error)] text-xs mt-1 hidden transition-all duration-300 ease-in-out"></div>
 </div>

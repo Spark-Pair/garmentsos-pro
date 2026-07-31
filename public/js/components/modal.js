@@ -128,9 +128,9 @@ function createModal(data, animate = 'animate') {
                     </button>
                 </div>
 
-                ${data.info && !isMenuModal ?
-                    `<div class="${data.id}Info absolute z-10 ${data.calcBottom?.length > 0 ? 'bottom-14' : 'bottom-4'}  left-4 border border-[var(--glass-border-color)]/10 group bg-[var(--glass-border-color)]/5 backdrop-blur-md rounded-xl cursor-pointer flex items-center justify-end p-1 overflow-hidden h-auto pr-3 transition-all duration-300 ease-in-out shadow-md pointer-events-auto" >
-                        <div class="flex items-center justify-center bg-[var(--bg-color)] border border-[var(--glass-border-color)]/20 rounded-lg p-2" >
+                ${data.info ?
+                    `<div class="${data.id}Info absolute z-10 ${data.calcBottom?.length > 0 ? 'bottom-14' : isMenuModal ? 'bottom-9.5 left-9.5' : 'bottom-4 left-4 '} border border-[var(--glass-border-color)]/10 group bg-[var(--glass-border-color)]/5 backdrop-blur-md rounded-lg cursor-pointer flex items-center justify-end p-1 overflow-hidden h-auto pr-3 transition-all duration-300 ease-in-out shadow-md pointer-events-auto" >
+                        <div class="flex items-center justify-center bg-[var(--bg-color)] border border-[var(--glass-border-color)]/20 rounded-md p-2" >
                             <div class="transition-all duration-300 ease-in-out size-2.5 relative" >
                                 <i class="fas fa-info text-xs absolute top-1/2 left-1/2 -translate-1/2" ></i>
                             </div>
@@ -409,7 +409,7 @@ function createModal(data, animate = 'animate') {
     if (data.cards && isMenuModal) {
         clutter += `
             <div class="flex-1 flex flex-col ${data.image ? 'ml-8' : ''} h-full w-full overflow-hidden">
-                <div class="rounded-2xl border border-[var(--glass-border-color)]/25 bg-[var(--h-secondary-bg-color)]/80 shadow-sm overflow-hidden flex h-full flex-col">
+                <div class="rounded-3xl border border-[var(--glass-border-color)]/25 bg-[var(--h-secondary-bg-color)]/80 shadow-sm overflow-hidden flex h-full flex-col">
                     <div class="flex flex-col gap-4 border-b border-[var(--glass-border-color)]/20 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
                         <div class="flex items-center gap-3">
                             <span class="h-10 w-1.5 shrink-0 rounded-full bg-[var(--primary-color)]/80"></span>
@@ -419,7 +419,7 @@ function createModal(data, animate = 'animate') {
                             </div>
                         </div>
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                            <div class="${data.id}Info rounded-xl border border-[var(--glass-border-color)]/20 bg-[var(--h-bg-color)] px-3 py-2 text-xs font-semibold text-[var(--secondary-text)] shadow-sm">
+                            <div class="${data.id}Info rounded-lg border border-[var(--glass-border-color)]/20 bg-[var(--h-bg-color)] px-3 py-2 text-xs font-semibold text-[var(--secondary-text)] shadow-sm">
                                 ${data.info || ''}
                             </div>
                             ${data.basicSearch ? `<div class="form-group relative" id="basicSearch">
@@ -428,13 +428,13 @@ function createModal(data, animate = 'animate') {
                                         type="text"
                                         placeholder="Search menu..."
                                         autocomplete="off"
-                                        class="w-full rounded-xl bg-[var(--h-bg-color)] border border-[var(--glass-border-color)]/30 text-[var(--text-color)] px-3 py-2 focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out disabled:bg-transparent disabled:opacity-70"
+                                        class="w-full rounded-lg bg-[var(--h-bg-color)] border border-[var(--glass-border-color)]/30 text-[var(--text-color)] px-3 py-2 focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out disabled:bg-transparent disabled:opacity-70"
                                         oninput="${data.onBasicSearch}"
                                     />
 
                                     <button
                                         type="button"
-                                        class="bg-[var(--primary-color)] px-4 rounded-xl hover:bg-[var(--h-primary-color)] transition-all duration-300 ease-in-out cursor-pointer text-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                                        class="bg-[var(--primary-color)] px-4 rounded-lg hover:bg-[var(--h-primary-color)] transition-all duration-300 ease-in-out cursor-pointer text-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <i class="text-xs fa-solid fa-magnifying-glass"></i>
                                     </button>

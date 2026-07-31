@@ -358,10 +358,24 @@
             fill: var(--primary-color) !important;
         }
 
-        :where(a, button, input, select, textarea, [role="button"], [tabindex]):focus-visible {
-            outline: 2px solid var(--primary-color);
-            outline-offset: 3px;
-            box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary-color) 22%, transparent);
+        /* Normal input → focus input par */
+        :where(input, select, textarea):focus-visible {
+            outline: 1px solid var(--primary-color);
+            outline-offset: 2px;
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 22%, transparent);
+        }
+
+        /* border-none wale input ki apni focus styling remove */
+        :where(input, select, textarea).border-none:focus-visible {
+            outline: none;
+            box-shadow: none;
+        }
+
+        /* border-none input ke DIRECT parent par focus styling */
+        *:has(> :where(input, select, textarea).border-none:focus-visible) {
+            outline: 1px solid var(--primary-color);
+            outline-offset: 2px;
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 22%, transparent);
         }
 
         .nav-link:focus-visible,
@@ -491,8 +505,121 @@
             background: white;
         }
 
-        .selectParent:has(input:focus) .selectDropdownIcon {
-            scale: 1 -1;
+        /* Error icon sirf tab dikhe jab field mein error ho */
+        .form-group .field-control,
+        .select-component .selectParent {
+            position: relative;
+        }
+
+        .errorIconWrap {
+            position: absolute;
+            top: 50%;
+            z-index: 20;
+        }
+
+        .errorIcon {
+            display: flex;
+            width: 1rem;
+            height: 1rem;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            border: 1px solid var(--border-error);
+            border-radius: 9999px;
+            background: var(--secondary-bg-color);
+            color: var(--border-error) !important;
+            font-size: 0.65rem;
+            font-weight: 700;
+            line-height: 1;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            box-shadow: none;
+            transition: opacity 140ms ease, transform 140ms ease, background-color 140ms ease;
+        }
+
+        .form-group.has-field-error .errorIcon {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        .errorIcon:hover,
+        .errorIcon:focus-visible {
+            background: var(--border-error);
+            color: white !important;
+            outline: none;
+            transform: scale(1.05);
+        }
+
+        .field-error-msg {
+            position: absolute;
+            right: -0.35rem;
+            bottom: calc(100% + 0.55rem);
+            z-index: 100;
+            width: max-content;
+            min-width: 7.5rem;
+            max-width: 13rem;
+            padding: 0.38rem 0.58rem;
+            border: 1px solid color-mix(in srgb, var(--border-error) 42%, transparent);
+            border-radius: 0.5rem;
+            background: var(--secondary-bg-color);
+            color: var(--border-error) !important;
+            font-size: 0.7rem;
+            font-weight: 500;
+            line-height: 1.25;
+            box-shadow: 0 6px 18px rgb(15 23 42 / 0.12);
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transform: translateY(3px);
+            transition: opacity 140ms ease, visibility 140ms ease, transform 140ms ease;
+        }
+
+        .field-error-msg::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            right: 0.55rem;
+            border: 4px solid transparent;
+            border-top-color: color-mix(in srgb, var(--border-error) 42%, transparent);
+        }
+
+        .errorIconWrap:hover .field-error-msg,
+        .errorIconWrap:focus-within .field-error-msg {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+
+        .field-error-msg.hidden {
+            display: none !important;
+        }
+
+        .form-group.has-field-error > span label {
+            color: var(--border-error) !important;
+        }
+
+        .form-group.has-field-error .field-control > input:not([type='hidden']),
+        .select-component.has-field-error .selectParent > .form-group input:not([type='hidden']) {
+            border-color: var(--border-error) !important;
+            background-color: color-mix(in srgb, var(--border-error) 4%, var(--h-bg-color)) !important;
+            box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-error) 18%, transparent);
+        }
+
+        .form-group.has-field-error .field-control > input:not([type='hidden']):focus-visible,
+        .select-component.has-field-error .selectParent > .form-group input:not([type='hidden']):focus-visible {
+            outline-color: var(--border-error) !important;
+            box-shadow: 0 0 0 2px color-mix(in srgb, var(--border-error) 12%, transparent) !important;
+        }
+
+        .select-component .selectParent > .form-group input {
+            padding-right: 3.5rem;
+        }
+
+        .form-group.has-field-error input:disabled {
+            opacity: 0.78;
         }
 
         .td {
@@ -501,6 +628,21 @@
             white-space: nowrap;
         }
 
+        .rounded-sm {
+            border-radius: 0.40rem !important;
+        }
+
+        .rounded-md {
+            border-radius: 0.55rem !important;
+        }
+
+        .rounded-lg {
+            border-radius: 0.75rem !important;
+        }
+
+        .rounded-xl {
+            border-radius: 0.95rem !important;
+        }
     </style>
 
     @include('components.document-preview-styles')
@@ -595,8 +737,8 @@
             </div>
             <div class="left_actions absolute top-5 left-5 flex gap-2">
                 <button id="go_back_button" type="button" aria-label="Go Back" class="border border-gray-600 group bg-[var(--bg-color)] h-full rounded-xl cursor-pointer flex items-center justify-end p-1 overflow-hidden hover:pr-3 transition-all duration-300 ease-in-out">
-                    <div class="flex items-center justify-center bg-[var(--h-bg-color)] rounded-lg p-2">
-                        <svg class="size-3 transition-all duration-300 ease-in-out group-hover:size-2.5 fill-[var(--secondary-text)]"
+                    <div class="flex items-center justify-center bg-[var(--h-bg-color)] rounded-lg p-1.5">
+                        <svg class="size-4 transition-all duration-300 ease-in-out group-hover:size-3.5 fill-[var(--secondary-text)]"
                         xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
                         <path d="M19 12H5m6-6l-6 6 6 6" stroke="currentColor" stroke-width="2.5" fill="none"/>
                         </svg>
@@ -606,8 +748,8 @@
                     </span>
                 </button>
                 <button id="refresh_button" type="button" aria-label="Refresh" class="border border-gray-600 group bg-[var(--bg-color)] h-full rounded-xl cursor-pointer flex items-center justify-end p-1 overflow-hidden hover:pr-3 transition-all duration-300 ease-in-out">
-                    <div class="flex items-center justify-center bg-[var(--h-bg-color)] rounded-lg p-2">
-                        <svg class="size-3 transition-all duration-300 ease-in-out group-hover:size-2.5 fill-[var(--secondary-text)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+                    <div class="flex items-center justify-center bg-[var(--h-bg-color)] rounded-lg p-1.5">
+                        <svg class="size-4 transition-all duration-300 ease-in-out group-hover:size-3.5 fill-[var(--secondary-text)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
                             <g>
                               <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
                               <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" transform="translate(0.3, 0.3)" />
@@ -761,7 +903,10 @@
             };
 
             document.addEventListener('click', (event) => {
-                const option = event.target.closest('[data-module-branch-option]');
+                const option = event.target.closest(
+                    '[data-module-branch-option]'
+                );
+
                 if (!option) {
                     return;
                 }
@@ -769,37 +914,163 @@
                 event.preventDefault();
                 event.stopPropagation();
 
-                if (option.disabled || !moduleBranchPreferenceForm) {
+                if (
+                    option.disabled ||
+                    option.dataset.submitting === '1' ||
+                    !moduleBranchPreferenceForm
+                ) {
                     return;
                 }
 
-                const moduleKey = option.dataset.moduleKey || '';
-                const branchId = option.dataset.branchId || '';
+                const moduleKey =
+                    option.dataset.moduleKey || '';
+
+                const branchId =
+                    option.dataset.branchId || '';
+
                 if (!moduleKey || !branchId) {
                     return;
                 }
 
-                moduleBranchPreferenceForm.elements.module_key.value = moduleKey;
-                moduleBranchPreferenceForm.elements.branch_id.value = branchId;
-                moduleBranchPreferenceForm.elements.selection_mode.value = 'single';
-                moduleBranchPreferenceForm.querySelectorAll('[name="branch_ids[]"]').forEach((input) => input.remove());
-                moduleBranchPreferenceForm.elements.redirect_to.value = window.location.href;
-                moduleBranchPreferenceForm.submit();
+                const switcher =
+                    option.closest('.branch-switcher');
+
+                /*
+                * Prevent repeated clicks/submits.
+                */
+                option.dataset.submitting = '1';
+
+                /*
+                * Play selected animation before submit.
+                */
+                option.classList.add('is-switching');
+
+                switcher?.classList.add(
+                    'is-submitting'
+                );
+
+                /*
+                * Disable all single-branch options
+                * while submit is pending.
+                */
+                switcher
+                    ?.querySelectorAll(
+                        '[data-module-branch-option]'
+                    )
+                    .forEach((otherOption) => {
+                        otherOption.disabled = true;
+                    });
+
+                /*
+                * Wait briefly so animation is visible.
+                */
+                window.setTimeout(() => {
+                    moduleBranchPreferenceForm
+                        .elements
+                        .module_key
+                        .value = moduleKey;
+
+                    moduleBranchPreferenceForm
+                        .elements
+                        .branch_id
+                        .value = branchId;
+
+                    moduleBranchPreferenceForm
+                        .elements
+                        .selection_mode
+                        .value = 'single';
+
+                    moduleBranchPreferenceForm
+                        .querySelectorAll(
+                            '[name="branch_ids[]"]'
+                        )
+                        .forEach((input) => {
+                            input.remove();
+                        });
+
+                    moduleBranchPreferenceForm
+                        .elements
+                        .redirect_to
+                        .value = window.location.href;
+
+                    moduleBranchPreferenceForm.submit();
+                }, 220);
             }, true);
 
             document.addEventListener('change', (event) => {
-                const allToggle = event.target.closest('[data-module-branch-all]');
-                if (!allToggle) {
+                const allToggle = event.target.closest(
+                    '[data-module-branch-all]'
+                );
+
+                /*
+                * All Branches toggle hua:
+                * sari individual branches ko same state do.
+                */
+                if (allToggle) {
+                    const switcher = allToggle.closest(
+                        '.branch-switcher'
+                    );
+
+                    switcher
+                        ?.querySelectorAll(
+                            '[data-module-branch-checkbox]'
+                        )
+                        .forEach((checkbox) => {
+                            checkbox.checked = allToggle.checked;
+                        });
+
                     return;
                 }
 
-                allToggle.closest('.branch-switcher')?.querySelectorAll('[data-module-branch-checkbox]').forEach((checkbox) => {
-                    checkbox.checked = allToggle.checked;
-                });
+                /*
+                * Individual branch toggle hui:
+                * check karo kya sari branches selected hain.
+                */
+                const branchCheckbox = event.target.closest(
+                    '[data-module-branch-checkbox]'
+                );
+
+                if (!branchCheckbox) {
+                    return;
+                }
+
+                const switcher = branchCheckbox.closest(
+                    '.branch-switcher'
+                );
+
+                const allBranchesToggle = switcher?.querySelector(
+                    '[data-module-branch-all]'
+                );
+
+                const branchCheckboxes = Array.from(
+                    switcher?.querySelectorAll(
+                        '[data-module-branch-checkbox]'
+                    ) || []
+                );
+
+                const allSelected =
+                    branchCheckboxes.length > 0 &&
+                    branchCheckboxes.every(
+                        (checkbox) => checkbox.checked
+                    );
+
+                /*
+                * Sari manually selected hon to
+                * All Branches auto selected.
+                *
+                * Kisi ek ko unselect karo to
+                * All Branches auto unselected.
+                */
+                if (allBranchesToggle) {
+                    allBranchesToggle.checked = allSelected;
+                }
             });
 
             document.addEventListener('click', (event) => {
-                const apply = event.target.closest('[data-module-branch-apply]');
+                const apply = event.target.closest(
+                    '[data-module-branch-apply]'
+                );
+
                 if (!apply) {
                     return;
                 }
@@ -807,34 +1078,117 @@
                 event.preventDefault();
                 event.stopPropagation();
 
-                if (!moduleBranchPreferenceForm) {
+                if (
+                    apply.dataset.submitting === '1' ||
+                    !moduleBranchPreferenceForm
+                ) {
                     return;
                 }
 
-                const moduleKey = apply.dataset.moduleKey || '';
+                const moduleKey =
+                    apply.dataset.moduleKey || '';
+
                 if (!moduleKey) {
                     return;
                 }
 
-                const wrapper = apply.closest('.branch-switcher');
-                const selectedIds = Array.from(wrapper?.querySelectorAll('[data-module-branch-checkbox]:checked') || [])
-                    .map((checkbox) => checkbox.dataset.branchId)
+                const wrapper =
+                    apply.closest('.branch-switcher');
+
+                const selectedIds = Array.from(
+                    wrapper?.querySelectorAll(
+                        '[data-module-branch-checkbox]:checked'
+                    ) || []
+                )
+                    .map((checkbox) =>
+                        checkbox.dataset.branchId
+                    )
                     .filter(Boolean);
 
-                moduleBranchPreferenceForm.querySelectorAll('[name="branch_ids[]"]').forEach((input) => input.remove());
+                /*
+                * Prevent duplicate apply submits.
+                */
+                apply.dataset.submitting = '1';
+                apply.disabled = true;
+
+                const originalText =
+                    apply.textContent;
+
+                apply.textContent =
+                    'Applying...';
+
+                wrapper?.classList.add(
+                    'is-submitting'
+                );
+
+                /*
+                * Remove previous branch_ids[] fields.
+                */
+                moduleBranchPreferenceForm
+                    .querySelectorAll(
+                        '[name="branch_ids[]"]'
+                    )
+                    .forEach((input) => {
+                        input.remove();
+                    });
+
+                /*
+                * Add currently selected branches.
+                */
                 selectedIds.forEach((branchId) => {
-                    const input = document.createElement('input');
+                    const input =
+                        document.createElement('input');
+
                     input.type = 'hidden';
                     input.name = 'branch_ids[]';
                     input.value = branchId;
-                    moduleBranchPreferenceForm.appendChild(input);
+
+                    moduleBranchPreferenceForm
+                        .appendChild(input);
                 });
 
-                moduleBranchPreferenceForm.elements.module_key.value = moduleKey;
-                moduleBranchPreferenceForm.elements.branch_id.value = selectedIds[0] || '';
-                moduleBranchPreferenceForm.elements.selection_mode.value = 'multiple';
-                moduleBranchPreferenceForm.elements.redirect_to.value = window.location.href;
-                moduleBranchPreferenceForm.submit();
+                moduleBranchPreferenceForm
+                    .elements
+                    .module_key
+                    .value = moduleKey;
+
+                moduleBranchPreferenceForm
+                    .elements
+                    .branch_id
+                    .value = selectedIds[0] || '';
+
+                moduleBranchPreferenceForm
+                    .elements
+                    .selection_mode
+                    .value = 'multiple';
+
+                moduleBranchPreferenceForm
+                    .elements
+                    .redirect_to
+                    .value = window.location.href;
+
+                /*
+                * Small delay gives the button feedback
+                * time to appear before navigation.
+                */
+                window.setTimeout(() => {
+                    moduleBranchPreferenceForm.submit();
+                }, 180);
+
+                /*
+                * Safety fallback if submit is interrupted.
+                */
+                window.setTimeout(() => {
+                    if (document.body.contains(apply)) {
+                        apply.dataset.submitting = '0';
+                        apply.disabled = false;
+                        apply.textContent = originalText;
+
+                        wrapper?.classList.remove(
+                            'is-submitting'
+                        );
+                    }
+                }, 5000);
             }, true);
 
             const launchGuardActive = () => {
