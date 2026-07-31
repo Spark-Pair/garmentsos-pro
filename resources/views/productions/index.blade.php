@@ -40,12 +40,15 @@
             <div class="details h-full z-40">
                 <div class="container-parent h-full">
                     <div class="card_container px-3 h-full flex flex-col">
-                        <div id="table-head" class="grid grid-cols-6 bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4">
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Article No.</div>
-                            <div class="col-span-2 cursor-pointer" onclick="sortByThis(this)">Worker Name</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Ticket</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Issue Date</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Receive Date</div>
+                        <div id="table-head" class="flex bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4">
+                            <div class="w-1/8 cursor-pointer" onclick="sortByThis(this)">Article No.</div>
+                            <div class="w-1/8 cursor-pointer" onclick="sortByThis(this)">Issue Date</div>
+                            <div class="w-1/8 cursor-pointer" onclick="sortByThis(this)">Receive Date</div>
+                            <div class="w-1/8 cursor-pointer" onclick="sortByThis(this)">Ticket</div>
+                            <div class="w-1/7 cursor-pointer" onclick="sortByThis(this)">Worker Name</div>
+                            <div class="w-1/8 cursor-pointer" onclick="sortByThis(this)">Quantity</div>
+                            <div class="w-1/8 cursor-pointer" onclick="sortByThis(this)">Rate</div>
+                            <div class="w-1/8 cursor-pointer" onclick="sortByThis(this)">Amount</div>
                         </div>
                         <p id="noItemsError" style="display: none" class="text-sm text-[var(--border-error)] mt-3">No items found</p>
                         <div class="overflow-y-auto grow my-scrollbar-2">

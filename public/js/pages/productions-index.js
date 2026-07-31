@@ -9,14 +9,17 @@
         window.createRow = function createRow(data) {
             return `
             <div id="${data.id}" oncontextmenu='${htmlAttr(data.oncontextmenu || "")}' onclick='${htmlAttr(data.onclick || "")}'
-                class="item row relative group grid grid-cols-6 text-center border-b border-[var(--h-bg-color)] items-center py-2 cursor-pointer hover:bg-[var(--h-secondary-bg-color)] transition-all fade-in ease-in-out"
+                class="item row relative group flex border-b border-[var(--h-bg-color)] items-center py-2 cursor-pointer hover:bg-[var(--h-secondary-bg-color)] transition-all fade-in ease-in-out"
                 data-json='${jsonAttr(data)}'>
 
-                <span>${data.article_no}</span>
-                <span class="col-span-2">${data.worker_name}</span>
-                <span>${data.ticket}</span>
-                <span>${data.issue_date}</span>
-                <span>${data.receive_date}</span>
+                <span class="w-1/8" >${data.article_no}</span>
+                <span class="w-1/8" >${data.issue_date}</span>
+                <span class="w-1/8" >${data.receive_date}</span>
+                <span class="w-1/8" >${data.ticket}</span>
+                <span class="w-1/7" >${data.worker_name}</span>
+                <span class="w-1/8" >${data.quantity}</span>
+                <span class="w-1/8" >${formatNumbersWithDigits(data.rate ?? 0, 2, 2)}</span>
+                <span class="w-1/8" >${formatNumbersWithDigits(data.amount ?? 0, 1, 1)}</span>
             </div>`;
         };
 
@@ -87,10 +90,10 @@
                     Article: article.article_no || data.article_no,
                     Work: work.title || "-",
                     Worker: worker.employee_name || "-",
-                    "Issue Date": data.issue_date,
-                    "Receive Date": data.receive_date,
-                    Rate: data.rate ? formatMoney(data.rate) : "-",
-                    Amount: data.amount ? formatMoney(data.amount) : "-",
+                    "Issue Date": data.issue_date ? formatDate(data.issue_date) : '-',
+                    "Receive Date": data.receive_date ? formatDate(data.receive_date) : '-',
+                    Rate: data.rate ? formatNumbersWithDigits(data.rate, 2, 2) : '-',
+                    Amount: data.amount ? formatNumbersWithDigits(data.amount, 1, 1) : '-',
                 },
                 bottomActions,
             });
