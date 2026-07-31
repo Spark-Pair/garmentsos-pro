@@ -132,17 +132,17 @@
                 <div class="container-parent h-full">
                     <div class="card_container px-3 pb-3 h-full flex flex-col">
                         <div id="table-head" class="flex justify-between bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4">
-                            <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">Date</div>
-                            <div class="text-center w-1/7 cursor-pointer" onclick="sortByThis(this)">Customer</div>
-                            <div class="text-center w-1/7 cursor-pointer" onclick="sortByThis(this)">Supplier Name</div>
-                            <div class="text-center w-1/7 cursor-pointer" onclick="sortByThis(this)">Beneficiary</div>
-                            <div class="text-center w-1/11 cursor-pointer" onclick="sortByThis(this)">Method</div>
-                            <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">Amount</div>
-                            <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">Reff. No.</div>
-                            <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">Clear Date</div>
-                            <div class="text-center w-1/9 cursor-pointer" onclick="sortByThis(this)">Cleared Amount</div>
-                            <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">Voucher / CR No.</div>
-                            <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">DR No.</div>
+                            <div class="text-center w-1/8 cursor-pointer" onclick="sortByThis(this)">Date</div>
+                            <div class="text-center w-1/4 cursor-pointer" onclick="sortByThis(this)">Customer</div>
+                            <div class="text-center w-1/6 cursor-pointer" onclick="sortByThis(this)">Supplier Name</div>
+                            <div class="text-center w-1/6 cursor-pointer" onclick="sortByThis(this)">Beneficiary</div>
+                            <div class="text-center w-1/12 cursor-pointer" onclick="sortByThis(this)">Method</div>
+                            <div class="text-center w-1/12 cursor-pointer" onclick="sortByThis(this)">Amount</div>
+                            <div class="text-center w-1/12 cursor-pointer" onclick="sortByThis(this)">Reff. No.</div>
+                            <div class="text-center w-1/8 cursor-pointer" onclick="sortByThis(this)">Clear Date</div>
+                            <div class="text-center w-1/10 cursor-pointer" onclick="sortByThis(this)">Cleared Amt.</div>
+                            <div class="text-center w-1/11 cursor-pointer" onclick="sortByThis(this)">Vou./CR No.</div>
+                            <div class="text-center w-1/12 cursor-pointer" onclick="sortByThis(this)">DR No.</div>
                         </div>
                         <p id="noItemsError" style="display: none" class="text-sm text-[var(--border-error)] mt-3">No items found</p>
                         <div class="overflow-y-auto grow my-scrollbar-2">
