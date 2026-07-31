@@ -197,9 +197,9 @@ class CRController extends Controller
             'new_payments' => json_decode($request->newPayments ?? '[]'),
         ];
 
-        if (!str_starts_with($data['c_r_no'], 'CR-')) {
-            $data['c_r_no'] = 'CR-' . $data['c_r_no'];
-        }
+        // if (!str_starts_with($data['c_r_no'], 'CR-')) {
+        //     $data['c_r_no'] = 'CR-' . $data['c_r_no'];
+        // }
         $data['c_r_no'] = app(BranchSerialService::class)->formatBranchDocumentNumber(
             $data['c_r_no'],
             'cr',

@@ -129,7 +129,7 @@ class DRController extends Controller
         $dr = new DR($branches->assignBranchOnCreate($data, 'dr'));
         $dr->save(); // 👈 pehle save karenge taake $dr->id mil jaye
         $dr->d_r_no = app(BranchSerialService::class)->formatBranchDocumentNumber(
-            'DR-' . $dr->id,
+            $dr->id,
             'dr',
             $branches->selectedBranchForModule('dr')
         );
