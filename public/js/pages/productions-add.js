@@ -1299,7 +1299,7 @@
                 validateInput(document.getElementById("article_quantity"));
                 let quantity = parseFloat(document.getElementById("article_quantity").value);
                 let rate = parseFloat(document.getElementById("rate").value);
-                document.getElementById("amount").value = rate * quantity;
+                document.getElementById("amount").value = (rate * quantity).toFixed(2);
             };
 
             window.trackTicketState = function trackTicketState(elem) {
