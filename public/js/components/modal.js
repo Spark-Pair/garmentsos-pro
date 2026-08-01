@@ -509,7 +509,7 @@ function createModal(data, animate = 'animate') {
 
                 <!-- Header -->
                 <div id="table-head"
-                    class="flex justify-between items-center bg-[var(--h-bg-color)] rounded-lg py-2 px-4 mb-3">
+                    class="flex justify-between items-center bg-[var(--h-bg-color)] rounded-lg py-2 ${data.table.headerPaddingClass || 'px-4'} mb-3">
                     ${headerHTML}
                 </div>
 
@@ -1259,7 +1259,7 @@ function createModal(data, animate = 'animate') {
         setupCardKeyboardNavigation(modalWrapper, data);
     }
 
-    data.table ? renderTableBody(data.table.body) : '';
+    data.table ? renderTableBody(data.table.body, data.table.rowPaddingClass) : '';
 
     deferModalFocus(() => {
         data.fields?.forEach(field => {
@@ -1278,7 +1278,7 @@ function createModal(data, animate = 'animate') {
     formatAllAmountInputs();
 }
 
-function renderTableBody(tableBody) {
+function renderTableBody(tableBody, rowPaddingClass = 'px-4') {
     let bodyHTML = '';
 
     if (tableBody.length > 0) {
@@ -1316,14 +1316,14 @@ function renderTableBody(tableBody) {
                 }
             }).join('');
             bodyHTML += `
-                <div id='${data[0].jsonData?.id}' ${data[0].jsonData ? `data-json='${jsonAttr(data[0].jsonData)}'` : ''} data class="flex justify-between items-center border-t border-gray-600 py-2 px-4 ${data[0].checkbox ? 'cursor-pointer row-toggle select-none customer-row hover:bg-[var(--h-secondary-bg-color)] transition-all fade-in ease-in-out' : ''}">
+                <div id='${data[0].jsonData?.id}' ${data[0].jsonData ? `data-json='${jsonAttr(data[0].jsonData)}'` : ''} data class="flex justify-between items-center border-t border-gray-600 py-2 ${rowPaddingClass} ${data[0].checkbox ? 'cursor-pointer row-toggle select-none customer-row hover:bg-[var(--h-secondary-bg-color)] transition-all fade-in ease-in-out' : ''}">
                     ${rowHTML}
                 </div>
             `;
         });
     } else {
         bodyHTML += `
-            <div class="flex justify-between items-center border-t border-gray-600 py-2 px-4">
+            <div class="flex justify-between items-center border-t border-gray-600 py-2 ${rowPaddingClass}">
                 <div class="grow text-center text-[var(--border-error)]">No available yet.</div>
             </div>
         `;

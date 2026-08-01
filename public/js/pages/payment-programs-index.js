@@ -39,6 +39,257 @@ function initPaymentProgramsIndex() {
 
     const fetchedData = [];
     let selectedSubCategoryId;
+    let lastPaymentProgramDetails = null;
+
+    const cleanPaymentText = (value, fallback = '-') => {
+        if (value === null || value === undefined) return fallback;
+        const text = String(value).trim();
+        return text === '' || text.toLowerCase() === 'null' ? fallback : text;
+    };
+
+    const escapePaymentText = (value, fallback = '-') => {
+        const div = document.createElement('div');
+        div.textContent = cleanPaymentText(value, fallback);
+        return div.innerHTML;
+    };
+
+    const paymentPartyText = (payment) => cleanPaymentText(
+        payment.bank_account?.sub_category?.supplier_name
+        ?? payment.bank_account?.sub_category?.customer_name
+        ?? payment.sub_category?.supplier_name
+        ?? payment.sub_category?.customer_name
+        ?? '-'
+    );
+
+    const paymentAccountText = (payment) => {
+        const title = cleanPaymentText(payment.bank_account?.account_title);
+        const bank = cleanPaymentText(payment.bank_account?.bank?.short_title);
+        return title === '-' && bank === '-' ? '-' : `${title} | ${bank}`;
+    };
+
+    const paymentReferenceLines = (payment) => {
+        const lines = [];
+        const transactionId = cleanPaymentText(payment.transaction_id, '');
+        const chequeNo = cleanPaymentText(payment.cheque_no, '');
+        const slipNo = cleanPaymentText(payment.slip_no, '');
+        const referenceNo = cleanPaymentText(payment.reff_no ?? payment.reference_no, '');
+        const clearDate = cleanPaymentText(payment.clear_date, '');
+        const remarks = cleanPaymentText(payment.remarks, '');
+        const primaryReference = chequeNo || slipNo || transactionId || referenceNo;
+        const primaryLabel = chequeNo ? 'Cheque' : slipNo ? 'Slip' : 'Ref';
+
+        if (primaryReference) lines.push(`${primaryLabel}: ${primaryReference}`);
+        if (clearDate) lines.push(`Clear: ${formatDate(clearDate)}`);
+        if (remarks) lines.push(remarks);
+
+        return lines.length ? lines : ['-'];
+    };
+
+    const paymentReferenceHtml = (payment) => paymentReferenceLines(payment)
+        .map((line) => escapePaymentText(line))
+        .join('<br>');
+
+    function paymentProgramDetailRows(data) {
+        const sourceArray = Array.isArray(data?.data?.payments)
+            ? data.data.payments
+            : Array.isArray(data?.data?.payment_programs)
+            ? data.data.payment_programs
+            : [];
+
+        return sourceArray.map((payment, index) => ({
+            no: index + 1,
+            date: formatDate(payment.date),
+            method: cleanPaymentText(payment.method),
+            beneficiary: paymentPartyText(payment),
+            account: paymentAccountText(payment),
+            amount: Number(payment.amount || 0),
+            referenceLines: paymentReferenceLines(payment),
+        }));
+    }
+
+    function buildPaymentProgramPrintData(data) {
+        const rows = paymentProgramDetailRows(data);
+        const receivedTotal = rows.reduce((sum, row) => sum + row.amount, 0);
+
+        return {
+            title: 'Payment Details',
+            customerName: cleanPaymentText(data?.customer_name),
+            customerBalance: formatNumbersWithDigits(data?.customer_balance ?? 0, 1, 1),
+            orderBalance: formatNumbersWithDigits(data?.order_balance ?? 0, 1, 1),
+            receivedTotal: formatNumbersWithDigits(receivedTotal, 1, 1),
+            rows,
+        };
+    }
+
+    function renderPaymentDetailsPrintHtml(printData) {
+        const rows = printData.rows.length
+            ? printData.rows.map((row) => `
+                <div class="pp-row">
+                    <div class="pp-cell pp-no">${row.no}</div>
+                    <div class="pp-cell pp-date">${escapePaymentText(row.date)}</div>
+                    <div class="pp-cell pp-method">${escapePaymentText(row.method)}</div>
+                    <div class="pp-cell pp-beneficiary">${escapePaymentText(row.beneficiary)}</div>
+                    <div class="pp-cell pp-account">${escapePaymentText(row.account)}</div>
+                    <div class="pp-cell pp-amount">${escapePaymentText(formatNumbersWithDigits(row.amount, 1, 1))}</div>
+                    <div class="pp-cell pp-reference">${row.referenceLines.map((line) => escapePaymentText(line)).join('<br>')}</div>
+                </div>
+            `).join('')
+            : '<div class="pp-empty">No payment details available.</div>';
+
+        return `
+            <html>
+                <head>
+                    <title>${escapePaymentText(printData.title)}</title>
+                    <style>
+                        @page { size: A4; margin: 0.19in; }
+                        * { box-sizing: border-box; }
+                        body {
+                            margin: 0;
+                            padding: 0;
+                            background: #fff;
+                            color: #000;
+                            font-family: Arial, Helvetica, sans-serif;
+                            font-size: 11px;
+                        }
+                        .pp-page {
+                            width: 210mm;
+                            max-width: 100%;
+                            margin: 0 auto;
+                            padding: 6px 0;
+                        }
+                        .pp-branch {
+                            width: 95%;
+                            margin: 0 auto 8px;
+                            border: 1px solid #111;
+                            border-radius: 8px;
+                            padding: 4px 12px;
+                            line-height: 1.2;
+                            font-weight: 600;
+                            font-size: 10.5px;
+                        }
+                        .pp-slip {
+                            width: 95%;
+                            margin: 0 auto 10px;
+                            border: 1px solid #111;
+                            border-radius: 10px;
+                            padding: 6px;
+                            overflow: hidden;
+                            break-inside: avoid;
+                            page-break-inside: avoid;
+                        }
+                        .pp-title {
+                            border: 1px solid #111;
+                            border-radius: 8px;
+                            padding: 5px 12px;
+                            margin-bottom: 5px;
+                            text-align: center;
+                            font-weight: 700;
+                            line-height: 1.2;
+                            font-size: 11px;
+                        }
+                        .pp-table {
+                            width: 100%;
+                        }
+                        .pp-head,
+                        .pp-row {
+                            display: flex;
+                            align-items: stretch;
+                            width: 100%;
+                        }
+                        .pp-head {
+                            background: #555;
+                            color: #fff;
+                            font-weight: 700;
+                            text-align: center;
+                            border-radius: 7px;
+                            overflow: hidden;
+                        }
+                        .pp-row {
+                            border-bottom: 1px solid #222;
+                            break-inside: avoid;
+                            page-break-inside: avoid;
+                        }
+                        .pp-row:last-child { border-bottom: 0; }
+                        .pp-cell {
+                            padding: 3px 5px;
+                            line-height: 1.12;
+                            min-width: 0;
+                            overflow-wrap: anywhere;
+                        }
+                        .pp-no { width: 6%; text-align: center; }
+                        .pp-date { width: 17%; text-align: center; white-space: nowrap; }
+                        .pp-method { width: 12%; text-align: center; font-weight: 700; text-transform: capitalize; }
+                        .pp-beneficiary { width: 15%; text-align: center; }
+                        .pp-account { width: 19%; text-align: center; }
+                        .pp-amount { width: 14%; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+                        .pp-reference { width: 17%; text-align: left; overflow-wrap: normal; word-break: normal; }
+                        .pp-empty {
+                            padding: 28px 10px;
+                            text-align: center;
+                            color: #444;
+                            border-bottom: 1px solid #222;
+                        }
+                        .pp-totals {
+                            display: grid;
+                            grid-template-columns: repeat(3, 1fr);
+                            gap: 6px;
+                            border-top: 1px solid #111;
+                            margin-top: 5px;
+                            padding-top: 5px;
+                        }
+                        .pp-total {
+                            border: 1px solid #111;
+                            border-radius: 8px;
+                            padding: 5px 8px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                            gap: 8px;
+                            text-align: left;
+                            font-weight: 700;
+                            line-height: 1.15;
+                            font-size: 10.5px;
+                            white-space: nowrap;
+                        }
+                        .pp-total span {
+                            font-variant-numeric: tabular-nums;
+                        }
+                        @media print {
+                            .pp-slip {
+                                page-break-inside: avoid;
+                                break-inside: avoid;
+                            }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <main class="pp-page">
+                        <div class="pp-branch">Program Payment Details</div>
+                        <section class="pp-slip">
+                            <div class="pp-title">${escapePaymentText(printData.customerName)}</div>
+                            <div class="pp-table">
+                                <div class="pp-head">
+                                    <div class="pp-cell pp-no">#</div>
+                                    <div class="pp-cell pp-date">Date</div>
+                                    <div class="pp-cell pp-method">Method</div>
+                                    <div class="pp-cell pp-beneficiary">Beneficiary</div>
+                                    <div class="pp-cell pp-account">Account</div>
+                                    <div class="pp-cell pp-amount">Amount</div>
+                                    <div class="pp-cell pp-reference">Reference</div>
+                                </div>
+                                ${rows}
+                            </div>
+                            <section class="pp-totals">
+                                <div class="pp-total"><span>Customer Bal.</span><span>${escapePaymentText(printData.customerBalance)}</span></div>
+                                <div class="pp-total"><span>Order Bal.</span><span>${escapePaymentText(printData.orderBalance)}</span></div>
+                                <div class="pp-total"><span>Received Total</span><span>${escapePaymentText(printData.receivedTotal)}</span></div>
+                            </section>
+                        </section>
+                    </main>
+                </body>
+            </html>
+        `;
+    }
 
     function getCategoryData(value) {
         const subCategorySearchInput = document.getElementById('subCategory');
@@ -47,12 +298,13 @@ function initPaymentProgramsIndex() {
         const subCategoryWrapper = subCategorySearchInput?.closest('.form-group')?.parentElement?.closest('.form-group').parentElement.parentElement;
         const subCategoryLabel = subCategoryWrapper?.querySelector('label');
         const remarksInputDom = document.getElementById('remarks');
+        const remarksWrapper = remarksInputDom?.parentElement?.parentElement;
 
         if (!subCategorySearchInput || !subCategoryHiddenInput || !subCategoryOptionBox || !subCategoryWrapper) return;
+        remarksWrapper?.classList.remove("hidden");
 
         if (value !== "waiting") {
             subCategoryWrapper.classList.remove("hidden");
-            remarksInputDom.parentElement.parentElement.classList.add("hidden");
 
             $.ajax({
                 url: "/get-category-data",
@@ -132,7 +384,6 @@ function initPaymentProgramsIndex() {
             });
         } else {
             subCategoryWrapper.classList.add("hidden");
-            remarksInputDom.parentElement.parentElement.classList.remove("hidden");
         }
     }
 
@@ -185,7 +436,6 @@ function initPaymentProgramsIndex() {
                     label: 'Remarks',
                     name: 'remarks',
                     id: 'remarks',
-                    hidden: true,
                     placeholder: 'Enter remarks here',
                 },
                 {
@@ -245,12 +495,24 @@ function initPaymentProgramsIndex() {
     window.printDetails = function(elem) {
         closeAllDropdowns();
 
-        if (elem.parentElement.tagName.toLowerCase() === 'li') {
-            elem.parentElement.parentElement.querySelector('#show-details').click();
-            document.getElementById('modalForm').parentElement.classList.add('hidden');
+        if (elem?.parentElement?.tagName?.toLowerCase() === 'li') {
+            const contextData = window.__lastPaymentProgramContextData;
+            if (contextData) {
+                lastPaymentProgramDetails = contextData;
+            }
         }
 
-        const preview = document.getElementById('modelInner');
+        if (!lastPaymentProgramDetails) {
+            const modalJson = document.getElementById('modalForm')?.dataset?.paymentProgramDetails;
+            if (modalJson) {
+                lastPaymentProgramDetails = JSON.parse(modalJson);
+            }
+        }
+
+        if (!lastPaymentProgramDetails) {
+            console.error('Payment details are not available for printing.');
+            return;
+        }
 
         let oldIframe = document.getElementById('printIframe');
         if (oldIframe) oldIframe.remove();
@@ -267,39 +529,7 @@ function initPaymentProgramsIndex() {
         let printDocument = printIframe.contentDocument || printIframe.contentWindow.document;
         printDocument.open();
 
-        const headContent = document.head.innerHTML;
-
-        printDocument.write(`
-            <html>
-                <head>
-                    <title>Print Program Details</title>
-                    ${headContent}
-                    <style>
-                        @media print {
-                            @page {
-                                size: A4;
-                                margin: 0.31in, 0.31in, 0.31in, 0.31in;
-                            }
-                            body, body * {
-                                color: #000000 !important;
-                            }
-                            #table-head, #calc-bottom .final {
-                                background-color: transparent !important;
-                                border: 1px solid #6b7280 !important;
-                                page-break-inside: avoid;
-                            }
-                            #table-body > div {
-                                page-break-inside: avoid;
-                                page-break-after: auto;
-                            }
-                        }
-                    </style>
-                </head>
-                <body>
-                    ${preview.innerHTML}
-                </body>
-            </html>
-        `);
+        printDocument.write(renderPaymentDetailsPrintHtml(buildPaymentProgramPrintData(lastPaymentProgramDetails)));
 
         printDocument.close();
 
@@ -308,8 +538,6 @@ function initPaymentProgramsIndex() {
                 printIframe.contentWindow.focus();
                 printIframe.contentWindow.print();
             }, 500);
-
-            document.getElementById('modalForm').parentElement.remove();
         };
     }
 
@@ -341,6 +569,8 @@ function initPaymentProgramsIndex() {
         e.preventDefault();
         let item = e.target.closest('.item');
         let data = JSON.parse(item.dataset.json);
+        window.__lastPaymentProgramContextData = data;
+        lastPaymentProgramDetails = data;
 
         let contextMenuData = {
             item: item,
@@ -378,6 +608,8 @@ function initPaymentProgramsIndex() {
 
     window.generateModal = function(item) {
         let data = JSON.parse(item.dataset.json);
+        window.__lastPaymentProgramContextData = data;
+        lastPaymentProgramDetails = data;
         let tableBody = [];
         let totalAmount = 0;
 
@@ -387,40 +619,90 @@ function initPaymentProgramsIndex() {
             ? data.data.payment_programs
             : [];
 
+        const cleanText = (value, fallback = '-') => {
+            if (value === null || value === undefined) return fallback;
+            const text = String(value).trim();
+            return text === '' || text.toLowerCase() === 'null' ? fallback : text;
+        };
+
+        const escapeCell = (value, fallback = '-') => {
+            const div = document.createElement('div');
+            div.textContent = cleanText(value, fallback);
+            return div.innerHTML;
+        };
+
+        const paymentParty = (payment) => escapeCell(
+            payment.bank_account?.sub_category?.supplier_name
+            ?? payment.bank_account?.sub_category?.customer_name
+            ?? payment.sub_category?.supplier_name
+            ?? payment.sub_category?.customer_name
+            ?? '-'
+        );
+
+        const paymentAccount = (payment) => {
+            const title = cleanText(payment.bank_account?.account_title);
+            const bank = cleanText(payment.bank_account?.bank?.short_title);
+            return title === '-' && bank === '-' ? '-' : `${escapeCell(title)} | ${escapeCell(bank)}`;
+        };
+
+        const paymentReference = (payment) => {
+            const parts = [];
+            const transactionId = cleanText(payment.transaction_id, '');
+            const chequeNo = cleanText(payment.cheque_no, '');
+            const slipNo = cleanText(payment.slip_no, '');
+            const referenceNo = cleanText(payment.reff_no ?? payment.reference_no, '');
+            const clearDate = cleanText(payment.clear_date, '');
+            const remarks = cleanText(payment.remarks, '');
+            const primaryReference = chequeNo || slipNo || transactionId || referenceNo;
+            const primaryLabel = chequeNo ? 'Cheque' : slipNo ? 'Slip' : 'Ref';
+
+            if (primaryReference) parts.push(`${primaryLabel}: ${escapeCell(primaryReference)}`);
+            if (clearDate) parts.push(`Clear: ${escapeCell(formatDate(clearDate))}`);
+            if (remarks) parts.push(escapeCell(remarks));
+
+            return parts.length ? parts.join('<br>') : '-';
+        };
+
         tableBody = sourceArray.map((item, index) => {
-            totalAmount += item.amount;
+            totalAmount += Number(item.amount || 0);
             return [
-                {data: index+1, class: 'w-[5%]'},
-                {data: formatDate(item.date), class: 'w-1/4'},
-                {data: (item.bank_account?.sub_category?.supplier_name ?? item.bank_account?.sub_category?.customer_name ?? 'Self Account'), class: 'w-1/3 capitalize'},
-                {data: (item.bank_account?.account_title ?? '-') + ' | ' + (item.bank_account?.bank?.short_title ?? '-'), class: 'w-1/3 capitalize'},
-                {data: formatNumbersWithDigits(item.amount, 1, 1), class: 'w-1/6'},
-                {data: item.transaction_id, class: 'w-[10%] capitalize'},
+                {data: index+1, class: 'w-[4%] text-center text-[var(--secondary-text)]'},
+                {data: formatDate(item.date), class: 'w-[16%] whitespace-nowrap'},
+                {data: escapeCell(item.method), class: 'w-[10%] capitalize font-semibold'},
+                {data: paymentParty(item), class: 'w-[12%] capitalize text-left px-1'},
+                {data: paymentAccount(item), class: 'w-[24%] capitalize text-left px-1 leading-5'},
+                {data: formatNumbersWithDigits(item.amount, 1, 1), class: 'w-[12%] text-right font-semibold tabular-nums pr-2'},
+                {data: paymentReference(item), class: 'w-[22%] text-left text-[var(--secondary-text)] leading-5 pl-1'},
             ];
         });
 
         let modalData = {
             id: 'modalForm',
             class: 'max-w-4xl h-[37rem]',
-            name: `Payment Details - ${data.customer_name} | Customer Bal. ${formatNumbersWithDigits(data.customer_balance, 1, 1)} | Order Bal. ${formatNumbersWithDigits(data.order_balance, 1, 1)}`,
+            name: `Payment Details - ${cleanText(data.customer_name)}`,
             table: {
                 name: 'Details',
                 headers: [
-                    { label: "#", class: "w-[5%]" },
-                    { label: "Data", class: "w-1/4" },
-                    { label: "Beneficiary", class: "w-1/3" },
-                    { label: "Acc. Title", class: "w-1/3" },
-                    { label: "Amount", class: "w-1/6" },
-                    { label: "Reff. No.", class: "w-[10%]" },
+                    { label: "#", class: "w-[4%] text-center" },
+                    { label: "Date", class: "w-[16%]" },
+                    { label: "Method", class: "w-[10%]" },
+                    { label: "Beneficiary", class: "w-[12%] text-left px-1" },
+                    { label: "Account", class: "w-[24%] text-left px-1" },
+                    { label: "Amount", class: "w-[12%] text-right pr-2" },
+                    { label: "Reference / Details", class: "w-[22%] text-left pl-1" },
                 ],
                 body: tableBody,
                 scrollable: true,
+                headerPaddingClass: 'px-2',
+                rowPaddingClass: 'px-2',
             },
             calcBottom: [
-                {label: 'Total Amount - Rs.', name: 'total', value: formatNumbersWithDigits(totalAmount, 1, 1), disabled: true},
+                {label: 'Customer Bal. - Rs.', name: 'customer_balance', value: formatNumbersWithDigits(data.customer_balance, 1, 1), disabled: true},
+                {label: 'Order Bal. - Rs.', name: 'order_balance', value: formatNumbersWithDigits(data.order_balance, 1, 1), disabled: true},
+                {label: 'Received Total - Rs.', name: 'total', value: formatNumbersWithDigits(totalAmount, 1, 1), disabled: true},
             ],
             bottomActions: [
-                {id: 'print', text: 'Print Details', onclick: 'printDetails(this)'}
+                {id: 'print', text: 'Print', onclick: 'printDetails(this)'}
             ]
         }
 
@@ -446,6 +728,10 @@ function initPaymentProgramsIndex() {
         }
 
         createModal(modalData);
+        const modal = document.getElementById('modalForm');
+        if (modal) {
+            modal.dataset.paymentProgramDetails = JSON.stringify(data);
+        }
     }
 
     window.createRow = createRow;

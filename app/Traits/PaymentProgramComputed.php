@@ -124,7 +124,16 @@ trait PaymentProgramComputed
                     'id' => $payment->id,
                     'date' => $payment->date,
                     'amount' => (float) $payment->amount,
+                    'method' => $payment->method,
+                    'type' => $payment->type,
                     'transaction_id' => $payment->transaction_id,
+                    'cheque_no' => $payment->cheque_no,
+                    'cheque_date' => $payment->cheque_date,
+                    'slip_no' => $payment->slip_no,
+                    'slip_date' => $payment->slip_date,
+                    'reff_no' => $payment->reff_no,
+                    'clear_date' => $payment->clear_date,
+                    'remarks' => $payment->remarks,
 
                     'bank_account' => $bankAccount ? [
                         'id' => $bankAccount->id,
