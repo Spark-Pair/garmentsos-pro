@@ -40,16 +40,15 @@
             subCategoryLabel,
         } = getSubCategoryElements();
         const customerSelect = document.getElementById('customer_id');
+        const remarksWrapper = remarksInputDom?.parentElement?.parentElement;
 
         if (!subCategorySearchInput || !subCategoryHiddenInput || !subCategoryOptionBox || !subCategoryWrapper || !subCategoryLabel) {
             return;
         }
+        remarksWrapper?.classList.remove('hidden');
 
         if (value !== 'waiting') {
             subCategoryWrapper.classList.remove('hidden');
-            if (remarksInputDom?.parentElement?.parentElement) {
-                remarksInputDom.parentElement.parentElement.classList.add('hidden');
-            }
 
             $.ajax({
                 url: '/get-category-data',
@@ -126,9 +125,6 @@
             });
         } else {
             subCategoryWrapper.classList.add('hidden');
-            if (remarksInputDom?.parentElement?.parentElement) {
-                remarksInputDom.parentElement.parentElement.classList.remove('hidden');
-            }
         }
     };
 
@@ -140,9 +136,7 @@
 
         if (!editConfig && customerSelect) customerSelect.disabled = true;
         if (!editConfig && categorySelectDom) categorySelectDom.disabled = true;
-        if (!editConfig && remarksInputDom?.parentElement?.parentElement) {
-            remarksInputDom.parentElement.parentElement.classList.add('hidden');
-        }
+        remarksInputDom?.parentElement?.parentElement?.classList.remove('hidden');
 
         if (editConfig) {
             if (customerSelect) customerSelect.disabled = false;
