@@ -18,6 +18,12 @@
         @method('PUT')
         <x-form-title-bar title="Edit Payment Program" />
 
+        @if ($hasReceivedPayments)
+            <div class="col-span-full mb-4 rounded-lg border border-[var(--glass-border-color)] bg-[var(--h-bg-color)] px-4 py-3 text-[var(--secondary-text)]">
+                This program already has received payments. Customer and category are locked; only amount, date, and remarks can be updated.
+            </div>
+        @endif
+
         <div class="grid grid-cols-2 gap-4">
             <x-input label="Date" name="date" id="date" type="date" value="{{ old('date', $paymentProgram->date?->format('Y-m-d')) }}" onchange="trackDateState(this)" validateMax max="{{ now()->toDateString() }}" required />
 
@@ -28,6 +34,7 @@
                 :options="$customers_options"
                 onchange="trackCustomerState(this)"
                 required
+                :disabled="$hasReceivedPayments"
                 showDefault
             />
 
@@ -38,6 +45,7 @@
                 :options="$categories_options"
                 onchange="getCategoryData(this.value)"
                 required
+                :disabled="$hasReceivedPayments"
                 showDefault
             />
 
@@ -45,8 +53,15 @@
                 label="Disabled"
                 name="sub_category"
                 id="subCategory"
+                :disabled="$hasReceivedPayments"
                 showDefault
             />
+
+            @if ($hasReceivedPayments)
+                <input type="hidden" name="customer_id" value="{{ $paymentProgram->customer_id }}">
+                <input type="hidden" name="category" value="{{ $paymentProgram->category }}">
+                <input type="hidden" name="sub_category" value="{{ $paymentProgram->sub_category_id }}">
+            @endif
 
             <x-input label="Remarks" name="remarks" id="remarks" value="{{ old('remarks', $paymentProgram->remarks) }}" placeholder="Enter Remarks" />
 

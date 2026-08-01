@@ -266,7 +266,10 @@ class PaymentProgramController extends Controller
             ];
         }
 
-        return view('payment-programs.edit', compact('paymentProgram', 'customers_options'));
+        $hasReceivedPayments = $paymentProgram->customerPayments->isNotEmpty()
+            || $paymentProgram->supplierPayments->isNotEmpty();
+
+        return view('payment-programs.edit', compact('paymentProgram', 'customers_options', 'hasReceivedPayments'));
     }
 
     /**
@@ -311,13 +314,26 @@ class PaymentProgramController extends Controller
         $hasPayments = $paymentProgram->customerPayments()->exists() || $paymentProgram->supplierPayments()->exists();
         $restrictedChanged = (int) $paymentProgram->customer_id !== (int) $request->customer_id
             || (string) $paymentProgram->category !== (string) $request->category
-            || (int) ($paymentProgram->sub_category_id ?? 0) !== (int) ($request->sub_category ?? 0)
-            || (float) $paymentProgram->amount !== (float) $request->amount;
+            || (int) ($paymentProgram->sub_category_id ?? 0) !== (int) ($request->sub_category ?? 0);
 
         if ($hasPayments && $restrictedChanged) {
             return redirect()->back()
                 ->withInput()
-                ->with('error', 'This payment program has connected payments. Edit remarks/date only, or remove connected payments first.');
+                ->with('error', 'This payment program has received payments. Customer/category cannot be changed; update amount only.');
+        }
+
+        if ($hasPayments) {
+            $paymentProgram->date = $request->date;
+            $paymentProgram->amount = $request->amount;
+            $paymentProgram->remarks = $request->remarks;
+            $paidAmount = (float) $paymentProgram->customerPayments()->sum('amount');
+            $balance = (float) $request->amount - $paidAmount;
+            $paymentProgram->status = $balance <= 0
+                ? ($balance < 0 ? 'Overpaid' : 'Paid')
+                : 'Unpaid';
+            $paymentProgram->save();
+
+            return redirect()->route('payment-programs.index')->with('success', 'Payment program amount updated successfully.');
         }
 
         $customer = app(ModuleBranchService::class)->applyRelatedScope(Customer::query(), 'customers', 'payment_programs')->find($request->customer_id);
@@ -530,8 +546,7 @@ class PaymentProgramController extends Controller
 
                 return $q->where(function ($qq) {
                     $qq->where('status', 'Unpaid')
-                        ->orWhereHas('supplierPayments', fn($sq) => $sq
-                            ->whereNull('voucher_id'));
+                        ->orWhereHas('supplierPayments', fn($sq) => $this->pendingSupplierVoucherPaymentQuery($sq));
                 });
             };
 
@@ -552,8 +567,7 @@ class PaymentProgramController extends Controller
 
                         // ONLY pending supplier payments
                         ->withSum([
-                            'supplierPayments as voucher_pending_payment' => fn($sq) => $sq
-                                ->whereNull('voucher_id'),
+                            'supplierPayments as voucher_pending_payment' => fn($sq) => $this->pendingSupplierVoucherPaymentQuery($sq),
                         ], 'amount'),
                 ])
                 ->applyFilters($request, false, true);
@@ -596,6 +610,14 @@ class PaymentProgramController extends Controller
         }
 
         return view('payment-programs.supplierSummary', compact('authLayout'));
+    }
+
+    private function pendingSupplierVoucherPaymentQuery(mixed $query): mixed
+    {
+        return $query
+            ->whereNull('voucher_id')
+            ->whereNull('c_r_id')
+            ->whereRaw("LOWER(COALESCE(method, '')) NOT LIKE ?", ['%cr%']);
     }
 
     private function branchScopedPaymentProgramQuery(
