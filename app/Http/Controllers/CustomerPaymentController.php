@@ -13,6 +13,7 @@ use App\Services\Branches\ModuleBranchService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 
 class CustomerPaymentController extends Controller
@@ -428,25 +429,14 @@ class CustomerPaymentController extends Controller
         }
 
         $payload = $this->buildCustomerPaymentPayload($request);
-        $program = null;
 
-        if (($payload['method'] ?? null) === 'program') {
-            if (empty($payload['program_id'])) {
-                return redirect()->back()->withInput()->with('error', 'Please select a payment program for program payments.');
-            }
-
-            $program = PaymentProgram::select('id', 'customer_id', 'amount', 'category', 'sub_category_id')
-                ->find($payload['program_id']);
-
-            if (!$program) {
-                return redirect()->back()->withInput()->with('error', 'Selected payment program was not found.');
-            }
-
-            if ((int) $program->customer_id !== (int) $payload['customer_id']) {
-                return redirect()->back()->withInput()->with('error', 'Selected payment program does not belong to the selected customer.');
-            }
-
-            // Allow any amount for program payments (no balance limit)
+        try {
+            $program = $this->normalizeProgramPaymentPayload($payload);
+        } catch (ValidationException $exception) {
+            return redirect()->back()
+                ->withErrors($exception->errors())
+                ->withInput()
+                ->with('error', collect($exception->errors())->flatten()->first());
         }
 
         DB::transaction(function () use ($payload, $program) {
@@ -618,25 +608,14 @@ class CustomerPaymentController extends Controller
 
         $payload = $this->buildCustomerPaymentPayload($request);
         $oldProgramId = $customerPayment->program_id;
-        $program = null;
 
-        if (($payload['method'] ?? null) === 'program') {
-            if (empty($payload['program_id'])) {
-                return redirect()->back()->withInput()->with('error', 'Please select a payment program for program payments.');
-            }
-
-            $program = PaymentProgram::select('id', 'customer_id', 'amount', 'category', 'sub_category_id')
-                ->find($payload['program_id']);
-
-            if (!$program) {
-                return redirect()->back()->withInput()->with('error', 'Selected payment program was not found.');
-            }
-
-            if ((int) $program->customer_id !== (int) $payload['customer_id']) {
-                return redirect()->back()->withInput()->with('error', 'Selected payment program does not belong to the selected customer.');
-            }
-
-            // Allow any amount for program payments (no balance limit)
+        try {
+            $program = $this->normalizeProgramPaymentPayload($payload);
+        } catch (ValidationException $exception) {
+            return redirect()->back()
+                ->withErrors($exception->errors())
+                ->withInput()
+                ->with('error', collect($exception->errors())->flatten()->first());
         }
 
         DB::transaction(function () use ($payload, $customerPayment, $program, $oldProgramId) {
@@ -956,6 +935,8 @@ class CustomerPaymentController extends Controller
             'balance' => $balance,
             'remarks' => $program->remarks,
             'status' => $program->status,
+            'has_sub_category' => filled($program->sub_category_id),
+            'program_method_available' => filled($program->sub_category_id) && $program->category !== 'waiting',
             'sub_category' => [
                 'id' => $subCategory?->id,
                 'supplier_name' => $subCategory?->supplier_name ?? null,
@@ -964,6 +945,51 @@ class CustomerPaymentController extends Controller
                 'bank_accounts' => $bankAccountsPayload,
             ],
         ];
+    }
+
+    private function normalizeProgramPaymentPayload(array &$payload): ?PaymentProgram
+    {
+        $method = (string) ($payload['method'] ?? '');
+        $programId = $payload['program_id'] ?? null;
+
+        if (blank($programId)) {
+            if ($method === 'program') {
+                throw ValidationException::withMessages([
+                    'program_id' => 'Please select a categorized payment program for program payments.',
+                ]);
+            }
+
+            return null;
+        }
+
+        $program = PaymentProgram::select('id', 'customer_id', 'amount', 'category', 'sub_category_id', 'sub_category_type')
+            ->find($programId);
+
+        if (!$program) {
+            throw ValidationException::withMessages([
+                'program_id' => 'Selected payment program was not found.',
+            ]);
+        }
+
+        if ((int) $program->customer_id !== (int) $payload['customer_id']) {
+            throw ValidationException::withMessages([
+                'program_id' => 'Selected payment program does not belong to the selected customer.',
+            ]);
+        }
+
+        if (blank($program->sub_category_id)) {
+            if ($method === 'program') {
+                throw ValidationException::withMessages([
+                    'method' => 'Program method is available only after the payment program category is selected.',
+                ]);
+            }
+
+            return $program;
+        }
+
+        $payload['method'] = 'program';
+
+        return $program;
     }
 
     private function formatSetupPayload(Setup $setup): array

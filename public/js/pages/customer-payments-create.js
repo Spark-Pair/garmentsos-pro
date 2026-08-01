@@ -159,6 +159,10 @@ function initCustomerPaymentsCreate() {
         return [];
     }
 
+    function programMethodAvailable(program) {
+        return Boolean(program?.program_method_available || program?.has_sub_category || program?.sub_category?.id);
+    }
+
     function setOptionOnNthLi(triggerDom, index, key, value = '') {
         const li = triggerDom.closest('.selectParent')?.querySelectorAll('ul li')[index];
         if (li) li.dataset[key] = value;
@@ -414,9 +418,10 @@ function initCustomerPaymentsCreate() {
             return;
         }
         let ProgramData = JSON.parse(selectedLi.dataset.option);
-        methodSelectDom.disabled = false;
+        const canUseProgramMethod = programMethodAvailable(ProgramData);
+        methodSelectDom.disabled = canUseProgramMethod;
 
-        if (ProgramData.category != 'waiting') {
+        if (canUseProgramMethod) {
             let desiredMethod = methodSelectDom.closest('.selectParent').querySelector('ul li[data-value="program"]');
             if (!desiredMethod) {
                 methodSelectDom.closest('.selectParent').querySelector('ul').innerHTML += `
@@ -429,6 +434,11 @@ function initCustomerPaymentsCreate() {
             }
         } else {
             methodSelectDom.closest('.selectParent').querySelector('ul li[data-value="program"]')?.remove();
+            const methodHiddenInput = methodSelectDom.closest('.selectParent')?.querySelector('.dbInput[data-for="method"]');
+            if ((methodHiddenInput?.value || methodSelectDom.value).toLowerCase() === 'program') {
+                methodSelectDom.value = '';
+                if (methodHiddenInput) methodHiddenInput.value = '';
+            }
             detailsDom.innerHTML = '';
         }
         trackDateState(dateDom);
@@ -539,7 +549,10 @@ function initCustomerPaymentsCreate() {
         lockProgramFlowSelect(programSelectDom);
 
         const selectedProgram = JSON.parse(programOption.dataset.option || '{}');
-        if (selectedProgram.category === 'waiting') return;
+        if (!programMethodAvailable(selectedProgram)) {
+            methodSelectDom.disabled = false;
+            return;
+        }
 
         const methodOption = methodSelectDom.closest('.selectParent')?.querySelector('ul li[data-value="program"]');
         const methodSelection = selectOptionInProgramFlow(methodOption);

@@ -187,6 +187,10 @@ function initCustomerPaymentsEdit() {
         return formatNumbersWithDigits(numeric, 1, 1);
     }
 
+    function programMethodAvailable(program) {
+        return Boolean(program?.program_method_available || program?.has_sub_category || program?.sub_category?.id);
+    }
+
     function applyEditDefaults() {
         if (!customerPayment) return;
 
@@ -212,9 +216,8 @@ function initCustomerPaymentsEdit() {
         methodSelectDom.value = '';
         detailsInputsContainer.classList.remove('mb-4');
         if (elem.value == 'payment_program') {
-            methodSelectDom.closest('.selectParent').querySelector('ul').innerHTML += `
-                <li data-for="method" data-value="program" onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg transition hover:bg-[var(--h-bg-color)] text-nowrap overflow-x-auto scrollbar-hidden ">Program</li>
-            `;
+            methodSelectDom.closest('.selectParent').querySelector('ul li[data-value="program"]')?.remove();
+            methodSelectDom.disabled = true;
             detailsInputsContainer.innerHTML = "";
 
             const typeScope = typeSelectDom.closest('.selectParent') || document;
@@ -260,6 +263,7 @@ function initCustomerPaymentsEdit() {
             detailsInputsContainer.innerHTML = "";
             methodSelectDom.closest('.selectParent').querySelector("ul li[data-value='program']")?.remove();
             methodSelectDom.value = '';
+            methodSelectDom.disabled = false;
         }
         trackMethodState(methodSelectDom);
     }
@@ -302,8 +306,9 @@ function initCustomerPaymentsEdit() {
             ].join('');
         } else if (elem.value == 'program') {
             let programSelectDom = document.getElementById('payment_programs');
-            selectedProgramData = JSON.parse(programSelectDom.closest('.selectParent')?.querySelector('ul li.selected').dataset.option);
-            if (selectedProgramData.category != 'waiting') {
+            const selectedProgramLi = programSelectDom?.closest('.selectParent')?.querySelector('ul li.selected');
+            selectedProgramData = JSON.parse(selectedProgramLi?.dataset?.option || '{}');
+            if (programMethodAvailable(selectedProgramData)) {
                 if (selectedProgramData.category != 'waiting') {
                     let beneficiary = '-';
                     if (selectedProgramData.category) {
@@ -331,7 +336,7 @@ function initCustomerPaymentsEdit() {
                     buildInput({ label: 'Remarks', name: 'remarks', id: 'remarks', placeholder: 'Remarks', value: customerPayment.remarks, dataValidate: 'friendly', oninput: 'validateInput(this)' }),
                 ].join('');
 
-                let bankAccountData = selectedProgramData.sub_category.bank_accounts;
+                let bankAccountData = selectedProgramData.sub_category?.bank_accounts;
 
                 if (bankAccountData) {
                     let bankAccountsSelect = document.getElementById('bank_accounts');
@@ -367,7 +372,10 @@ function initCustomerPaymentsEdit() {
         }
         let ProgramData = JSON.parse(selectedLi.dataset.option);
 
-        if (ProgramData.category != 'waiting') {
+        const canUseProgramMethod = programMethodAvailable(ProgramData);
+        methodSelectDom.disabled = canUseProgramMethod;
+
+        if (canUseProgramMethod) {
             const desiredMethod = methodSelectDom.closest('.selectParent').querySelector('ul li[data-value="program"]');
             if (!desiredMethod) {
                 methodSelectDom.closest('.selectParent').querySelector('ul').innerHTML += `
@@ -379,6 +387,11 @@ function initCustomerPaymentsEdit() {
                 ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
         } else {
             methodSelectDom.closest('.selectParent').querySelector('ul li[data-value="program"]')?.remove();
+            const methodHiddenInput = methodSelectDom.closest('.selectParent')?.querySelector('.dbInput[data-for="method"]');
+            if ((methodHiddenInput?.value || methodSelectDom.value).toLowerCase() === 'program') {
+                methodSelectDom.value = '';
+                if (methodHiddenInput) methodHiddenInput.value = '';
+            }
             detailsDom.innerHTML = '';
         }
         trackDateState(dateDom);
