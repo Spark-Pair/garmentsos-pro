@@ -143,7 +143,7 @@
         [data-theme='light'] {
             --bg-color: #ffffff;
             --h-bg-color: #d1d3d7;
-            --secondary-bg-color: #eef0f2;
+            --secondary-bg-color: #ebeff3;
             --h-secondary-bg-color: hsl(0, 0%, 96%);
             --text-color: #1f2937;
             --secondary-text: #4b5563;
@@ -403,6 +403,10 @@
             /* For Firefox */
         }
 
+        input[type="date"] {
+            height: 2.437rem !important;
+        }
+
         input[disabled] {
             cursor: not-allowed;
         }
@@ -554,7 +558,7 @@
 
         .field-error-msg {
             position: absolute;
-            right: -0.35rem;
+            right: 0;
             bottom: calc(100% + 0.55rem);
             z-index: 100;
             width: max-content;
@@ -637,11 +641,19 @@
         }
 
         .rounded-lg {
-            border-radius: 0.75rem !important;
+            border-radius: 0.65rem !important;
         }
 
         .rounded-xl {
             border-radius: 0.95rem !important;
+        }
+
+        .rounded-2xl {
+            border-radius: 1.15rem !important;
+        }
+
+        .rounded-3xl {
+            border-radius: 1.35rem !important;
         }
     </style>
 
@@ -737,7 +749,7 @@
             </div>
             <div class="left_actions absolute top-5 left-5 flex gap-2">
                 <button id="go_back_button" type="button" aria-label="Go Back" class="border border-gray-600 group bg-[var(--bg-color)] h-full rounded-xl cursor-pointer flex items-center justify-end p-1 overflow-hidden hover:pr-3 transition-all duration-300 ease-in-out">
-                    <div class="flex items-center justify-center bg-[var(--h-bg-color)] rounded-lg p-1.5">
+                    <div class="flex items-center justify-center bg-[var(--h-bg-color)] rounded-lg p-2">
                         <svg class="size-4 transition-all duration-300 ease-in-out group-hover:size-3.5 fill-[var(--secondary-text)]"
                         xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
                         <path d="M19 12H5m6-6l-6 6 6 6" stroke="currentColor" stroke-width="2.5" fill="none"/>
@@ -748,7 +760,7 @@
                     </span>
                 </button>
                 <button id="refresh_button" type="button" aria-label="Refresh" class="border border-gray-600 group bg-[var(--bg-color)] h-full rounded-xl cursor-pointer flex items-center justify-end p-1 overflow-hidden hover:pr-3 transition-all duration-300 ease-in-out">
-                    <div class="flex items-center justify-center bg-[var(--h-bg-color)] rounded-lg p-1.5">
+                    <div class="flex items-center justify-center bg-[var(--h-bg-color)] rounded-lg p-2">
                         <svg class="size-4 transition-all duration-300 ease-in-out group-hover:size-3.5 fill-[var(--secondary-text)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
                             <g>
                               <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
