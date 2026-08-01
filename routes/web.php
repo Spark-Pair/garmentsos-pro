@@ -266,6 +266,7 @@ Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensur
     Route::post('set-cr-type', [Controller::class, 'setCRType'])->name('set-cr-type');
     Route::post('set-statement-type', [Controller::class, 'setStatementType'])->name('set-statement-type');
     Route::post('set-physical-quantity-report-type', [Controller::class, 'setPhysicalQuantityReportType'])->name('set-physical-quantity-report-type');
+    Route::post('set-fabric-report-type', [Controller::class, 'setFabricReportType'])->name('set-fabric-report-type');
 
     Route::get('reports/statement', [ReportController::class, 'statement'])->middleware('moduleEnabled:reports')->name('reports.statement');
     Route::post('reports/statement/get-names', [ReportController::class, 'getNames'])->name('reports.statement.get-names');

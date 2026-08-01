@@ -45,12 +45,14 @@ class User extends Authenticatable
         'c_r_type',
         'statement_type',
         'physical_quantity_report_type',
+        'fabric_report_type',
         'menu_shortcuts',
     ];
 
     protected $attributes = [
         'statement_type' => 'general',
         'physical_quantity_report_type' => 'altration',
+        'fabric_report_type' => 'worker',
     ];
 
     protected $casts = [

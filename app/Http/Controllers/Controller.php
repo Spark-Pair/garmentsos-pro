@@ -1362,6 +1362,40 @@ class Controller extends BaseController
         ]);
     }
 
+    public function setFabricReportType(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            "fabric_report_type" => "required|in:worker,tag,article",
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(["error" => $validator->errors()->first()]);
+        }
+
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(["error" => "Session expired. Please sign in again."], 401);
+        }
+
+        if (!Schema::hasColumn('users', 'fabric_report_type')) {
+            report(new \RuntimeException('Fabric report type preference column is missing. Run migrations before saving fabric report type.'));
+
+            return response()->json([
+                "error" => "Fabric report preference is not ready. Please run migrations and refresh.",
+            ], 503);
+        }
+
+        $user->fabric_report_type = $request->fabric_report_type;
+        $user->save();
+
+        session()->flash('success', 'Fabric report type updated.');
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Fabric report type set as default.',
+        ]);
+    }
+
     public function getUtilityAccounts(Request $request)
     {
         $validator = Validator::make($request->all(), [

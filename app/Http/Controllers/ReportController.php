@@ -225,6 +225,7 @@ class ReportController extends Controller
             $bank_accounts = app(ModuleBranchService::class)->applyRelatedScope(BankAccount::with('bank')->where('status', 'active'), 'bank_accounts', 'reports_statement')->get();
             return response()->json($bank_accounts->map(fn ($account) => [
                 'id' => $account->id,
+                'date' => $account->date,
                 'account_title' => $account->account_title,
                 'category' => $account->category,
                 'bank' => [
@@ -918,33 +919,40 @@ class ReportController extends Controller
                 ->sortByDesc(fn (array $row) => ($row['date_raw'] ?? '') . ' ' . ($row['created_at'] ?? ''))
                 ->values();
 
-            if ($request->limit) {
-                $rows = $rows->take((int) $request->limit)->values();
+            $reportMode = $request->input('mode', Auth::user()?->fabric_report_type ?? 'worker');
+            if (!in_array($reportMode, ['worker', 'tag', 'article'], true)) {
+                $reportMode = 'worker';
             }
+
+            $summaryRows = $this->summarizeFabricReportRows($rows, $reportMode);
+
+            if ($request->limit) {
+                $summaryRows = $summaryRows->take((int) $request->limit)->values();
+            }
+
+            $calculations = $this->fabricReportSummaryCalculations($summaryRows);
 
             $authLayout = $this->getAuthLayout($request->route()->getName(), 'table');
             return response()->json([
-                'data' => $rows,
+                'data' => $summaryRows,
                 'authLayout' => $authLayout,
                 'branch_scope' => [
                     'mode' => $branchContext['mode'],
                     'labels' => $branchContext['branch_names'],
                 ],
-                'calculations' => [
-                    'total_received' => $rows->sum('received_quantity'),
-                    'total_issued' => $rows->sum('issued_quantity'),
-                    'total_returned' => $rows->sum('returned_quantity'),
-                    'total_production_used' => $rows->sum('production_quantity'),
-                    'total_balance' => collect($sourceQuantity)->sum(),
-                ],
+                'calculations' => $calculations,
             ]);
         }
 
         $authLayout = $this->getAuthLayout($request->route()->getName(), 'table');
         $branchContext = app(ModuleBranchService::class)->reportBranchContext('reports_fabric');
         $selectedBranchLabels = $branchContext['branch_names'];
+        $fabricReportType = Auth::user()?->fabric_report_type ?? 'worker';
+        if (!in_array($fabricReportType, ['worker', 'tag', 'article'], true)) {
+            $fabricReportType = 'worker';
+        }
 
-        return view('reports.fabric', compact('authLayout', 'selectedBranchLabels'));
+        return view('reports.fabric', compact('authLayout', 'selectedBranchLabels', 'fabricReportType'));
     }
 
     public function physicalQuantity(Request $request, PhysicalQuantityReportService $physicalQuantityReportService)
@@ -1034,6 +1042,141 @@ class ReportController extends Controller
                 $scope->orWhereNull($branchColumn);
             }
         });
+    }
+
+    private function summarizeFabricReportRows($rows, string $mode)
+    {
+        $groups = [];
+
+        foreach ($rows as $row) {
+            $source = (string) ($row['source'] ?? '');
+            $fabric = $this->cleanFabricReportValue($row['fabric'] ?? '-');
+            $tag = $this->cleanFabricReportValue($row['tag'] ?? '-');
+            $unit = $this->cleanFabricReportValue($row['unit'] ?? '-');
+            $worker = $this->cleanFabricReportValue($row['worker_name'] ?? '-');
+            $article = $this->cleanFabricReportValue($row['article_no'] ?? '-');
+            $received = 0.0;
+            $used = 0.0;
+            $returned = 0.0;
+
+            if ($mode === 'worker') {
+                if ($worker === '-') {
+                    continue;
+                }
+
+                if ($source === 'Issued to Worker') {
+                    $received = (float) ($row['issued_quantity'] ?? 0);
+                } elseif ($source === 'Used in Production') {
+                    $used = (float) ($row['production_quantity'] ?? 0);
+                } elseif ($source === 'Returned by Worker') {
+                    $returned = (float) ($row['returned_quantity'] ?? 0);
+                } else {
+                    continue;
+                }
+
+                $key = $this->fabricReportKey([$worker, $tag, $unit]);
+                $groups[$key] ??= [
+                    'mode' => $mode,
+                    'worker_name' => $worker,
+                    'fabric' => $fabric,
+                    'tag' => $tag,
+                    'unit' => $unit,
+                    'received_quantity' => 0.0,
+                    'used_quantity' => 0.0,
+                    'returned_quantity' => 0.0,
+                    'available_quantity' => 0.0,
+                    'details' => [],
+                ];
+            } elseif ($mode === 'tag') {
+                if ($source === 'Received' || $source === 'Inventory In') {
+                    $received = (float) ($row['received_quantity'] ?? 0);
+                } elseif ($source === 'Returned by Worker') {
+                    $received = (float) ($row['returned_quantity'] ?? 0);
+                } elseif ($source === 'Used in Production') {
+                    $used = (float) ($row['production_quantity'] ?? 0);
+                } elseif ($source === 'Inventory Out') {
+                    $used = (float) ($row['issued_quantity'] ?? 0);
+                } else {
+                    continue;
+                }
+
+                $key = $this->fabricReportKey([$fabric, $tag, $unit]);
+                $groups[$key] ??= [
+                    'mode' => $mode,
+                    'fabric' => $fabric,
+                    'tag' => $tag,
+                    'unit' => $unit,
+                    'received_quantity' => 0.0,
+                    'used_quantity' => 0.0,
+                    'returned_quantity' => 0.0,
+                    'available_quantity' => 0.0,
+                    'details' => [],
+                ];
+            } else {
+                if ($source !== 'Used in Production' || $article === '-') {
+                    continue;
+                }
+
+                $used = (float) ($row['production_quantity'] ?? 0);
+                $key = $this->fabricReportKey([$fabric, $tag, $unit, $article]);
+                $groups[$key] ??= [
+                    'mode' => $mode,
+                    'fabric' => $fabric,
+                    'tag' => $tag,
+                    'unit' => $unit,
+                    'article_no' => $article,
+                    'received_quantity' => 0.0,
+                    'used_quantity' => 0.0,
+                    'returned_quantity' => 0.0,
+                    'available_quantity' => 0.0,
+                    'details' => [],
+                ];
+            }
+
+            $groups[$key]['received_quantity'] += $received;
+            $groups[$key]['used_quantity'] += $used;
+            $groups[$key]['returned_quantity'] += $returned;
+            $groups[$key]['available_quantity'] =
+                $groups[$key]['received_quantity'] - $groups[$key]['used_quantity'] - $groups[$key]['returned_quantity'];
+            $groups[$key]['details'][] = array_merge($row, [
+                'summary_received_quantity' => $received,
+                'summary_used_quantity' => $used,
+                'summary_returned_quantity' => $returned,
+            ]);
+        }
+
+        return collect($groups)
+            ->sortBy([
+                fn ($row) => strtolower((string) ($row['worker_name'] ?? $row['fabric'] ?? '')),
+                fn ($row) => strtolower((string) ($row['tag'] ?? '')),
+                fn ($row) => strtolower((string) ($row['article_no'] ?? '')),
+            ])
+            ->values();
+    }
+
+    private function fabricReportSummaryCalculations($rows): array
+    {
+        return [
+            'total_received' => (float) $rows->sum('received_quantity'),
+            'total_issued' => 0.0,
+            'total_returned' => (float) $rows->sum('returned_quantity'),
+            'total_production_used' => (float) $rows->sum('used_quantity'),
+            'total_used' => (float) $rows->sum('used_quantity'),
+            'total_available' => (float) $rows->sum('available_quantity'),
+            'total_balance' => (float) $rows->sum('available_quantity'),
+        ];
+    }
+
+    private function cleanFabricReportValue($value): string
+    {
+        $value = trim((string) $value);
+
+        return $value === '' ? '-' : $value;
+    }
+
+    private function fabricReportKey(array $parts): string
+    {
+        return implode('|', array_map(fn ($part) => strtolower($this->cleanFabricReportValue($part)), $parts));
     }
 
     private function expenseStatementPayload(int $id): ?array
