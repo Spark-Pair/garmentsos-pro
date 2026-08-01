@@ -50,7 +50,7 @@
 </div>
 <div class="relative w-full md:w-auto md:z-40">
     <aside
-        class="bg-[var(--secondary-bg-color)] w-full md:w-16 flex justify-between md:flex-col items-center px-5 py-3 md:px-0 md:py-3 h-full md:h-screen transition-all duration-300 ease-in-out fade-in relative z-40">
+        class="w-full md:w-16 flex justify-between md:flex-col items-center px-5 py-3 md:px-0 md:py-3 h-full md:h-screen transition-all duration-300 ease-in-out fade-in relative z-40">
         <!-- Logo -->
         <a href="/"
             class="text-[var(--text-color)] p-3 w-14 h-14 flex items-center justify-center group cursor-normal relative"
