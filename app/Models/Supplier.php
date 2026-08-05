@@ -445,11 +445,12 @@ class Supplier extends Model
         } else {
             $expenses = $mapQuery($expenseQuery, fn($i) => [
                 'date' => $rawDate($i, 'date'),
-                'reff_no' => $i->reff_no,
+                'reff_no' => $i->reff_no ?? '-',
                 'type' => 'invoice',
+                'method' => 'Expense',
                 'bill' => (float) ($i->amount ?? 0),
                 'payment' => 0,
-                'description' => $i->remarks ?? '-',
+                'description' => $i->remarks . ' (' . $i->id . ')' ?? '-',
                 'created_at' => $i->created_at,
                 'source' => [
                     'type' => 'expense',
@@ -459,12 +460,12 @@ class Supplier extends Model
 
             $payments = $mapQuery($paymentQuery, fn($p) => [
                 'date' => $rawDate($p, 'date'),
-                'reff_no' => $p->cheque_no ?? $p->slip?->slip_no ?? $p->cheque?->cheque_no ?? $p->transaction_id ?? $p->reff_no,
+                'reff_no' => $p->cheque_no ?? $p->slip?->slip_no ?? $p->cheque?->cheque_no ?? $p->transaction_id ?? $p->reff_no ?? '-',
                 'type' => 'payment',
                 'method' => $p->method,
                 'payment' => (float) ($p->amount ?? 0),
                 'bill' => 0,
-                'description' => $paymentDescription($p),
+                'description' => $paymentDescription($p) ?? '-',
                 'created_at' => $p->created_at,
                 'source' => [
                     'type' => $p->voucher_id ? 'voucher' : 'supplier_payment',

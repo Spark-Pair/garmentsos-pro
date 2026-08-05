@@ -250,6 +250,12 @@ class Customer extends Model
                     : null);
         };
 
+        $invoiceDescription = function ($i) {
+            $biltyNo = $i->bilty? $i->bilty->bilty_no : '-';
+            $cargoName = $i->cargo? $i->cargo->cargo_name : '-';
+            return "$biltyNo | $cargoName";
+        };
+
         if ($type === 'summarized') {
             // 🔹 Group invoices by date
             $invoiceGrouped = $invoices->groupBy(fn($i) => Carbon::parse($i->date)->toDateString());
@@ -306,6 +312,7 @@ class Customer extends Model
                     'date' => $i->date,
                     'reff_no' => $i->invoice_no,
                     'type' => 'invoice',
+                    'method' => 'Invoice',
                     'bill' => (float) $i->netAmount,
                     'payment' => 0,
                     'created_at' => $i->created_at,
@@ -353,8 +360,10 @@ class Customer extends Model
                     'date' => $i->date,
                     'reff_no' => $i->invoice_no,
                     'type' => 'invoice',
+                    'method' => 'Invoice',
                     'bill' => (float) $i->netAmount,
                     'payment' => 0,
+                    'description' => $invoiceDescription($i),
                     'created_at' => $i->created_at,
                     'source' => [
                         'type' => 'invoice',

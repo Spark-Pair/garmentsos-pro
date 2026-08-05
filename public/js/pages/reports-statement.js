@@ -356,7 +356,7 @@
                         response.forEach(function (item) {
                             let displayText = "";
                             if (category === "customer") {
-                                displayText = item.customer_name + " | " + item.city?.short_title;
+                                displayText = item.customer_name + " | " + item.city?.title;
                             } else if (category === "supplier") {
                                 displayText = item.supplier_name || "";
                             } else if (category === "bank_account") {
