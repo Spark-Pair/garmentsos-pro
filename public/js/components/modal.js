@@ -116,7 +116,7 @@ function createModal(data, animate = 'animate') {
     let clutter = `
         <form id="${data.id}" method="${data.method ?? 'POST'}" action="${data.action}" enctype="multipart/form-data" class="w-full h-full flex flex-col space-y-4 relative items-center justify-center ${animate == 'animate' ? 'scale-in' : ''} ${data.class}">
             <input type="hidden" name="_token" value="${document.querySelector('meta[name=\'csrf-token\']')?.content}">
-            <div class="${data.class} ${data.preview ? `bg-white text-black ${isA5Preview ? "w-[calc(148mm+3rem)] max-w-[calc(100vw-2rem)]" : "max-w-4xl"} h-[35rem] py-0` : 'bg-[var(--secondary-bg-color)]'} ${data.cards ? (isMenuModal ? 'h-[42rem] max-w-6xl' : 'h-[40rem] max-w-6xl') : (explicitMaxWidth || isA5Preview ? '' : 'max-w-2xl')} rounded-2xl shadow-lg ${isA5Preview ? '' : 'w-full'} ${isMenuModal ? 'p-4 sm:p-5' : 'p-6'} flex relative">
+            <div class="${data.class} ${data.preview ? `bg-white text-black ${isA5Preview ? "w-[calc(148mm+5rem)] max-w-[calc(100vw-2rem)]" : "max-w-4xl"} h-[35rem] py-0` : 'bg-[var(--secondary-bg-color)]'} ${data.cards ? (isMenuModal ? 'h-[42rem] max-w-6xl' : 'h-[40rem] max-w-6xl') : (explicitMaxWidth || isA5Preview ? '' : 'max-w-2xl')} rounded-2xl shadow-lg ${isA5Preview ? '' : 'w-full'} ${isMenuModal ? 'p-4 sm:p-5' : 'p-6'} flex relative">
                 <div id="modal-close" onclick="closeModal('${data.id}')" tabindex="-1"
                     class="absolute top-0 -right-4 translate-x-full bg-[var(--secondary-bg-color)] rounded-2xl shadow-lg w-auto p-3 text-sm transition-all duration-300 ease-in-out hover:scale-[0.95] cursor-pointer">
                     <button type="button" tabindex="-1" data-modal-close-button="true"
@@ -629,7 +629,7 @@ function createModal(data, animate = 'animate') {
         const rows = Array.isArray(array) ? array : [];
         const chunks = [];
         let remaining = rows.slice();
-        const maxRowsWithoutTotals = 12;
+        const maxRowsWithoutTotals = 13;
         const maxRowsWithTotals = 11;
 
         if (remaining.length <= maxRowsWithTotals) {
@@ -708,7 +708,7 @@ function createModal(data, animate = 'animate') {
 
             invoiceTableBody = `
                 ${previewData.payments.map((payment, index) => {
-                    const hrClass = index === 0 ? "mb-2.5" : "my-2.5";
+                    const hrClass = index === 0 ? "mb-2" : "my-2";
                     return `
                     <div>
                         <hr class="w-full ${hrClass} border-gray-600">
@@ -760,7 +760,7 @@ function createModal(data, animate = 'animate') {
 
         } else if (data.preview.type == "cargo_list") {
             const cargoInvoices = Array.isArray(previewData.invoices) ? previewData.invoices : [];
-            const cargoPages = chunkArray(cargoInvoices, 24, false);
+            const cargoPages = chunkArray(cargoInvoices, 26, false);
             let cargoSerial = 1;
 
             cargoPages.forEach((cargoChunk, pageIndex) => {
@@ -774,7 +774,7 @@ function createModal(data, animate = 'animate') {
                 `;
 
                 invoiceTableBody = cargoChunk.map((invoice, index) => {
-                    const hrClass = index === 0 ? "mb-2.5" : "my-2.5";
+                    const hrClass = index === 0 ? "mb-2" : "my-2";
                     return `
                     <div>
                         <hr class="w-full ${hrClass} border-black">
@@ -843,7 +843,7 @@ function createModal(data, animate = 'animate') {
                                 .map(key => orderedArticle[key])
                                 .find(v => v !== null && v !== undefined) ?? 0;
                             const total = parseInt(salesRate) * qty;
-                            const hrClass = index === 0 ? "mb-2.5" : "my-2.5";
+                            const hrClass = index === 0 ? "mb-2" : "my-2";
 
                             totalAmount += total;
                             totalPcs += qty;
@@ -963,16 +963,10 @@ function createModal(data, animate = 'animate') {
                                         </div>
                                     ` : ''}
                                 </div>
-                                <!-- Phone Number (Below Both) -->
-                                ${data.preview.type != 'form' && previewCompany.phone_number ? `
-                                    <div class="mt-2 text-sm text-gray-600">
-                                        ${previewCompany.phone_number}
-                                    </div>
-                                ` : ''}
                             </div>
                         </div>
                         <div class="right">
-                            <div class="logo text-right">
+                            <div class="logo text-right py-1">
                                 <h1 class="text-2xl font-medium text-[var(--h-primary-color)]">${data.preview.document}</h1>
                                 ${documentNo ? `<div class="document-number mt-1 text-right">${documentNoLabel}: ${documentNo}</div>` : ''}
                                 ${!['invoice', 'order', 'shipment'].includes(data.preview.type) && previewData.order_no ? '<div class="mt-1 text-right">Order No.: ' + previewData.order_no + '</div>' : ''}
@@ -1017,7 +1011,7 @@ function createModal(data, animate = 'animate') {
                         <hr class="w-full my-3 border-black">
                         <div class="body w-full px-5 grow mx-auto">
                             <div class="table w-full">
-                                <div class="table w-full border border-black rounded-lg pb-2.5 overflow-hidden">
+                                <div class="table w-full border border-black rounded-lg pb-2 overflow-hidden">
                                     <div class="thead w-full">
                                         <div class="tr ${data.preview.type == 'voucher' || data.preview.type == 'cargo_list' ? 'flex justify-between' : 'grid'} ${data.preview.type == 'order' ? 'grid-cols-9' : data.preview.type == 'invoice' ? 'grid-cols-8' : data.preview.type == 'shipment' ? 'grid-cols-8' : 'grid-cols-9'} w-full px-4 py-1.5 bg-[var(--primary-color)] text-white">
                                             ${invoiceTableHeader}
@@ -1057,10 +1051,8 @@ function createModal(data, animate = 'animate') {
                     </div>
                     <hr class="w-full my-3 border-black">
                     <div class="footer flex w-full text-sm px-5 justify-between text-black">
-                        <p class="leading-none">Powered by SparkPair</p>
-                        ${['invoice', 'order', 'shipment', 'cargo_list'].includes(data.preview.type) ? `<p class="leading-none text-sm">Page ${pageIndex + 1} of ${totalPages}</p>` : ''}
-                        ${['invoice', 'order', 'shipment', 'cargo_list'].includes(data.preview.type) ? `<p class="leading-none text-sm">Printed: ${printDateTime()}</p>` : ''}
-                        <p class="leading-none text-sm">&copy; ${new Date().getFullYear()} SparkPair | +92 316 5825495</p>
+                        <p class="leading-none text-sm">Powered by SparkPair | +92 316 5825495</p>
+                        ${['invoice', 'order', 'shipment', 'cargo_list'].includes(data.preview.type) ? `<p class="leading-none text-sm">${pageIndex + 1} of ${totalPages} | ${printDateTime()}</p>` : ''}
                     </div>
                 </div>
             </div>

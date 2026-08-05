@@ -86,7 +86,7 @@
                         <style>
                             @page {
                                 size: A5 portrait;
-                                margin: 0;
+                                margin: 3mm;
                             }
 
                             @media print {

@@ -138,7 +138,7 @@
             const source = Array.isArray(rows) ? rows : [];
             const chunks = [];
             let remaining = source.slice();
-            const maxRowsWithoutTotals = 12;
+            const maxRowsWithoutTotals = 13;
             const maxRowsWithTotals = 11;
 
             if (remaining.length <= maxRowsWithTotals) {
@@ -1709,7 +1709,7 @@
                                 <style>
                                     @page {
                                         size: A5 portrait;
-                                        margin: 0;
+                                        margin: 3mm;
                                     }
 
                                     @media print {

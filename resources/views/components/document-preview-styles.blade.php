@@ -179,6 +179,16 @@
         padding: 4px 9px !important;
     }
 
+    .gos-a5-document .thead .tr {
+        min-height: 0;
+        padding: 5.5px 9px !important;
+    }
+
+    .cargo-list-document .tbody .tr {
+        min-height: 0;
+        padding: 5.5px 9px !important;
+    }
+
     .gos-a5-document .tbody hr {
         margin-top: 0 !important;
         margin-bottom: 0 !important;
@@ -186,7 +196,7 @@
 
     .gos-a5-document .table.border {
         padding-bottom: 0 !important;
-        border-radius: 6px !important;
+        border-radius: 8px !important;
     }
 
     .gos-a5-document > .flex > .grid.grid-cols-2 {
@@ -197,10 +207,10 @@
 
     .gos-a5-document .total {
         min-height: 25px;
-        border-radius: 5px !important;
+        border-radius: 8px !important;
         font-size: 11px !important;
         line-height: 1.2 !important;
-        padding: 5px 10px !important;
+        padding: 5px 8px !important;
     }
 
     .gos-a5-document .total > div:first-child {
@@ -225,8 +235,8 @@
 
     .gos-a5-document hr:has(+ .footer),
     .gos-a5-document hr:has(+ .tfooter) {
-        margin-top: 3px !important;
-        margin-bottom: 2px !important;
+        margin-top: 6px !important;
+        margin-bottom: 6px !important;
     }
 
     .gos-a5-document .footer:has(> :nth-child(4)),
@@ -288,7 +298,7 @@
         --gos-invoice-detail-bg: #f8fafc;
         --gos-invoice-muted: #374151;
         box-sizing: border-box;
-        padding: 3.75mm;
+        padding: 0;
         font-size: 11px;
         line-height: 1.28;
     }
@@ -296,8 +306,8 @@
     .gos-a5-invoice hr {
         border-color: var(--gos-invoice-border) !important;
         border-top-width: 1px !important;
-        margin-top: 4px !important;
-        margin-bottom: 4px !important;
+        margin-top: 6px !important;
+        margin-bottom: 6px !important;
     }
 
     .gos-a5-invoice #banner,
@@ -406,14 +416,23 @@
     .gos-a5-invoice .thead .tr {
         column-gap: 0;
         min-height: 28px;
-        padding: 3px 6px !important;
-        border-bottom: 0.5px solid var(--gos-invoice-border);
+        padding: 3px 7px !important;
     }
 
     .gos-a5-invoice .tbody .tr {
         column-gap: 0;
         min-height: 38px;
-        padding: 3px 6px !important;
+        padding: 3px 7px !important;
+    }
+
+    .cargo-list-preview .thead .tr {
+        min-height: 0;
+        padding: 5.5px 7px !important;
+    }
+
+    .cargo-list-preview .tbody .tr {
+        min-height: 0;
+        padding: 5.5px 7px !important;
     }
 
     .gos-a5-invoice .th,
@@ -485,10 +504,6 @@
     .gos-a5-invoice .grid-cols-9 .td:nth-child(8) {
         justify-content: flex-end;
         text-align: right;
-    }
-
-    .gos-a5-invoice .tbody hr {
-        display: none;
     }
 
     .gos-a5-invoice .invoice-item-row {
@@ -582,7 +597,7 @@
     .gos-a5-invoice .total {
         min-height: 24px;
         font-size: 12px !important;
-        padding: 5px 10px !important;
+        padding: 5px 8px !important;
     }
 
     .gos-a5-invoice .total > div:last-child {
@@ -595,64 +610,6 @@
 
     .gos-a5-invoice .total:last-child > div:last-child {
         font-weight: 700;
-    }
-
-    .gos-a5-invoice .cargo-list-document .thead .tr {
-        min-height: 21px;
-        padding-top: 3px !important;
-        padding-bottom: 3px !important;
-    }
-
-    .gos-a5-invoice .cargo-list-document .tbody .tr {
-        min-height: 20.5px;
-        padding-top: 2.5px !important;
-        padding-bottom: 2.5px !important;
-    }
-
-    .gos-a5-invoice .cargo-list-document .th,
-    .gos-a5-invoice .cargo-list-document .td {
-        font-size: 9.2px !important;
-        line-height: 1.08 !important;
-    }
-
-    .gos-a5-invoice.cargo-list-preview {
-        padding: 4mm !important;
-    }
-
-    .gos-a5-invoice.cargo-list-preview #banner,
-    .gos-a5-invoice.cargo-list-preview .banner,
-    .gos-a5-invoice.cargo-list-preview #header,
-    .gos-a5-invoice.cargo-list-preview .header,
-    .gos-a5-invoice.cargo-list-preview .body,
-    .gos-a5-invoice.cargo-list-preview .footer,
-    .gos-a5-invoice.cargo-list-preview .tfooter {
-        padding-left: 8px !important;
-        padding-right: 8px !important;
-    }
-
-    .gos-a5-invoice.cargo-list-preview .thead .tr,
-    .gos-a5-invoice.cargo-list-preview .tbody .tr {
-        column-gap: 8px !important;
-    }
-
-    .gos-a5-invoice .cargo-list-document .thead .th,
-    .gos-a5-invoice .cargo-list-document .tbody .td {
-        justify-content: flex-start;
-        text-align: left;
-    }
-
-    .gos-a5-invoice .cargo-list-document .thead .th:first-child,
-    .gos-a5-invoice .cargo-list-document .tbody .td:first-child,
-    .gos-a5-invoice .cargo-list-document .thead .th:nth-child(4),
-    .gos-a5-invoice .cargo-list-document .tbody .td:nth-child(4) {
-        justify-content: center;
-        text-align: center;
-    }
-
-    .gos-a5-invoice .cargo-list-document .thead .th:last-child,
-    .gos-a5-invoice .cargo-list-document .tbody .td:last-child {
-        justify-content: flex-end;
-        text-align: right;
     }
 
     .gos-a5-invoice > .flex > .grid.grid-cols-2 {

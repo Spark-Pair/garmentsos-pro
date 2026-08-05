@@ -78,10 +78,10 @@
                                 }
 
                                 .preview {
-                                    width: 142mm !important;
-                                    height: 204mm !important;
-                                    max-width: 142mm !important;
-                                    max-height: 204mm !important;
+                                    width: 148mm !important;
+                                    height: 210mm !important;
+                                    max-width: 148mm !important;
+                                    max-height: 210mm !important;
                                     overflow: hidden !important;
                                     break-after: page;
                                     page-break-after: always;
