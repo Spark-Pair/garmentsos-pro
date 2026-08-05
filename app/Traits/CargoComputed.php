@@ -23,7 +23,10 @@ trait CargoComputed
                     'short_title' => $invoice->customer->city->short_title,
                 ] : null,
             ] : null,
-        ])->values();
+        ])->sortBy(
+            fn($invoice) => $invoice['invoice_no'] ?? '',
+            SORT_NATURAL | SORT_FLAG_CASE
+        )->values();
 
         return [
             'id' => $this->id,
@@ -38,6 +41,8 @@ trait CargoComputed
                 'cargo_name' => $this->cargo_name,
                 'date' => $this->date?->format('Y-m-d'),
                 'invoices' => $invoices,
+                'branch_id' => $this->branch_id,
+                'branch_branding' => app(\App\Services\Branches\ModuleBranchService::class)->documentBranding('cargo', $this),
             ],
             'oncontextmenu' => "generateContextMenu(event)",
             'onclick' => "generateModal(this)",
