@@ -46,22 +46,23 @@
             <div class="details h-full z-40">
                 <div class="container-parent h-full">
                     <div class="card_container px-3 h-full flex flex-col">
-                        <div id="table-head" class="grid grid-cols-[8%_7%_4%_8%_8%_8%_8%_7%_7%_8%_4%_4%_4%_8%_7%] items-center bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4 text-xs">
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Article No.</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Proc. By</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Unit</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Total Qty.</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Received Qty.</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Ordered Qty.</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Invoiced Qty.</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Return Qty.</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Adjustment Qty.</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Current Stock Qty.</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">A</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">B</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">C</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Remaining Qty.</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Shipment</div>
+                        <div id="table-head" class="flex items-center bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4 text-xs">
+                            <div class="cursor-pointer w-[7%]" onclick="sortByThis(this)">Article</div>
+                            <div class="cursor-pointer w-[7%]" onclick="sortByThis(this)">Proc. By</div>
+                            <div class="cursor-pointer w-[4%]" onclick="sortByThis(this)">Unit</div>
+                            <div class="cursor-pointer w-[8%]" onclick="sortByThis(this)">Orderable</div>
+                            <div class="cursor-pointer w-[8%]" onclick="sortByThis(this)">Total</div>
+                            <div class="cursor-pointer w-[8%]" onclick="sortByThis(this)">Received</div>
+                            <div class="cursor-pointer w-[8%]" onclick="sortByThis(this)">Ordered</div>
+                            <div class="cursor-pointer w-[8%]" onclick="sortByThis(this)">Invoiced</div>
+                            <div class="cursor-pointer w-[8%]" onclick="sortByThis(this)">Return</div>
+                            <div class="cursor-pointer w-[8%]" onclick="sortByThis(this)">Adjustment</div>
+                            <div class="cursor-pointer w-[8%]" onclick="sortByThis(this)">Current Stock</div>
+                            <div class="cursor-pointer w-[8%]" onclick="sortByThis(this)">A</div>
+                            <div class="cursor-pointer w-[8%]" onclick="sortByThis(this)">B</div>
+                            <div class="cursor-pointer w-[8%]" onclick="sortByThis(this)">C</div>
+                            <div class="cursor-pointer w-[8%]" onclick="sortByThis(this)">Remaining</div>
+                            <div class="cursor-pointer w-[8%]" onclick="sortByThis(this)">Shipment</div>
                         </div>
                         <p id="noItemsError" style="display: none" class="text-sm text-[var(--border-error)] mt-3">No items found</p>
                         <div class="overflow-y-auto grow my-scrollbar-2">

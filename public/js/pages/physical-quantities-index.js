@@ -6,24 +6,25 @@
         window.createRow = function createRow(data) {
             return `
             <div id="${data.id}" oncontextmenu='${htmlAttr(data.oncontextmenu || "")}' onclick='${htmlAttr(data.onclick || "")}'
-                class="item row relative group grid grid-cols-[8%_7%_4%_8%_8%_8%_8%_7%_7%_8%_4%_4%_4%_8%_7%] border-b border-[var(--h-bg-color)] items-center py-2 cursor-pointer hover:bg-[var(--h-secondary-bg-color)] transition-all fade-in ease-in-out text-xs"
+                class="item row relative group flex border-b border-[var(--h-bg-color)] items-center py-2 cursor-pointer hover:bg-[var(--h-secondary-bg-color)] transition-all fade-in ease-in-out text-xs"
                 data-json='${jsonAttr(data)}'>
 
-                <span>${data.article_no}</span>
-                <span class="capitalize">${data.processed_by}</span>
-                <span>${data.unit}</span>
-                <span>${data.total_quantity}</span>
-                <span>${data.received_quantity} - Pkts.</span>
-                <span>${data.ordered_quantity} - Pkts.</span>
-                <span>${data.invoiced_quantity} - Pkts.</span>
-                <span>${data.return_quantity} - Pkts.</span>
-                <span>${data.adjustment_quantity} - Pkts.</span>
-                <span>${data.current_stock} - Pkts.</span>
-                <span>${data.a_category}</span>
-                <span>${data.b_category}</span>
-                <span>${data.c_category}</span>
-                <span>${data.remaining_quantity} - Pkts.</span>
-                <span>${data.shipment}</span>
+                <div class="w-[7%]">${data.article_no}</div>
+                <div class="w-[7%] capitalize">${data.processed_by}</div>
+                <div class="w-[4%]">${data.unit}</div>
+                <div class="w-[8%]">${data.orderable_quantity}</div>
+                <div class="w-[8%]">${data.total_quantity}</div>
+                <div class="w-[8%]">${data.received_quantity}</div>
+                <div class="w-[8%]">${data.ordered_quantity}</div>
+                <div class="w-[8%]">${data.invoiced_quantity}</div>
+                <div class="w-[8%]">${data.return_quantity}</div>
+                <div class="w-[8%]">${data.adjustment_quantity}</div>
+                <div class="w-[8%]">${data.current_stock}</div>
+                <div class="w-[8%]">${data.a_category}</div>
+                <div class="w-[8%]">${data.b_category}</div>
+                <div class="w-[8%]">${data.c_category}</div>
+                <div class="w-[8%]">${data.remaining_quantity}</div>
+                <div class="w-[8%]">${data.shipment}</div>
             </div>`;
         };
 

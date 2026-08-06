@@ -139,7 +139,7 @@ class ArticleStockService
             $totalReturnPcs = (int) ($returns->firstWhere('type', 'return')?->quantity ?? 0);
             $totalAdjustmentPcs = (int) ($returns->firstWhere('type', 'adjustment')?->quantity ?? 0);
             $currentStockPcs = max(0, $receivedPcs - $totalInvoicedPcs + $totalReturnPcs + $totalAdjustmentPcs);
-            $orderablePcs = max(0, $totalPcs - $totalOrderedPcs);
+            $orderablePcs = max(0, $totalPcs - $totalOrderedPcs - $totalInvoicedPcs + $totalReturnPcs + $totalAdjustmentPcs);
             $remainingReceivePcs = max(0, $totalPcs - $receivedPcs);
 
             $summary = [
