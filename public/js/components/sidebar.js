@@ -1,8 +1,28 @@
 (() => {
     function initSidebar() {
+        if (window.__sidebarInitialized) {
+            if (typeof window.renderMenuShortcuts === 'function') {
+                window.renderMenuShortcuts();
+            }
+            if (typeof window.renderMobileMenuShortcuts === 'function') {
+                window.renderMobileMenuShortcuts();
+            }
+            return;
+        }
+        window.__sidebarInitialized = true;
+
         const config = window.__sidebar || {};
         const menuData = config.menuData || [];
         const pageName = window.location.href.toLowerCase().split('/')[3];
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/'/g, '&#39;')
+                .replace(/"/g, '&quot;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
 
         function removeSidebarFromTabOrder() {
             document.querySelectorAll('aside a, aside button, aside [role="button"], aside [tabindex], #mobileMenu a, #mobileMenu button, #mobileMenu [role="button"], #mobileMenu [tabindex]')
@@ -111,8 +131,58 @@
             });
             customMenuShortcutsDom.innerHTML = clutter;
             removeSidebarFromTabOrder();
+            renderMobileMenuShortcuts();
         }
         window.renderMenuShortcuts = renderMenuShortcuts;
+
+        function mobileShortcutCard(module) {
+            const links = Array.isArray(module.subMenu) ? module.subMenu : [];
+            const primary = links[0]?.href || '#';
+            const actions = links
+                .slice(0, 3)
+                .map(item => `
+                    <a href="${escapeHtml(item.href)}"
+                        class="rounded-lg border border-gray-600/45 bg-[var(--bg-color)] px-3 py-2 text-center text-xs text-[var(--text-color)]">
+                        ${escapeHtml(item.name)}
+                    </a>
+                `)
+                .join('');
+
+            return `
+                <div class="rounded-xl border border-gray-600/45 bg-[var(--secondary-bg-color)] p-3 shadow-sm">
+                    <div class="flex items-center justify-between gap-3">
+                        <a href="${escapeHtml(primary)}" class="flex min-w-0 items-center gap-3">
+                            <span class="flex size-10 shrink-0 items-center justify-center rounded-[41.5%] bg-[var(--h-bg-color)]">
+                                ${module.svgIcon || '<i class="fas fa-circle text-[var(--primary-color)]"></i>'}
+                            </span>
+                            <span class="truncate font-semibold text-[var(--text-color)]">${escapeHtml(module.name)}</span>
+                        </a>
+                        <button type="button"
+                            class="mobile-shortcut-toggle flex size-9 shrink-0 items-center justify-center rounded-lg border border-gray-600 text-[var(--secondary-text)]"
+                            aria-expanded="false">
+                            <i class="fas fa-chevron-down transition-transform duration-200"></i>
+                        </button>
+                    </div>
+                    <div class="mobile-shortcut-actions hidden grid-cols-2 gap-2 pt-3">
+                        ${actions || `<a href="${escapeHtml(primary)}" class="rounded-lg border border-gray-600/45 bg-[var(--bg-color)] px-3 py-2 text-center text-xs text-[var(--text-color)]">Open</a>`}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderMobileMenuShortcuts() {
+            const mobileShortcutsDom = document.getElementById('mobileMenuShortcuts');
+            if (!mobileShortcutsDom) return;
+
+            const shortcuts = getMenuShortcuts();
+            const filteredModules = menuData.filter(module => shortcuts.includes(module.id));
+            const modules = filteredModules.length ? filteredModules : menuData.slice(0, 4);
+
+            mobileShortcutsDom.innerHTML = modules.length
+                ? modules.map(mobileShortcutCard).join('')
+                : `<button type="button" class="rounded-xl border border-gray-600 bg-[var(--secondary-bg-color)] px-4 py-3 text-left text-[var(--text-color)]" onclick="generateMenuModal(); window.closeMobileMenu && window.closeMobileMenu();">Open Menu</button>`;
+        }
+        window.renderMobileMenuShortcuts = renderMobileMenuShortcuts;
         renderMenuShortcuts();
 
         let modalData = {
@@ -271,24 +341,49 @@
         const mobileMenuOverlay = document.getElementById('mobileMenuOverlay');
         const mobileMenu = document.getElementById('mobileMenu');
 
-        function toggleMobileMenu() {
+        function setMobileMenuOpen(open) {
             if (!mobileMenuOverlay || !mobileMenu) return;
             closeAllMobileMenuDropdowns();
-            menuToggleIcon?.classList.toggle('fa-bars');
-            menuToggleIcon?.classList.toggle('fa-xmark');
-            mobileMenu.classList.toggle('-translate-y-full');
-            mobileMenu.classList.toggle('is-open');
-            mobileMenuOverlay.classList.toggle('opacity-zero');
-            mobileMenuOverlay.classList.toggle('pointer-events-none');
+            menuToggleIcon?.classList.toggle('fa-bars', !open);
+            menuToggleIcon?.classList.toggle('fa-xmark', open);
+            mobileMenu.classList.toggle('-translate-y-full', !open);
+            mobileMenu.classList.toggle('is-open', open);
+            mobileMenuOverlay.classList.toggle('opacity-zero', !open);
+            mobileMenuOverlay.classList.toggle('pointer-events-none', !open);
         }
+
+        function toggleMobileMenu() {
+            setMobileMenuOpen(!mobileMenu?.classList.contains('is-open'));
+        }
+
+        window.openMobileMenu = () => setMobileMenuOpen(true);
+        window.closeMobileMenu = () => setMobileMenuOpen(false);
 
         menuToggle?.addEventListener('click', () => {
             toggleMobileMenu();
         });
 
+        document.querySelectorAll('.mobile-menu-close').forEach(button => {
+            button.addEventListener('click', () => setMobileMenuOpen(false));
+        });
+
+        document.addEventListener('click', event => {
+            const toggle = event.target.closest?.('.mobile-shortcut-toggle');
+            if (!toggle) return;
+
+            const actions = toggle.closest('.rounded-xl')?.querySelector('.mobile-shortcut-actions');
+            if (!actions) return;
+
+            const isOpen = !actions.classList.contains('hidden');
+            actions.classList.toggle('hidden', isOpen);
+            actions.classList.toggle('grid', !isOpen);
+            toggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+            toggle.querySelector('i')?.classList.toggle('rotate-180', !isOpen);
+        });
+
         mobileMenuOverlay?.addEventListener('mousedown', e => {
             if (e.target.classList.contains('mobileMenuOverlay')) {
-                toggleMobileMenu();
+                setMobileMenuOpen(false);
             }
         });
 
@@ -398,4 +493,6 @@
     } else {
         boot();
     }
+    document.addEventListener('app:config:ready', boot);
+    document.addEventListener('sidebar:config:ready', boot);
 })();

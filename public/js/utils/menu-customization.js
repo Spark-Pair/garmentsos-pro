@@ -89,6 +89,9 @@ function updateMenuCustomization(moduleName, newState, switchBtn = null) {
                 if (typeof window.renderMenuShortcuts === 'function') {
                     window.renderMenuShortcuts();
                 }
+                if (typeof window.renderMobileMenuShortcuts === 'function') {
+                    window.renderMobileMenuShortcuts();
+                }
                 reRenderInfoInModal('.menuModalInfo', `Enabled: ${window.menu_shortcuts.length}/${window.maxShortcutsLimit}`);
                 return;
             }

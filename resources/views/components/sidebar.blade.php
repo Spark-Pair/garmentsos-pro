@@ -109,9 +109,9 @@
             <!-- Dropdown Menu -->
             <div
                 role="menu" aria-label="User menu"
-                class="dropdownMenu text-sm absolute bottom-0 left-16 hidden border border-gray-600 w-48 bg-[var(--h-secondary-bg-color)] text-[var(--text-color)] shadow-lg rounded-2xl opacity-0 transform scale-95 transition-all duration-300 ease-in-out z-50">
+                class="dropdownMenu text-sm absolute bottom-0 left-16 hidden border border-gray-600 w-52 bg-[var(--h-secondary-bg-color)] text-[var(--text-color)] shadow-lg rounded-2xl opacity-0 transform scale-95 transition-all duration-300 ease-in-out z-50">
                 <ul class="p-2">
-                    @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant', 'store_keeper']))
+                    @if (app_menu_can('setup', ['developer', 'owner', 'admin', 'accountant', 'store_keeper']))
                         <!-- Setups -->
                         <li>
                             <a href="{{ route('setups.index') }}"
@@ -122,7 +122,7 @@
                             </a>
                         </li>
                     @endif
-                    @if (module_enabled('rates') && in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant', 'store_keeper']))
+                    @if (module_enabled('rates'))
                         <!-- rates -->
                         <li>
                             <a href="{{ route('rates.index') }}"
@@ -153,6 +153,22 @@
                                     class="block px-4 py-2 hover:bg-[var(--h-bg-color)] rounded-lg transition-all duration-200 ease-in-out cursor-pointer">
                                     <i class="fas fa-code-branch text-[var(--secondary-color)] mr-3"></i>
                                     Branches
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{{ route('developer.branches.modules.index') }}"
+                                    role="menuitem"
+                                    class="block px-4 py-2 hover:bg-[var(--h-bg-color)] rounded-lg transition-all duration-200 ease-in-out cursor-pointer">
+                                    <i class="fas fa-sliders-h text-[var(--secondary-color)] mr-3"></i>
+                                    Branch Modules
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{{ route('developer.branches.access.index') }}"
+                                    role="menuitem"
+                                    class="block px-4 py-2 hover:bg-[var(--h-bg-color)] rounded-lg transition-all duration-200 ease-in-out cursor-pointer">
+                                    <i class="fas fa-user-shield text-[var(--secondary-color)] mr-3"></i>
+                                    Role / Permissions
                                 </a>
                             </li>
                             <li>
@@ -206,8 +222,34 @@
         class="mobileMenuOverlay inset-0 w-screen h-screen bg-[var(--overlay-color)] opacity-zero opacity-transition pointer-events-none fixed z-50">
         <div id="mobileMenu"
             class="fixed top-0 left-0 md:hidden w-full max-h-screen overflow-y-auto bg-[var(--secondary-bg-color)] z-50 flex flex-col items-start justify-start p-4 space-y-4 transform -translate-y-full transition-all 0.5s ease-in-out">
+            <div class="flex w-full items-center justify-between border-b border-gray-600/40 pb-3">
+                <div>
+                    <p class="text-xs text-[var(--secondary-text)]">Navigation</p>
+                    <h2 class="text-lg font-semibold text-[var(--text-color)]">Menu</h2>
+                </div>
+                <button type="button"
+                    class="mobile-menu-close flex size-10 items-center justify-center rounded-lg border border-gray-600 bg-[var(--secondary-bg-color)] text-[var(--text-color)]">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="flex flex-col gap-2 w-full">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold uppercase tracking-wide text-[var(--secondary-text)]">Shortcuts</span>
+                    <button type="button"
+                        class="rounded-lg bg-[var(--primary-color)] px-3 py-2 text-xs font-semibold text-white"
+                        onclick="generateMenuModal(); window.closeMobileMenu && window.closeMobileMenu();">
+                        <i class="fas fa-bars mr-1"></i>
+                        All Actions
+                    </button>
+                </div>
+                <div id="mobileMenuShortcuts" class="grid grid-cols-1 gap-2 w-full"></div>
+            </div>
+
+            <div class="border-t border-gray-600 w-full my-2"></div>
+
             <!-- Main Menu Items -->
-            <div class="flex flex-col space-y-2 w-full">
+            <div class="hidden flex-col space-y-2 w-full">
                 <x-mobile-menu-item href="/" title="Home" active="{{ request()->is('home') }}" />
 
                 @php
@@ -277,7 +319,7 @@
                 <x-mobile-menu-item href="{{ route('setups.index') }}" title="Setups"
                     active="{{ request()->is('setups') }}" />
 
-                @if (module_enabled('rates') && in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant', 'store_keeper']))
+                @if (app_menu_can('rates', ['developer', 'owner', 'admin', 'accountant']))
                     <x-mobile-menu-item href="{{ route('rates.index') }}" title="Rates"
                         active="{{ request()->is('rates*') }}" />
                 @endif
@@ -293,6 +335,8 @@
                             $systemDropdown = array_merge([
                                 ['href' => route('developer.settings'), 'title' => 'Developer Settings'],
                                 ['href' => route('developer.branches.index'), 'title' => 'Branches'],
+                                ['href' => route('developer.branches.modules.index'), 'title' => 'Branch Modules'],
+                                ['href' => route('developer.branches.access.index'), 'title' => 'Role / Permissions'],
                                 ['href' => route('developer.license.status'), 'title' => 'License Status'],
                             ], $systemDropdown);
                         }
@@ -326,7 +370,7 @@
 <script>
     window.__sidebar = {
         menuData: [
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('users', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "users",
                 name: "Users",
@@ -351,7 +395,7 @@
             },
         @endif
 
-        @if (module_enabled('suppliers') && in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('suppliers', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "suppliers",
                 name: "Suppliers",
@@ -373,7 +417,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('vouchers', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "vouchers",
                 name: "Vouchers",
@@ -396,7 +440,7 @@
             },
         @endif
 
-        @if (module_enabled('customers') && in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('customers', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "customers",
                 name: "Customers",
@@ -418,7 +462,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('customer_payments', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "customer-payments",
                 name: "Payments",
@@ -440,7 +484,7 @@
             },
         @endif
 
-        @if (module_enabled('articles') && in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant', 'store_keeper']))
+        @if (app_menu_can('articles', ['developer', 'owner', 'admin', 'accountant', 'store_keeper']))
             {
                 id: "articles",
                 name: "Articles",
@@ -462,7 +506,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant', 'store_keeper']))
+        @if (app_menu_can('physical_quantities', ['developer', 'owner', 'admin', 'accountant', 'store_keeper']))
             {
                 id: "physical-quantities",
                 name: "Physical Quantities",
@@ -484,7 +528,7 @@
             },
         @endif
 
-        @if (module_enabled('inventory') && in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant', 'store_keeper']))
+        @if (app_menu_can('inventory', ['developer', 'owner', 'admin', 'accountant', 'store_keeper']))
             {
                 id: "inventory",
                 name: "Inventory",
@@ -506,7 +550,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('orders', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "orders",
                 name: "Orders",
@@ -528,7 +572,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('payment_programs', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "payment-programs",
                 name: "Payment Programs",
@@ -552,7 +596,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('shipments', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "shipments",
                 name: "Shipments",
@@ -574,7 +618,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('expenses', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "expenses",
                 name: "Expenses",
@@ -596,7 +640,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('invoices', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "invoices",
                 name: "Invoices",
@@ -618,7 +662,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('cargos', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "cargos",
                 name: "Cargos",
@@ -640,7 +684,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('bilties', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "bilties",
                 name: "Bilties",
@@ -662,7 +706,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('bank_accounts', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "bank-accounts",
                 name: "Bank Accounts",
@@ -684,7 +728,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant', 'store_keeper']))
+        @if (app_menu_can('fabrics', ['developer', 'owner', 'admin', 'accountant', 'store_keeper']))
             {
                 id: "fabrics",
                 name: "Fabrics",
@@ -708,7 +752,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('employees', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "employees",
                 name: "Employees",
@@ -730,7 +774,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('employee_payments', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "employee-payments",
                 name: "Employee Payments",
@@ -829,7 +873,7 @@
             @endif
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('daily_ledger', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "daily-ledger",
                 name: "Daily Ledger",
@@ -851,7 +895,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('balance_entries', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "balance-entries",
                 name: "Balance Entries",
@@ -873,7 +917,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('cr', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "cr",
                 name: "CR",
@@ -895,7 +939,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('dr', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "dr",
                 name: "DR",
@@ -917,7 +961,7 @@
             },
         @endif
 
-        @if (module_enabled('reports') && in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('reports', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "reports",
                 name: "Reports",
@@ -942,7 +986,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('productions', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "productions",
                 name: "Productions",
@@ -964,7 +1008,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('sales_returns', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "sales-returns",
                 name: "Sales Return",
@@ -986,7 +1030,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('attendances', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "attendances",
                 name: "Attendance",
@@ -1009,7 +1053,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('utility_bills', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "utility-bills",
                 name: "Utility Bills",
@@ -1031,7 +1075,7 @@
             },
         @endif
 
-        @if (in_array(Auth::user()->role, ['developer', 'owner', 'admin', 'accountant']))
+        @if (app_menu_can('utility_accounts', ['developer', 'owner', 'admin', 'accountant']))
             {
                 id: "utility-accounts",
                 name: "Utility Accounts",
@@ -1057,4 +1101,5 @@
         themeFailureTemplate: @json($themeFailureTemplate),
         themeErrorTemplate: @json($themeErrorTemplate),
     };
+    document.dispatchEvent(new CustomEvent('sidebar:config:ready'));
 </script>
