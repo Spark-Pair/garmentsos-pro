@@ -80,6 +80,23 @@
             $currentBranchModuleKey = null;
         }
     }
+
+    $developerModeModules = [];
+    if (Auth::check() && !request()->is('login') && !request()->is('setup')) {
+        try {
+            $permissionService = app(\App\Services\Access\AppPermissionService::class);
+            $branchModuleService = app(\App\Services\Branches\ModuleBranchService::class);
+            $developerModeModules = collect(array_keys($branchModuleService->moduleRegistry()))
+                ->filter(fn ($moduleKey) => $permissionService->can(Auth::user(), $moduleKey, 'override'))
+                ->values()
+                ->all();
+        } catch (\Throwable) {
+            $developerModeModules = [];
+        }
+    }
+
+    $appConfig['currentModuleKey'] = $currentBranchModuleKey;
+    $appConfig['developerModeModules'] = $developerModeModules;
 @endphp
 <!DOCTYPE html>
 <html lang="en" data-theme="{{ $preferredTheme }}">
@@ -467,8 +484,8 @@
             position: absolute;
             inset: 0;
             border-radius: 9999px;
-            background: color-mix(in srgb, var(--secondary-text) 12%, var(--h-bg-color));
-            transition: background-color 180ms ease;
+            background: color-mix(in srgb, var(--secondary-text) 22%, var(--h-bg-color));
+            transition: background-color 160ms ease, box-shadow 160ms ease;
         }
 
         .app-toggle-thumb,
@@ -481,6 +498,11 @@
             background: color-mix(in srgb, white 78%, var(--secondary-text));
             box-shadow: 0 1px 3px rgb(15 23 42 / 0.22);
             transition: transform 180ms ease, background-color 180ms ease;
+        }
+
+        .app-toggle:not(.is-checked):not(:has(.app-toggle-input:checked)) {
+            border-color: color-mix(in srgb, var(--secondary-text) 36%, transparent);
+            background: color-mix(in srgb, var(--secondary-text) 20%, var(--h-bg-color));
         }
 
         .app-toggle.is-checked,
@@ -690,13 +712,13 @@
         <script defer src="{{ asset('js/utils/pusher-notifications.js') }}"></script>
     @endif
     <script defer src="{{ asset('js/components/select.js') }}"></script>
-    <script defer src="{{ asset('js/components/input.js') }}"></script>
+    <script defer src="{{ asset('js/components/input.js') }}?v={{ @filemtime(public_path('js/components/input.js')) }}"></script>
     <script defer src="{{ asset('js/app-init.js') }}"></script>
 
     <script defer src="{{ asset('js/components/card.js') }}"></script>
     <script defer src="{{ asset('js/components/modal.js') }}"></script>
     <script defer src="{{ asset('js/components/context-menu.js') }}"></script>
-    <script defer src="{{ asset('js/global-filter-manager.js') }}"></script>
+    <script defer src="{{ asset('js/global-filter-manager.js') }}?v={{ @filemtime(public_path('js/global-filter-manager.js')) }}"></script>
 </head>
 
 <body class="bg-[var(--secondary-bg-color)] text-[var(--text-color)] text-sm min-h-screen flex flex-col md:flex-row items-stretch justify-start fade-in" cz-shortcut-listen="true" data-app-config='@json($appConfig)'>
@@ -894,6 +916,31 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            const syncToggleVisual = (input) => {
+                const toggle = input?.closest('.app-toggle');
+                if (!toggle) return;
+                toggle.classList.toggle('is-checked', Boolean(input.checked));
+                toggle.setAttribute('aria-checked', input.checked ? 'true' : 'false');
+            };
+
+            document.querySelectorAll('.app-toggle-input').forEach((input) => {
+                syncToggleVisual(input);
+                input.addEventListener('change', () => syncToggleVisual(input));
+            });
+
+            document.addEventListener('click', (event) => {
+                const toggle = event.target.closest?.('.app-toggle');
+                if (!toggle || event.target.matches('input')) return;
+
+                const input = toggle.querySelector('.app-toggle-input');
+                if (!input || input.disabled) return;
+
+                event.preventDefault();
+                input.checked = !input.checked;
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+                syncToggleVisual(input);
+            });
+
             const overlay = document.getElementById('update-handoff-overlay');
             const moduleBranchPreferenceForm = document.getElementById('moduleBranchPreferenceForm');
             const updateLockStatusUrl = @json(Auth::check() ? route('developer.updater.update-lock-status') : null);

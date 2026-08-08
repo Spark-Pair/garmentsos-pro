@@ -66,6 +66,7 @@ class Kernel extends HttpKernel
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'ensureLicense' => \App\Http\Middleware\EnsureValidLicense::class,
         'moduleEnabled' => \App\Http\Middleware\EnsureModuleEnabled::class,
+        'appPermission' => \App\Http\Middleware\EnsureAppPermission::class,
         'featureEnabled' => \App\Http\Middleware\EnsureFeatureEnabled::class,
         'setup.complete' => \App\Http\Middleware\EnsureFirstRunSetupComplete::class,
         'setup.incomplete' => \App\Http\Middleware\RedirectIfFirstRunSetupComplete::class,

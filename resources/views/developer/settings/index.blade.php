@@ -24,6 +24,32 @@
                 <div class="container-parent h-full">
                     <div class="card_container px-4 h-full flex flex-col">
                         <div class="overflow-y-auto grow my-scrollbar-2 space-y-4  pr-1 text-left">
+        <section id="system-actions" class="{{ $panel }}">
+            <x-developer-panel-title title="System Actions" description="Developer navigation for setup, branches, access, licensing, and updates." />
+
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                @foreach ([
+                    ['href' => route('developer.branches.index'), 'icon' => 'fa-code-branch', 'title' => 'Branches', 'text' => 'Create and edit branch identity.'],
+                    ['href' => route('developer.branches.modules.index'), 'icon' => 'fa-sliders-h', 'title' => 'Branch Modules', 'text' => 'Manage module behavior for all branches.'],
+                    ['href' => route('developer.branches.access.index'), 'icon' => 'fa-user-shield', 'title' => 'Role / Permissions', 'text' => 'Manage role and user permissions by branch and module.'],
+                    ['href' => route('developer.license.status'), 'icon' => 'fa-key', 'title' => 'License', 'text' => 'Activation, rebind, and diagnostics.'],
+                    ['href' => route('developer.updater'), 'icon' => 'fa-shield-alt', 'title' => 'Updater', 'text' => 'Check, download, and apply updates.'],
+                ] as $action)
+                    <a href="{{ $action['href'] }}" class="rounded-xl border border-[var(--h-bg-color)] bg-[var(--h-bg-color)]/25 p-4 transition hover:-translate-y-0.5 hover:border-[var(--primary-color)]/60 hover:bg-[var(--secondary-bg-color)]">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-color)] text-white">
+                                <i class="fas {{ $action['icon'] }}"></i>
+                            </span>
+                            <span>
+                                <span class="block font-semibold">{{ $action['title'] }}</span>
+                                <span class="mt-1 block text-xs text-[var(--secondary-text)]">{{ $action['text'] }}</span>
+                            </span>
+                        </div>
+                    </a>
+                @endforeach
+            </div>
+        </section>
+
         <section id="branding" class="{{ $panel }}">
             <x-developer-panel-title title="Branding" description="Text and color values use current config defaults when no override exists.">
                 <span class="{{ $badge }} border-[var(--border-success)] bg-[var(--bg-success)] text-[var(--text-success)]">Safe text/color only</span>

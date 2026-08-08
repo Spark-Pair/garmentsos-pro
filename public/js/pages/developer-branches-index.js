@@ -12,14 +12,9 @@
             profile: true,
             bottomActions: [
                 {
-                    id: "manage-branch",
-                    text: "Manage Branch",
-                    onclick: `window.location.href = ${JSON.stringify(data.manage_url)}`,
-                },
-                {
                     id: "edit-branch",
                     text: "Edit",
-                    onclick: `window.location.href = ${JSON.stringify(data.edit_url)}`,
+                    link: data.edit_url,
                 },
             ],
         });

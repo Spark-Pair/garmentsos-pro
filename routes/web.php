@@ -113,6 +113,9 @@ Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensur
     Route::get('developer/branches', [BranchController::class, 'index'])->name('developer.branches.index');
     Route::get('developer/branches/create', [BranchController::class, 'create'])->name('developer.branches.create');
     Route::post('developer/branches', [BranchController::class, 'store'])->name('developer.branches.store');
+    Route::get('developer/branches/modules', [BranchController::class, 'modules'])->name('developer.branches.modules.index');
+    Route::post('developer/branches/modules/manage', [BranchController::class, 'updateModuleAcrossBranches'])->name('developer.branches.modules.manage');
+    Route::get('developer/branches/access', [BranchController::class, 'access'])->name('developer.branches.access.index');
     Route::get('developer/branches/{branch}', [BranchController::class, 'show'])->name('developer.branches.show');
     Route::get('developer/branches/{branch}/edit', [BranchController::class, 'edit'])->name('developer.branches.edit');
     Route::put('developer/branches/{branch}', [BranchController::class, 'update'])->name('developer.branches.update');
@@ -142,7 +145,7 @@ Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensur
     Route::get('developer/audit-logs', [LicenseController::class, 'auditLogs'])->name('developer.audit-logs');
 });
 
-Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensureLicense', 'readonly', 'blockWhenUpdating', 'dbTransaction']], function () {
+Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensureLicense', 'readonly', 'blockWhenUpdating', 'appPermission', 'dbTransaction']], function () {
     Route::get('home', [Controller::class, 'home'])->name('home');
 
     Route::resource('users', UserController::class)->except(['show']);
@@ -219,6 +222,8 @@ Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensur
 
     Route::resource('rates', RateController::class)->middleware('moduleEnabled:rates');
 
+    Route::get('productions/availability/parts', [ProductionController::class, 'availability'])->name('productions.availability');
+    Route::get('productions/availability/works', [ProductionController::class, 'availableWorks'])->name('productions.availability.works');
     Route::resource('productions', ProductionController::class);
 
     Route::resource('employees', EmployeeController::class);

@@ -8,10 +8,12 @@ use App\Models\CR;
 use App\Models\Customer;
 use App\Models\CustomerPayment;
 use App\Models\Employee;
+use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\PaymentProgram;
 use App\Models\Shipment;
 use App\Services\ArticleStockService;
+use App\Services\Access\AppPermissionService;
 use App\Services\Branches\BranchModuleRegistryService;
 use App\Services\Branches\ModuleBranchService;
 use App\Models\Supplier;
@@ -95,26 +97,30 @@ class Controller extends BaseController
 
     public function getCategoryData(Request $request)
     {
+        $branches = app(ModuleBranchService::class);
+        $currentModule = (string) ($request->input('module_key') ?: $request->input('current_module') ?: '');
+        $currentModule = $currentModule !== '' ? $currentModule : 'setups';
+
         switch ($request->category) {
             case 'supplier':
-                $suppliers = Supplier::whereHas('user', function ($query) {
+                $suppliers = $branches->applyRelatedScope(Supplier::whereHas('user', function ($query) {
                     $query->where('status', 'active');
-                })->select('id', 'supplier_name', 'date')->get()->makeHidden('creator', 'categories');
+                }), 'suppliers', $currentModule)->select('id', 'supplier_name', 'date')->get()->makeHidden('creator', 'categories');
 
                 return collect($this->supplierOptionPayloads($suppliers))->values();
                 break;
 
             case 'customer':
-                $customers = Customer::with('city:id,title')->whereHas('user', function ($query) {
+                $customers = $branches->applyRelatedScope(Customer::with('city:id,title')->whereHas('user', function ($query) {
                     $query->where('status', 'active');
-                })->select('id', 'customer_name', 'date', 'city_id')->get()->makeHidden('creator');
+                }), 'customers', $currentModule)->select('id', 'customer_name', 'date', 'city_id')->get()->makeHidden('creator');
 
                 return collect($this->customerOptionPayloads($customers))->values();
                 break;
 
             case 'self_account':
-                $accounts = BankAccount::with('subCategory', 'bank')
-                    ->where('category', 'self')
+                $accounts = $branches->applyRelatedScope(BankAccount::with('subCategory', 'bank')
+                    ->where('category', 'self'), 'bank_accounts', $currentModule)
                     ->get();
 
                 return collect($this->bankAccountOptionPayloads($accounts))->values();
@@ -183,6 +189,41 @@ class Controller extends BaseController
 
         if ($user->role === 'developer') {
             return true;
+        }
+
+        try {
+            $permissions = app(AppPermissionService::class);
+            $moduleKey = app(BranchModuleRegistryService::class)->moduleKeyForRoute(request()->route());
+            $action = $permissions->actionForRequest(request());
+
+            if ($moduleKey && $permissions->hasRule($user, $moduleKey) && $permissions->can($user, $moduleKey, $action)) {
+                return true;
+            }
+        } catch (\Throwable) {
+            //
+        }
+
+        if (in_array('developer', $roles, true)) {
+            try {
+                $moduleKey = app(BranchModuleRegistryService::class)->moduleKeyForRoute(request()->route());
+                $blockedDeveloperModeModules = [
+                    'dashboard',
+                    'home',
+                    'developer_settings',
+                    'developer_branches',
+                    'developer_backups',
+                    'developer_updater',
+                    'developer_license',
+                    'setup',
+                    'auth',
+                ];
+
+                if ($moduleKey && !in_array($moduleKey, $blockedDeveloperModeModules, true) && app_can($moduleKey, 'override')) {
+                    return true;
+                }
+            } catch (\Throwable) {
+                //
+            }
         }
 
         return in_array($user->role, $roles, true);
@@ -297,13 +338,35 @@ class Controller extends BaseController
             return response()->json(["error" => "Order not found."]);
         }
 
-        $allowInvoiced = $request->boolean('allow_invoiced') && Auth::user()?->role === 'developer';
+        $allowInvoiced = $request->boolean('allow_invoiced')
+            && (in_array(Auth::user()?->role, ['developer', 'owner', 'admin', 'accountant'], true) || app_can('invoices', 'override'));
         if ($order->status === 'invoiced' && !$allowInvoiced) {
             return response()->json(["error" => "This order has already been invoiced."]);
         }
 
         if (!$request->boolean('only_order')) {
             $stockErrors = [];
+            $currentInvoicePcs = collect();
+            if ($request->filled('current_invoice_id')) {
+                $currentInvoice = Invoice::with('invoiceArticles')
+                    ->whereKey((int) $request->current_invoice_id)
+                    ->first();
+
+                $currentInvoiceOrderNumbers = collect($this->documentNumberCandidates($currentInvoice?->order_no))
+                    ->map(fn ($value) => (string) $value)
+                    ->filter()
+                    ->values();
+                $selectedOrderNumbers = collect($this->documentNumberCandidates($order->order_no))
+                    ->map(fn ($value) => (string) $value)
+                    ->filter()
+                    ->values();
+
+                if ($currentInvoice && $currentInvoiceOrderNumbers->intersect($selectedOrderNumbers)->isNotEmpty()) {
+                    $currentInvoicePcs = $currentInvoice->invoiceArticles
+                        ->groupBy('article_id')
+                        ->map(fn ($lines) => (int) $lines->sum('invoice_pcs'));
+                }
+            }
             $stockMap = $this->articleStockMap(
                 $order->articles->pluck('article_id'),
                 $order->id,
@@ -311,7 +374,9 @@ class Controller extends BaseController
             );
 
             // Filter out articles with 0 stock or missing
-            $filteredArticles = $order->articles->filter(function ($orderedArticle) use (&$stockErrors, $stockMap) {
+            $isEditingInvoice = $request->filled('current_invoice_id');
+
+            $filteredArticles = $order->articles->filter(function ($orderedArticle) use (&$stockErrors, $stockMap, $currentInvoicePcs, $isEditingInvoice) {
 
                 $article = $orderedArticle->article;
 
@@ -324,10 +389,18 @@ class Controller extends BaseController
 
                 if (($article->pcs_per_packet ?? 0) > 0) {
                     $availablePcs = (float) ($stockMap->get($article->id)['current_stock_pcs'] ?? 0);
+                    $currentInvoiceArticlePcs = (int) ($currentInvoicePcs->get($orderedArticle->article_id) ?? 0);
+                    if ($isEditingInvoice) {
+                        $availablePcs += $currentInvoiceArticlePcs;
+                    }
 
                     $orderedPackets = ($orderedArticle->ordered_pcs ?? 0) / $article->pcs_per_packet;
-                    $invoiceQty = max(0, (int) ($orderedArticle->dispatched_pcs ?? 0));
+                    $invoiceQty = max(0, (int) ($orderedArticle->dispatched_pcs ?? 0) - $currentInvoiceArticlePcs);
                     $pendingPackets = max(0, $orderedPackets - ($invoiceQty / $article->pcs_per_packet));
+                    if ($isEditingInvoice) {
+                        $currentInvoicePackets = $currentInvoiceArticlePcs / $article->pcs_per_packet;
+                        $pendingPackets = max($pendingPackets, $currentInvoicePackets);
+                    }
 
                     $orderedArticle->total_quantity_in_packets = floor(min($pendingPackets, $availablePcs / $article->pcs_per_packet));
                 }

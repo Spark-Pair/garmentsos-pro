@@ -65,6 +65,7 @@
                 <x-form-title-bar title="Show Branches" />
 
                 <div class="absolute bottom-0 right-0 flex items-center justify-between gap-2 w-fll z-50 p-3 w-full pointer-events-none">
+                    <span></span>
                     <x-section-navigation-button link="{{ route('developer.branches.create') }}" title="Add New Branch" icon="fa-plus" />
                 </div>
 

@@ -910,6 +910,9 @@ class ModuleBranchService
         if (array_key_exists('doc_identity_prefix', $metadata)) {
             $config['doc_identity_prefix'] = (string) $metadata['doc_identity_prefix'];
         }
+        if (array_key_exists('label_override', $metadata) && filled($metadata['label_override'])) {
+            $config['label'] = (string) $metadata['label_override'];
+        }
 
         return $config;
     }
@@ -926,7 +929,24 @@ class ModuleBranchService
 
     public function moduleLabels(): array
     {
-        return app(BranchModuleRegistryService::class)->labels();
+        $labels = app(BranchModuleRegistryService::class)->labels();
+
+        if (!$this->schemaHasTable('branch_module_settings')) {
+            return $labels;
+        }
+
+        BranchModuleSetting::query()
+            ->whereNull('branch_id')
+            ->get(['module_key', 'metadata'])
+            ->each(function (BranchModuleSetting $setting) use (&$labels) {
+                $metadata = is_array($setting->metadata) ? $setting->metadata : [];
+                $label = trim((string) ($metadata['label_override'] ?? ''));
+                if ($label !== '') {
+                    $labels[$this->canonicalModuleKey($setting->module_key)] = $label;
+                }
+            });
+
+        return $labels;
     }
 
     private function moduleKeyCandidates(string $moduleKey): array
@@ -996,7 +1016,7 @@ class ModuleBranchService
 
         return $query->get()
             ->sortBy(fn (BranchModuleSetting $setting) => array_search($setting->module_key, $candidateKeys, true))
-            ->contains(fn (BranchModuleSetting $setting) => $setting->branch_enabled
+            ->contains(fn (BranchModuleSetting $setting) => ($requireSwitching || $setting->branch_enabled)
                 && $setting->status === 'active'
                 && (!$requireSwitching || $setting->allow_user_switching));
     }
@@ -1200,6 +1220,11 @@ class ModuleBranchService
         }
 
         $setting = $this->setting($moduleKey);
+        $metadata = is_array($setting?->metadata) ? $setting->metadata : [];
+        if ((bool) ($metadata['client_disabled'] ?? false)) {
+            return $this->isEnabledCache[$moduleKey] = false;
+        }
+
         if ($setting?->branch_enabled && $setting->status === 'active') {
             return $this->isEnabledCache[$moduleKey] = true;
         }
@@ -1269,7 +1294,7 @@ class ModuleBranchService
             return $this->branchAllowsSwitchingCache[$cacheKey];
         }
 
-        if (!$this->isRegisteredModule($moduleKey) || !$this->isBranchEnabled($moduleKey, $branchId)) {
+        if (!$this->isRegisteredModule($moduleKey) || !$this->branchTablesReadyForSelectors()) {
             return $this->branchAllowsSwitchingCache[$cacheKey] = false;
         }
 
@@ -1277,12 +1302,12 @@ class ModuleBranchService
         $setting = $settings->first();
 
         if ($setting) {
-            if ($setting->branch_enabled && $setting->status === 'active' && $setting->allow_user_switching) {
+            if ($setting->status === 'active' && $setting->allow_user_switching) {
                 return $this->branchAllowsSwitchingCache[$cacheKey] = true;
             }
 
             if ($this->canFallbackFromSetting($moduleKey, $setting)) {
-                $fallback = $settings->skip(1)->first(fn (BranchModuleSetting $candidate) => $candidate->branch_enabled && $candidate->status === 'active' && $candidate->allow_user_switching);
+                $fallback = $settings->skip(1)->first(fn (BranchModuleSetting $candidate) => $candidate->status === 'active' && $candidate->allow_user_switching);
                 if ($fallback) {
                     return $this->branchAllowsSwitchingCache[$cacheKey] = true;
                 }
@@ -1313,7 +1338,7 @@ class ModuleBranchService
         $setting = $this->setting($moduleKey);
         $defaultBranchId = $setting?->default_branch_id;
 
-        if (!$this->isEnabled($moduleKey) || !$user) {
+        if (!$user) {
             return $this->selectedBranchCache[$cacheKey] = ($defaultBranchId
                 ? Branch::query()->find($defaultBranchId)
                 : Branch::query()->where('is_main', true)->first());
@@ -1324,7 +1349,7 @@ class ModuleBranchService
             ->whereIn('module_key', $this->moduleKeyCandidates($moduleKey))
             ->first();
 
-        if ($preferred && $this->isBranchEnabled($moduleKey, $preferred->branch_id) && $this->canView($preferred->branch_id, $moduleKey, $user)) {
+        if ($preferred && $this->branchAllowsSwitching($moduleKey, $preferred->branch_id) && $this->canView($preferred->branch_id, $moduleKey, $user)) {
             return $this->selectedBranchCache[$cacheKey] = Branch::query()->find($preferred->branch_id);
         }
 
@@ -1332,7 +1357,7 @@ class ModuleBranchService
             ? Branch::query()->find($defaultBranchId)
             : Branch::query()->where('is_main', true)->first();
 
-        if ($branch && $this->isBranchEnabled($moduleKey, $branch->id) && $this->canView($branch->id, $moduleKey, $user)) {
+        if ($branch && $this->branchAllowsSwitching($moduleKey, $branch->id) && $this->canView($branch->id, $moduleKey, $user)) {
             return $this->selectedBranchCache[$cacheKey] = $branch;
         }
 
@@ -1340,7 +1365,7 @@ class ModuleBranchService
             ->where('status', 'active')
             ->orderBy('id')
             ->get()
-            ->first(fn (Branch $candidate) => $this->isBranchEnabled($moduleKey, $candidate->id) && $this->canView($candidate->id, $moduleKey, $user));
+            ->first(fn (Branch $candidate) => $this->branchAllowsSwitching($moduleKey, $candidate->id) && $this->canView($candidate->id, $moduleKey, $user));
     }
 
     public function switchableBranches(string $moduleKey, ?User $user = null)
@@ -1474,7 +1499,31 @@ class ModuleBranchService
             return false;
         }
 
+        if ($this->isWriteRoute() && !$this->shouldFilterRecords($moduleKey, $user)) {
+            return false;
+        }
+
         return $this->availableBranchesForModule($moduleKey, $user)->count() > 1;
+    }
+
+    private function isWriteRoute(): bool
+    {
+        $route = request()->route();
+        $routeName = (string) ($route?->getName() ?? '');
+        $action = strtolower((string) ($route?->getActionMethod() ?? ''));
+        $method = strtoupper((string) request()->method());
+
+        if ($method !== 'GET') {
+            return true;
+        }
+
+        foreach (['create', 'store', 'edit', 'update', 'destroy'] as $writeAction) {
+            if ($action === $writeAction || Str::endsWith($routeName, '.' . $writeAction)) {
+                return true;
+            }
+        }
+
+        return request()->is('*/create') || request()->is('*/*/edit');
     }
 
     public function supportsMultiBranchSelector(string $moduleKey): bool
@@ -1633,7 +1682,7 @@ class ModuleBranchService
             abort(422, 'Unknown or non-branchable module.');
         }
 
-        if (!$this->isEnabled($moduleKey)) {
+        if ($this->availableBranchesForModule($moduleKey, $user)->count() <= 1) {
             abort(422, 'This module does not support branch switching.');
         }
 
@@ -1660,7 +1709,7 @@ class ModuleBranchService
             abort(422, 'This module does not support multi-branch selection.');
         }
 
-        if (!$this->isEnabled($moduleKey)) {
+        if ($this->availableBranchesForModule($moduleKey, $user)->isEmpty()) {
             abort(422, 'This module does not support branch switching.');
         }
 

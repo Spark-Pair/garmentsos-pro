@@ -111,8 +111,8 @@
                                     <div class="flex min-w-0 items-center gap-3">
                                         <span class="h-10 w-1.5 shrink-0 rounded-full bg-[var(--primary-color)]/80"></span>
                                         <div class="min-w-0">
-                                            <h2 class="text-sm font-semibold uppercase tracking-wide">Module Settings</h2>
-                                            <p class="text-xs text-[var(--secondary-text)]">Choose where branch switchers appear and which records follow selected branch.</p>
+                                            <h2 class="text-sm font-semibold uppercase tracking-wide">Module Management</h2>
+                                            <p class="text-xs text-[var(--secondary-text)]">Per-branch module settings are managed from one module-wise screen.</p>
                                         </div>
                                     </div>
                                     <div class="flex items-center gap-2">
@@ -120,7 +120,34 @@
                                         <span class="rounded-xl border border-[var(--h-bg-color)] bg-[var(--h-bg-color)]/55 px-3 py-1.5 text-xs text-[var(--secondary-text)]">{{ $switchingCount }} switchers</span>
                                     </div>
                                 </summary>
-                                <form id="branchModuleSettingsForm" method="POST" action="{{ route('developer.branches.modules') }}" class="space-y-4 border-t border-[var(--h-bg-color)] p-5">
+                                <div class="border-t border-[var(--h-bg-color)] p-5">
+                                    <div class="rounded-2xl border border-[var(--h-bg-color)] bg-[var(--h-bg-color)]/25 p-5">
+                                        <div class="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+                                            <div>
+                                                <h3 class="text-base font-semibold">Manage modules by module, not by branch</h3>
+                                                <p class="mt-1 text-sm text-[var(--secondary-text)]">
+                                                    Module settings still save per branch, but editing is now centralized. Open a module once and update all branch rows together.
+                                                </p>
+                                            </div>
+                                            <a href="{{ route('developer.branches.modules.index') }}" class="{{ $button }}">Open Module Management</a>
+                                        </div>
+                                        <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                                            <div class="rounded-xl border border-[var(--h-bg-color)] bg-[var(--secondary-bg-color)] px-4 py-3">
+                                                <div class="text-[11px] uppercase tracking-wide text-[var(--secondary-text)]">Enabled modules</div>
+                                                <div class="mt-1 text-xl font-semibold">{{ $enabledCount }}</div>
+                                            </div>
+                                            <div class="rounded-xl border border-[var(--h-bg-color)] bg-[var(--secondary-bg-color)] px-4 py-3">
+                                                <div class="text-[11px] uppercase tracking-wide text-[var(--secondary-text)]">Branch switchers</div>
+                                                <div class="mt-1 text-xl font-semibold">{{ $switchingCount }}</div>
+                                            </div>
+                                            <div class="rounded-xl border border-[var(--h-bg-color)] bg-[var(--secondary-bg-color)] px-4 py-3">
+                                                <div class="text-[11px] uppercase tracking-wide text-[var(--secondary-text)]">Record filters</div>
+                                                <div class="mt-1 text-xl font-semibold">{{ $filteringCount }}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <form id="branchModuleSettingsForm" method="POST" action="{{ route('developer.branches.modules') }}" class="hidden space-y-4 border-t border-[var(--h-bg-color)] p-5">
                                     @csrf
                                     <input type="hidden" name="branch_id" value="{{ $branch->id }}">
                                     <input type="hidden" name="modules_payload" id="branchModulesPayload">
@@ -181,10 +208,12 @@
                                                             $supportsDocumentOptions = in_array($moduleKey, ['orders', 'invoices'], true);
                                                             $discountDisabled = (bool) ($metadata['discount_disabled'] ?? false);
                                                             $documentNote = (string) ($metadata['document_note'] ?? '');
+                                                            $displayLabel = (string) ($runtimeModule['label'] ?? $metadata['label_override'] ?? $module['label'] ?? $moduleKey);
+                                                            $labelOverride = (string) ($metadata['label_override'] ?? '');
                                                             $filterWarning = $filtering && ! $hasBranchIdSupport;
                                                         @endphp
 
-                                                        <div data-module-card data-module-key="{{ $moduleKey }}" data-module-search="{{ strtolower(($module['label'] ?? $moduleKey) . ' ' . $moduleKey . ' ' . ($module['page_reference'] ?? '') . ' ' . ($module['group'] ?? '')) }}" class="rounded-2xl border border-[var(--h-bg-color)] bg-[var(--secondary-bg-color)] p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--primary-color)]/50 hover:shadow">
+                                                        <div data-module-card data-module-key="{{ $moduleKey }}" data-module-search="{{ strtolower($displayLabel . ' ' . ($module['label'] ?? '') . ' ' . $moduleKey . ' ' . ($module['page_reference'] ?? '') . ' ' . ($module['group'] ?? '')) }}" class="rounded-2xl border border-[var(--h-bg-color)] bg-[var(--secondary-bg-color)] p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--primary-color)]/50 hover:shadow">
                                                             <input type="hidden" name="modules[{{ $moduleKey }}][_present]" value="1">
                                                             @php
                                                                 $modalId = 'branchModuleSettings_' . preg_replace('/[^A-Za-z0-9_-]/', '_', $moduleKey);
@@ -194,7 +223,7 @@
                                                                 <div class="min-w-0">
                                                                     <div class="flex flex-wrap items-center gap-2">
                                                                         <span class="h-2.5 w-2.5 shrink-0 rounded-full {{ $enabled && ($setting?->status ?? 'active') === 'active' ? 'bg-[var(--text-success)]' : 'bg-[var(--secondary-text)]' }}"></span>
-                                                                        <div class="font-semibold leading-tight">{{ $module['label'] ?? $moduleKey }}</div>
+                                                                        <div class="font-semibold leading-tight">{{ $displayLabel }}</div>
                                                                     </div>
                                                                     <div class="mt-1.5 flex flex-wrap items-center gap-1.5 pl-5 text-[11px] text-[var(--secondary-text)]">
                                                                         <span>{{ $moduleKey }}</span>
@@ -207,7 +236,7 @@
 
                                                             <div class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
                                                                 <label class="{{ $miniToggle }}">
-                                                                    <span>Enable module</span>
+                                                                    <span>Module active</span>
                                                                     <x-toggle-switch name="modules[{{ $moduleKey }}][branch_enabled]" :checked="$enabled" />
                                                                 </label>
 
@@ -240,7 +269,7 @@
                                                                         <div class="flex min-w-0 items-start gap-3">
                                                                             <span class="mt-1 h-10 w-1.5 shrink-0 rounded-full bg-[var(--primary-color)]/80"></span>
                                                                             <div class="min-w-0">
-                                                                                <h3 class="text-base font-semibold">{{ $module['label'] ?? $moduleKey }}</h3>
+                                                                                <h3 class="text-base font-semibold">{{ $displayLabel }}</h3>
                                                                                 <p class="mt-1 text-xs text-[var(--secondary-text)]">{{ $moduleKey }} | {{ $module['page_reference'] ?? '-' }}</p>
                                                                             </div>
                                                                         </div>
@@ -253,6 +282,19 @@
                                                                     <div class="min-h-0 overflow-y-auto my-scrollbar-2 bg-[var(--secondary-bg-color)] p-5">
                                                                         <input type="hidden" name="modules[{{ $moduleKey }}][_advanced_present]" value="1">
                                                                         <div class="space-y-4">
+                                                                            <section class="rounded-2xl border border-[var(--h-bg-color)] bg-[var(--h-bg-color)]/20 p-4">
+                                                                                <div class="mb-3">
+                                                                                    <h4 class="text-sm font-semibold">Display</h4>
+                                                                                    <p class="text-xs text-[var(--secondary-text)]">Optional name shown in developer controls and access selectors.</p>
+                                                                                </div>
+                                                                                <x-input
+                                                                                    name="modules[{{ $moduleKey }}][label_override]"
+                                                                                    id="module_label_override_{{ $moduleKey }}"
+                                                                                    :value="$labelOverride"
+                                                                                    placeholder="{{ $module['label'] ?? $moduleKey }}"
+                                                                                />
+                                                                            </section>
+
                                                                             <section class="rounded-2xl border border-[var(--h-bg-color)] bg-[var(--h-bg-color)]/20 p-4">
                                                                                 <div class="mb-3 flex items-center justify-between gap-3">
                                                                                     <div>
@@ -369,15 +411,24 @@
                                     <div class="flex min-w-0 items-center gap-3">
                                         <span class="h-10 w-1.5 shrink-0 rounded-full bg-[var(--primary-color)]/80"></span>
                                         <div class="min-w-0">
-                                            <h2 class="text-sm font-semibold uppercase tracking-wide">Access / Permissions</h2>
-                                            <p class="text-xs text-[var(--secondary-text)]">Grant branch access by role or a specific user.</p>
+                                            <h2 class="text-sm font-semibold uppercase tracking-wide">Role / Permission Management</h2>
+                                            <p class="text-xs text-[var(--secondary-text)]">Manage role/user permissions from the central system page.</p>
                                         </div>
                                     </div>
                                     <div class="flex items-center gap-2">
                                         <span class="rounded-xl border border-[var(--h-bg-color)] bg-[var(--h-bg-color)]/55 px-3 py-1.5 text-xs text-[var(--secondary-text)]">{{ $accessRows->count() }} access rows</span>
                                     </div>
                                 </summary>
-                                <div class="grid grid-cols-1 gap-5 border-t border-[var(--h-bg-color)] p-5 xl:grid-cols-[0.9fr_1.1fr]">
+                                <div class="border-t border-[var(--h-bg-color)] p-5">
+                                    <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--h-bg-color)] bg-[var(--secondary-bg-color)] p-4 shadow-sm">
+                                        <div>
+                                            <h3 class="text-sm font-semibold">Open central permissions</h3>
+                                            <p class="text-xs text-[var(--secondary-text)]">Role, user, branch, module aur edit/delete permissions ek hi page se manage karen.</p>
+                                        </div>
+                                        <a href="{{ route('developer.branches.access.index') }}" class="{{ $button }}">Role / Permissions</a>
+                                    </div>
+                                </div>
+                                <div class="hidden grid-cols-1 gap-5 border-t border-[var(--h-bg-color)] p-5 xl:grid-cols-[0.9fr_1.1fr]">
                                     <form method="POST" action="{{ route('developer.branches.access') }}" class="space-y-4 rounded-2xl border border-[var(--h-bg-color)] bg-[var(--secondary-bg-color)] p-4 shadow-sm">
                                         @csrf
                                         <input type="hidden" name="branch_id" value="{{ $branch->id }}">
@@ -417,7 +468,7 @@
                                                 </label>
                                             @endforeach
                                         </div>
-                                        <button type="submit" class="{{ $button }}">Save Access</button>
+                                        <button type="submit" class="{{ $button }}">Save Permissions</button>
                                     </form>
 
                                     <div class="overflow-hidden rounded-2xl border border-[var(--h-bg-color)] bg-[var(--secondary-bg-color)] shadow-sm">
@@ -592,23 +643,11 @@
             });
 
             document.querySelectorAll('[data-module-card]').forEach((card) => {
-                const enabledInput = moduleInput(card, 'branch_enabled');
                 const switcherInput = moduleInput(card, 'allow_user_switching');
                 const multiInput = moduleInput(card, 'supports_multi_branch_selector');
 
-                switcherInput?.addEventListener('change', () => {
-                    if (switcherInput.checked && enabledInput) {
-                        enabledInput.checked = true;
-                        syncToggleVisual(enabledInput);
-                    }
-                });
-
                 multiInput?.addEventListener('change', () => {
                     if (!multiInput.checked) return;
-                    if (enabledInput) {
-                        enabledInput.checked = true;
-                        syncToggleVisual(enabledInput);
-                    }
                     if (switcherInput) {
                         switcherInput.checked = true;
                         syncToggleVisual(switcherInput);
