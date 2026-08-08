@@ -46,6 +46,7 @@
                             <div class="w-1/8 cursor-pointer" onclick="sortByThis(this)">Receive Date</div>
                             <div class="w-1/8 cursor-pointer" onclick="sortByThis(this)">Ticket</div>
                             <div class="w-1/7 cursor-pointer" onclick="sortByThis(this)">Worker Name</div>
+                            <div class="w-1/8 cursor-pointer" onclick="sortByThis(this)">Type</div>
                             <div class="w-1/8 cursor-pointer" onclick="sortByThis(this)">Quantity</div>
                             <div class="w-1/8 cursor-pointer" onclick="sortByThis(this)">Rate</div>
                             <div class="w-1/8 cursor-pointer" onclick="sortByThis(this)">Amount</div>

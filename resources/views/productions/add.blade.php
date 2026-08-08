@@ -66,7 +66,35 @@
                 'withCheckbox' => true,
                 'checkBoxes' => [],
                 'required' => true,
-            ])->render() . '<input type="hidden" name="parts" id="dbParts" value="[]" />',
+            ])->render() . '<input type="hidden" name="parts" id="dbParts" value="[]" /><input type="hidden" name="production_flows" id="productionFlows" value="[]" />',
+            'selectRate' => view('components.select', [
+                'label' => 'Select Rate',
+                'id' => 'select_rate',
+                'options' => [],
+                'showDefault' => true,
+                'onchange' => 'trackSelectRateState(this)',
+            ])->render(),
+            'titleContainer' => '<div id="titleContainer" class="col-span-full hidden">' . view('components.input', [
+                'label' => 'Title',
+                'name' => 'title',
+                'id' => 'title',
+                'placeholder' => 'Enter Title',
+            ])->render() . '</div>',
+            'rateEditable' => view('components.input', [
+                'label' => 'Rate',
+                'name' => 'rate',
+                'id' => 'rate',
+                'placeholder' => 'Rate',
+                'oninput' => 'calculateAmount()',
+                'dataValidate' => 'numeric',
+            ])->render(),
+            'amountOptional' => view('components.input', [
+                'label' => 'Amount',
+                'name' => 'amount',
+                'id' => 'amount',
+                'readonly' => true,
+                'placeholder' => 'Amount',
+            ])->render(),
             'issueDate' => view('components.input', [
                 'label' => 'Issue Date',
                 'name' => 'issue_date',
@@ -77,6 +105,20 @@
                 'min' => '2024-01-01',
                 'validateMax' => true,
                 'max' => $todayDate,
+            ])->render(),
+            'issuedBy' => view('components.input', [
+                'label' => 'Issued By',
+                'name' => 'issued_by_name',
+                'id' => 'issued_by_name',
+                'placeholder' => 'Supervisor / issuer name',
+                'value' => '__ISSUED_BY_VALUE__',
+            ])->render(),
+            'receivedBy' => view('components.input', [
+                'label' => 'Received By',
+                'name' => 'received_by_name',
+                'id' => 'received_by_name',
+                'placeholder' => 'Worker representative name',
+                'value' => '__RECEIVED_BY_VALUE__',
             ])->render(),
         ],
         'receive' => [
@@ -168,7 +210,21 @@
                 'withCheckbox' => true,
                 'checkBoxes' => [],
                 'required' => true,
-            ])->render() . '<input type="hidden" name="parts" id="dbParts" value="[]" />',
+            ])->render() . '<input type="hidden" name="parts" id="dbParts" value="[]" /><input type="hidden" name="production_flows" id="productionFlows" value="[]" />',
+            'issuedBy' => view('components.input', [
+                'label' => 'Issued By',
+                'name' => 'issued_by_name',
+                'id' => 'issued_by_name',
+                'placeholder' => 'Worker representative name',
+                'value' => '__ISSUED_BY_VALUE__',
+            ])->render(),
+            'receivedBy' => view('components.input', [
+                'label' => 'Received By',
+                'name' => 'received_by_name',
+                'id' => 'received_by_name',
+                'placeholder' => 'Supervisor / receiver name',
+                'value' => '__RECEIVED_BY_VALUE__',
+            ])->render(),
         ],
         'modals' => [
             'quantityInput' => view('components.input', [
@@ -303,7 +359,6 @@
                         id="ticket"
                         :options="$ticket_options"
                         showDefault
-                        required
                         onchange="trackTicketState(this)"
                     />
 
@@ -372,13 +427,11 @@
             rates: @json($rates),
             tickets: @json($ticket_options ?? []),
             inventoryItems: @json($inventoryItems ?? []),
+            currentUserName: @json(Auth::user()?->name),
             isInventoryEnabled: @json(module_enabled('inventory')),
+            availabilityUrl: @json(route('productions.availability')),
+            workAvailabilityUrl: @json(route('productions.availability.works')),
+            printTicket: @json(session('production_ticket_preview')),
         };
-        window.__productionTicketAfterSave = @json(session('production_ticket_preview'));
-        window.addEventListener('DOMContentLoaded', () => {
-            if (window.__productionTicketAfterSave && window.previewProductionTicket) {
-                window.previewProductionTicket(window.__productionTicketAfterSave, false);
-            }
-        });
     </script>
 @endpush

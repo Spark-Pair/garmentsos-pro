@@ -4,6 +4,7 @@
         const productionType = config.productionType || "issue";
         const csrfToken = config.csrfToken || "";
         const templates = config.templates || {};
+        const currentUserName = config.currentUserName || "";
         const unitsOptionsHtml = templates.unitsSelect || config.unitsOptionsHtml || "";
         const todayDate = config.todayDate || "";
         const articles = config.articles || [];
@@ -15,9 +16,212 @@
         const tickets = config.tickets || [];
         const inventoryItems = config.inventoryItems || [];
         const printTicket = config.printTicket || null;
+        const availabilityUrl = config.availabilityUrl || "";
+        const workAvailabilityUrl = config.workAvailabilityUrl || "";
         if (config.companyData) {
             window.companyData = config.companyData;
         }
+
+        let currentAvailableParts = [];
+        let selectedPartQuantities = [];
+
+        function setAvailableParts(parts) {
+            currentAvailableParts = Array.isArray(parts) ? parts : [];
+            selectedPartQuantities = currentAvailableParts.map((item) => ({
+                part: item.part,
+                quantity: Number(item.quantity || 0),
+            }));
+            syncSelectedPartInputs();
+        }
+
+        function syncSelectedPartInputs() {
+            const dbPartsInput = document.getElementById("dbParts");
+            const flowInput = document.getElementById("productionFlows");
+            const quantityInput = document.getElementById("article_quantity");
+            if (dbPartsInput) {
+                dbPartsInput.value = JSON.stringify(selectedPartQuantities.map((item) => item.part));
+            }
+            if (flowInput) {
+                flowInput.value = JSON.stringify(selectedPartQuantities);
+            }
+            if (quantityInput) {
+                quantityInput.value = selectedPartQuantities.length
+                    ? Math.max(...selectedPartQuantities.map((item) => Number(item.quantity || 0)))
+                    : 0;
+            }
+        }
+
+        function renderPartQuantityCheckboxes(container) {
+            if (!container) return;
+
+            const fieldGroup = container.closest(".form-group");
+            if (fieldGroup) {
+                fieldGroup.classList.add("md:col-span-2");
+            }
+
+            container.className = "checkboxes_container max-h-56 overflow-y-auto rounded-md border border-gray-600 bg-[var(--secondary-bg-color)]";
+
+            if (!currentAvailableParts.length) {
+                container.innerHTML = `<div class="px-3 py-3 text-center text-xs font-medium text-[var(--border-error)]">No available parts.</div>`;
+                syncSelectedPartInputs();
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="sticky top-0 z-10 grid grid-cols-[2.25rem_minmax(0,1fr)_7rem_6rem] gap-2 border-b border-gray-600 bg-[var(--h-bg-color)] px-3 py-2 text-[11px] font-semibold uppercase text-[var(--secondary-text)]">
+                    <span></span>
+                    <span>Part</span>
+                    <span class="text-right">Quantity</span>
+                    <span class="text-right">Available</span>
+                </div>
+                ${currentAvailableParts.map((item) => `
+                    <label class="grid cursor-pointer grid-cols-[2.25rem_minmax(0,1fr)_7rem_6rem] items-center gap-2 border-b border-[color-mix(in_srgb,var(--h-bg-color)_70%,transparent)] px-3 py-2 last:border-b-0 hover:bg-[var(--h-bg-color)]">
+                        <span class="flex justify-center">
+                            <input type="checkbox"
+                                checked
+                                onchange="toggleThisCheckbox(this)"
+                                data-checkbox="${item.part}"
+                                data-max="${Number(item.quantity || 0)}"
+                                class="checkbox size-4 appearance-none rounded-sm border border-gray-600 bg-[var(--secondary-bg-color)] transition checked:bg-[var(--primary-color)]" />
+                        </span>
+                        <span class="truncate text-sm font-medium capitalize text-[var(--text-color)]">${item.part}</span>
+                        <input type="number"
+                            min="0"
+                            max="${Number(item.quantity || 0)}"
+                            value="${Number(item.quantity || 0)}"
+                            data-part-quantity="${item.part}"
+                            oninput="trackPartQuantity(this)"
+                            class="w-full rounded-md border border-gray-600 bg-[var(--h-bg-color)] px-2 py-1 text-right text-sm text-[var(--text-color)]" />
+                        <span class="text-right text-sm font-medium text-[var(--secondary-text)]">${Number(item.quantity || 0)}</span>
+                    </label>
+                `).join("")}
+            `;
+            syncSelectedPartInputs();
+        }
+
+        async function loadAvailableParts({ articleId, workId, mode, ticket = "" }) {
+            if (!availabilityUrl || !articleId) return [];
+
+            const url = new URL(availabilityUrl, window.location.origin);
+            url.searchParams.set("article_id", articleId);
+            url.searchParams.set("mode", mode);
+            if (workId) url.searchParams.set("work_id", workId);
+            if (ticket) url.searchParams.set("ticket", ticket);
+
+            const response = await fetch(url.toString(), {
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                    Accept: "application/json",
+                },
+            });
+            if (!response.ok) return [];
+
+            const payload = await response.json();
+            return payload.parts || [];
+        }
+
+        async function loadAvailableWorkIds({ articleId, mode }) {
+            if (!workAvailabilityUrl || !articleId) return [];
+
+            const url = new URL(workAvailabilityUrl, window.location.origin);
+            url.searchParams.set("article_id", articleId);
+            url.searchParams.set("mode", mode);
+
+            const response = await fetch(url.toString(), {
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                    Accept: "application/json",
+                },
+            });
+            if (!response.ok) return [];
+
+            const payload = await response.json();
+            return Array.isArray(payload.work_ids) ? payload.work_ids.map((id) => String(id)) : [];
+        }
+
+        function selectedDbValue(id) {
+            return document.querySelector(`input[data-for="${id}"]`)?.value || "";
+        }
+
+        function cleanWorkTitle(title) {
+            return String(title || "").split("|")[0].trim().toLowerCase();
+        }
+
+        function workerMatchesWork(worker, workText) {
+            const workerType = cleanWorkTitle(worker?.data_option?.type?.title);
+            const work = cleanWorkTitle(workText);
+
+            if (work === "stitching") {
+                return ["stitching", "cmt", "cut to pack"].includes(workerType);
+            }
+
+            if (work === "cmt") {
+                return workerType === "cmt";
+            }
+
+            return worker?.data_option?.type?.id == selectedDbValue("work");
+        }
+
+        window.trackPartQuantity = function trackPartQuantity(input) {
+            const max = Number(input.max || 0);
+            let quantity = Number(input.value || 0);
+            if (quantity > max) {
+                quantity = max;
+                input.value = max;
+            }
+
+            const part = input.dataset.partQuantity;
+            const checkbox = input.closest("label")?.querySelector(".checkbox");
+            selectedPartQuantities = selectedPartQuantities.filter((item) => item.part !== part);
+
+            if (checkbox?.checked && quantity > 0) {
+                selectedPartQuantities.push({ part, quantity });
+            }
+            syncSelectedPartInputs();
+            if (typeof calculateAmount === "function") {
+                calculateAmount();
+            }
+        };
+
+        window.trackSelectRateState = function trackSelectRateState(elem) {
+            const rateInput = document.getElementById("rate");
+            const titleInput = document.getElementById("title");
+            const titleContainer = document.getElementById("titleContainer");
+            if (!rateInput || !titleInput || !titleContainer) return;
+
+            if (elem.value !== "" && elem.value !== "0") {
+                titleContainer.classList.add("hidden");
+                rateInput.readOnly = true;
+                const selectedText = elem.closest(".selectParent").querySelector("li.selected").textContent;
+                rateInput.value = selectedText.split("|")[1]?.trim() || "";
+                titleInput.value = selectedText.split("|")[0]?.trim() || "";
+                calculateAmount();
+            } else if (elem.value === "0") {
+                titleContainer.classList.remove("hidden");
+                titleInput.value = "";
+                rateInput.value = "";
+                rateInput.readOnly = false;
+            } else {
+                titleInput.value = "";
+                rateInput.value = "";
+                titleContainer.classList.add("hidden");
+                rateInput.readOnly = true;
+            }
+        };
+
+        window.calculateAmount = function calculateAmount() {
+            const quantityInput = document.getElementById("article_quantity");
+            const rateInput = document.getElementById("rate");
+            const amountInput = document.getElementById("amount");
+            if (!quantityInput || !rateInput || !amountInput) return;
+
+            if (typeof validateInput === "function") {
+                validateInput(quantityInput);
+            }
+            const quantity = parseFloat(quantityInput.value || 0);
+            const rate = parseFloat(rateInput.value || 0);
+            amountInput.value = rate > 0 ? (rate * quantity).toFixed(2) : "";
+        };
 
         function renderTemplate(template, replacements) {
             if (!template) return "";
@@ -76,7 +280,7 @@
         moveHighlight(initialBtn, productionType === "issue" ? "issue" : "receive");
 
         if (printTicket && typeof window.showProductionTicket === "function") {
-            setTimeout(() => window.showProductionTicket(printTicket, true), 300);
+            setTimeout(() => window.showProductionTicket(printTicket, false), 300);
         }
 
         if (productionType === "issue") {
@@ -107,6 +311,37 @@
             let selectedTagsArray = [];
 
             if (!articleSelectInputDOM || !articleIdInputDOM) return;
+
+            function renderIssueWorkOptions() {
+                const workInput = document.querySelector('input[name="work_name"]');
+                const ul = document.querySelector('ul[data-for="work"]');
+                if (!workInput || !ul) return;
+
+                workInput.disabled = false;
+                ul.innerHTML = `
+                    <li data-for="work" data-value="" onmousedown="selectThisOption(this)"
+                        class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)] selected">
+                        -- Select Work --
+                    </li>
+                `;
+
+                allWorks.forEach(([workKey, workValue]) => {
+                    const workTitle = workValue.text;
+                    if (cleanWorkTitle(workTitle) === "cutting") {
+                        return;
+                    }
+
+                    ul.innerHTML += `
+                        <li data-for="work" data-value="${workKey}"
+                            onmousedown="selectThisOption(this)"
+                            class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)]">
+                            ${workTitle.split("|")[0].trim()}
+                        </li>
+                    `;
+                });
+            }
+
+            renderIssueWorkOptions();
 
             articleSelectInputDOM.addEventListener("keydown", (e) => {
                 e.preventDefault();
@@ -161,8 +396,10 @@
             };
 
             let selectedArticle = null;
+            let workLoadToken = 0;
 
             window.selectThisArticle = function selectThisArticle(articleElem) {
+                const currentWorkLoadToken = ++workLoadToken;
                 selectedArticle = JSON.parse(articleElem.getAttribute("data-json")).data;
 
                 articleIdInputDOM.value = selectedArticle.id;
@@ -173,95 +410,38 @@
 
                 closeModal("modalForm");
 
-                document.querySelector('input[name="work_name"]').disabled = false;
-
                 const ul = document.querySelector('ul[data-for="work"]');
+                renderIssueWorkOptions();
 
-                ul.innerHTML = `
-                    <li data-for="work" data-value="" onmousedown="selectThisOption(this)"
-                        class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)] selected">
-                        -- Select Work --
-                    </li>
-                `;
-
-                let afterCutting = [
-                    "Singer",
-                    "Print | E",
-                    "Embroidery | E",
-                    "Dhaap",
-                    "Wash",
-                    "O/F Look",
-                    "Kaj Button",
-                    "Bartake",
-                    "Stitching | E",
-                ];
-                const categorySeasonKey = `${selectedArticle.category}_${selectedArticle.season}`;
-                const partsRecievedFromCutting = selectedArticle.production
-                    .filter((p) => p.work.title === "Cutting")
-                    .flatMap((p) => p.parts);
-                const partsRecievedFromSinger = [
-                    ...new Set(
-                        selectedArticle.production
-                            .filter((p) => p.work.title === "Singer")
-                            .flatMap((p) => p.parts ?? [])
-                    ),
-                ];
-                const allIssuedParts = selectedArticle.production
-                    .filter((p) => p.receive_date === null)
-                    .flatMap((p) => p.parts);
-                const existingWorks = [...new Set(selectedArticle.production.flatMap((p) => p.work.title))];
-                const parts = allParts
-                    .filter(([key]) => key === categorySeasonKey)
-                    .flatMap(([_, value]) => value);
-
-                allWorks.forEach(([workKey, workValue]) => {
-                    const workTitle = workValue.text;
-                    let shouldShowWork = false;
-
-                    if (existingWorks.length === 1 && !afterCutting.includes("CMT | E")) {
-                        afterCutting.push("CMT | E");
-                    } else if (existingWorks.length !== 1 && afterCutting.includes("CMT | E")) {
-                        afterCutting = afterCutting.filter((w) => w !== "CMT | E");
-                    }
-
-                    const currentWorkParts = selectedArticle.production
-                        .filter((p) => p.work.title === workTitle)
-                        .flatMap((p) => p.parts);
-
-                    if (afterCutting.includes(workTitle)) {
-                        if (currentWorkParts.length < partsRecievedFromCutting.length) {
-                            shouldShowWork = true;
+                loadAvailableWorkIds({
+                        articleId: selectedArticle.id,
+                        mode: "issue",
+                }).then((availableWorkIds) => {
+                    if (currentWorkLoadToken !== workLoadToken) return;
+                    ul.querySelectorAll('li[data-for="work"][data-value]:not([data-value=""])').forEach((li) => {
+                        if (!availableWorkIds.includes(String(li.dataset.value))) {
+                            li.remove();
                         }
-                    }
+                    });
 
-                    if (shouldShowWork) {
-                        ul.innerHTML += `
-                            <li data-for="work" data-value="${workKey}"
-                                onmousedown="selectThisOption(this)"
-                                class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)]">
-                                ${workTitle.split("|")[0].trim()}
-                            </li>
-                        `;
+                    if (ul.children.length === 1) {
+                        ul.innerHTML = ``;
+                        document.querySelector('input[name="work_name"]').value = "";
+                        document.querySelector('input[name="work_name"]').disabled = true;
                     }
                 });
-
-                if (ul.children.length == 1) {
-                    ul.innerHTML = ``;
-                    document.querySelector('input[name="work_name"]').value = "";
-                    document.querySelector('input[name="work_name"]').disabled = true;
-                }
-
-                const selectedLi = ul.querySelector("li.selected");
-                if (selectedLi) {
-                    selectedLi.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-                }
             };
 
             window.trackWorkState = function trackWorkState(elem) {
                 if (elem.value !== "") {
-                    let correctWorkers = allWorkers.filter(
-                        (worker) => worker.data_option.type.id == elem.value
-                    );
+                    if (!selectedArticle) {
+                        appAlert("Select article first.");
+                        selectThisOption(elem.closest(".selectParent").querySelector('li[data-value=""]'));
+                        return;
+                    }
+
+                    const selectedWorkText = elem.closest(".selectParent").querySelector("li.selected")?.textContent.trim();
+                    let correctWorkers = allWorkers.filter((worker) => workerMatchesWork(worker, selectedWorkText));
 
                     if (correctWorkers.length > 0) {
                         document.querySelector('input[name="worker_name"]').disabled = false;
@@ -670,8 +850,16 @@
                 renderCardsInModal(materialModalData);
             };
 
-            window.generateSecondStep = function generateSecondStep(work) {
+            window.generateSecondStep = async function generateSecondStep(work) {
                 let secondStepHTML = "";
+                const workerName = document.querySelector('input[data-for="worker"]')?.value || "";
+                const issueHandoverHtml =
+                    renderTemplate(templates.issue?.issuedBy, {
+                        __ISSUED_BY_VALUE__: currentUserName,
+                    }) +
+                    renderTemplate(templates.issue?.receivedBy, {
+                        __RECEIVED_BY_VALUE__: workerName,
+                    });
                 const articleValue = `${selectedArticle.article_no} | ${selectedArticle.season} | ${selectedArticle.size} | ${selectedArticle.category} | ${formatNumbersDigitLess(
                     selectedArticle.quantity
                 )} (pcs) | Rs. ${formatNumbersWithDigits(selectedArticle.sales_rate, 1, 1)}`;
@@ -686,6 +874,11 @@
                           });
                 const partsHtml =
                     selectedArticle.category != "1_pc" ? templates.issue?.parts : "";
+                const rateHtml =
+                    (templates.issue?.selectRate || "") +
+                    (templates.issue?.titleContainer || "") +
+                    (templates.issue?.rateEditable || "") +
+                    (templates.issue?.amountOptional || "");
 
                 if (
                     work == "Singer" ||
@@ -699,7 +892,9 @@
                         articleHtml +
                         (templates.issue?.materials || "") +
                         quantityHtml +
+                        rateHtml +
                         (partsHtml || "") +
+                        issueHandoverHtml +
                         (templates.issue?.issueDate || "");
                 } else if (
                     work == "Print" ||
@@ -713,65 +908,41 @@
                     secondStepHTML =
                         articleHtml +
                         quantityHtml +
+                        rateHtml +
                         (partsHtml || "") +
+                        issueHandoverHtml +
                         (templates.issue?.issueDate || "");
                 }
                 document.getElementById("secondStep").innerHTML = secondStepHTML;
 
-                let partKey = selectedArticle.category + "_" + selectedArticle.season;
-                let partsClutter = "";
                 const checkboxes_container = document.querySelector(".checkboxes_container");
-
-                const partsReceivedFromCutting = selectedArticle.production
-                    .filter((p) => p.work.title === "Cutting")
-                    .flatMap((p) => p.parts);
-
-                const allIssuedParts = selectedArticle.production
-                    .filter((p) => p.receive_date === null)
-                    .flatMap((p) => p.parts);
-
-                const currentWorkParts = selectedArticle.production
-                    .filter((p) => p.work.title === work)
-                    .flatMap((p) => p.parts);
-
-                const availableParts = partsReceivedFromCutting.filter(
-                    (p) => !currentWorkParts.includes(p)
-                );
-
-                availableParts.forEach((part) => {
-                    partsClutter += `
-                        <label class="flex items-center gap-2 cursor-pointer rounded-md border border-[var(--h-bg-color)] bg-[var(--h-bg-color)] px-2 py-[0.1875rem] shadow-sm transition hover:shadow-md hover:border-primary">
-                            <input
-                                type="checkbox"
-                                onchange="toggleThisCheckbox(this)"
-                                data-checkbox="${part}"
-                                class="checkbox appearance-none bg-[var(--secondary-bg-color)] w-4 h-4 border border-gray-600 rounded-sm checked:bg-[var(--primary-color)] transition"
-                            />
-                            <span class="text-sm font-medium text-[var(--secondary-text)]">
-                                ${part}
-                            </span>
-                        </label>
-                    `;
+                const parts = await loadAvailableParts({
+                    articleId: selectedArticle.id,
+                    workId: selectedDbValue("work"),
+                    mode: "issue",
                 });
-
-                if (checkboxes_container) {
-                    checkboxes_container.innerHTML = partsClutter;
-                }
+                setAvailableParts(parts);
+                renderPartQuantityCheckboxes(checkboxes_container);
             };
 
             window.toggleThisCheckbox = function toggleThisCheckbox(checkbox) {
-                const dbPartsInput = document.getElementById("dbParts");
-
                 const checkboxValue = checkbox.dataset.checkbox;
+                const quantityInput = checkbox.closest("label")?.querySelector(`[data-part-quantity="${checkboxValue}"]`);
+                const quantity = Number(quantityInput?.value || checkbox.dataset.max || 0);
+                selectedPartQuantities = selectedPartQuantities.filter((item) => item.part !== checkboxValue);
                 if (checkbox.checked) {
-                    if (!selectedPartsArray.includes(checkboxValue)) {
-                        selectedPartsArray.push(checkboxValue);
+                    if (quantityInput) {
+                        quantityInput.disabled = false;
+                    }
+                    if (quantity > 0) {
+                        selectedPartQuantities.push({ part: checkboxValue, quantity });
                     }
                 } else {
-                    selectedPartsArray = selectedPartsArray.filter((part) => part !== checkboxValue);
+                    if (quantityInput) {
+                        quantityInput.disabled = true;
+                    }
                 }
-
-                dbPartsInput.value = JSON.stringify(selectedPartsArray);
+                syncSelectedPartInputs();
             };
 
             window.validateForNextStep = function validateForNextStep() {
@@ -794,6 +965,28 @@
 
             if (!articleSelectInputDOM || !articleIdInputDOM) return;
 
+            function renderReceiveWorkOptions() {
+                const workInput = document.querySelector('input[name="work_name"]');
+                const ul = document.querySelector('ul[data-for="work"]');
+                if (!workInput || !ul) return;
+
+                workInput.disabled = false;
+                ul.innerHTML = `
+                    <li data-for="work" data-value="" onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)] selected">-- Select Work --</li>
+                `;
+
+                allWorks.forEach(([workKey, workValue]) => {
+                    const workTitle = workValue.text;
+                    ul.innerHTML += `
+                        <li data-for="work" data-value="${workKey}" onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)]">
+                            ${workTitle.split("|")[0].trim()}
+                        </li>
+                    `;
+                });
+            }
+
+            renderReceiveWorkOptions();
+
             articleSelectInputDOM.addEventListener("keydown", (e) => {
                 e.preventDefault();
             });
@@ -803,18 +996,7 @@
             });
 
             function generateArticlesModal() {
-                const filteredArticles = articles.filter((a) => {
-                    const partKey = `${a.category}_${a.season}`;
-                    const allPartsForArticle = allParts
-                        .filter(([key]) => key === partKey)
-                        .flatMap(([_, value]) => value);
-
-                    const cuttingParts = a.production
-                        .filter((p) => p.work.title === "Cutting")
-                        .flatMap((p) => p.parts);
-
-                    return cuttingParts.length !== allPartsForArticle.length;
-                });
+                const filteredArticles = articles;
 
                 cardData =
                     articles.length > 0
@@ -873,7 +1055,6 @@
 
                 if (articleElem.dataset?.json) {
                     closeModal("modalForm");
-                    document.querySelector('input[name="work_name"]').disabled = false;
                 } else {
                     articleSelectInputDOM.disabled = true;
                 }
@@ -940,9 +1121,14 @@
 
             window.trackWorkState = function trackWorkState(elem) {
                 if (elem.value != "") {
-                    let correctWorkers = allWorkers.filter(
-                        (worker) => worker.data_option.type.id == elem.value
-                    );
+                    if (!selectedArticle) {
+                        appAlert("Select article first.");
+                        selectThisOption(elem.closest(".selectParent").querySelector('li[data-value=""]'));
+                        return;
+                    }
+
+                    const selectedWorkText = elem.closest(".selectParent").querySelector("li.selected")?.textContent.trim();
+                    let correctWorkers = allWorkers.filter((worker) => workerMatchesWork(worker, selectedWorkText));
 
                     if (correctWorkers.length > 0) {
                         document.querySelector('input[name="worker_name"]').disabled = false;
@@ -953,24 +1139,15 @@
                         `;
 
                         correctWorkers.forEach((worker) => {
-                            if (
-                                selectedArticle.production.find(
-                                    (p) =>
-                                        p.work.id == elem.value &&
-                                        p.receive_date == null &&
-                                        p.worker_id == worker.data_option.id
-                                )
-                            ) {
-                                ul.innerHTML += `
-                                    <li data-for="worker" data-value="${worker.data_option.id}" data-option='${jsonAttr(worker.data_option)}' onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)] selected">${worker.text}</li>
-                                `;
-                            } else {
-                                if (worker.data_option.type.title == "Cutting") {
-                                    ul.innerHTML += `
-                                        <li data-for="worker" data-value="${worker.data_option.id}" data-option='${jsonAttr(worker.data_option)}' onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)]">${worker.text}</li>
-                                    `;
-                                }
-                            }
+                            const isSelectedWorker = selectedArticle.production.find(
+                                (p) =>
+                                    p.work.id == elem.value &&
+                                    p.receive_date == null &&
+                                    p.worker_id == worker.data_option.id
+                            );
+                            ul.innerHTML += `
+                                <li data-for="worker" data-value="${worker.data_option.id}" data-option='${jsonAttr(worker.data_option)}' onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)] ${isSelectedWorker ? "selected" : ""}">${worker.text}</li>
+                            `;
                         });
 
                         const selectedLi = ul.querySelector("li.selected");
@@ -1152,9 +1329,17 @@
                     selectedTagsArray.length > 0 ? `${selectedTagsArray.length} Selected` : "";
             };
 
-            window.generateSecondStep = function generateSecondStep(work) {
+            window.generateSecondStep = async function generateSecondStep(work) {
                 let secondStepHTML = "";
                 let minDate = new Date();
+                const workerName = document.querySelector('input[data-for="worker"]')?.value || "";
+                const receiveHandoverHtml =
+                    renderTemplate(templates.receive?.issuedBy, {
+                        __ISSUED_BY_VALUE__: workerName,
+                    }) +
+                    renderTemplate(templates.receive?.receivedBy, {
+                        __RECEIVED_BY_VALUE__: currentUserName,
+                    });
 
                 if (
                     !new Date(
@@ -1190,6 +1375,7 @@
                         (templates.receive?.titleContainer || "") +
                         (templates.receive?.rateReadonly || "") +
                         (templates.receive?.amountReadonly || "") +
+                        receiveHandoverHtml +
                         (templates.receive?.receiveDateMax || "") +
                         partsHtml;
                 } else {
@@ -1199,6 +1385,7 @@
                         (templates.receive?.title || "") +
                         (templates.receive?.rateEditable || "") +
                         (templates.receive?.amountReadonly || "") +
+                        receiveHandoverHtml +
                         renderTemplate(templates.receive?.receiveDateMin, {
                             __MIN_DATE__: minDate,
                         }) +
@@ -1213,61 +1400,15 @@
                         ?.dataset.option || "{}"
                 );
                 const checkboxes_container = document.querySelector(".checkboxes_container");
-                let parts = [];
-                let partsClutter = "";
-
-                if (selectedTicket && Object.keys(selectedTicket).length > 0) {
-                    parts = selectedTicket.parts;
-                } else {
-                    const partKey = selectedArticle.category + "_" + selectedArticle.season;
-
-                    const allparts = allParts
-                        .filter(([key]) => key === partKey)
-                        .flatMap(([_, value]) => value);
-
-                    const existingParts = selectedArticle.production
-                        .flatMap((p) => p.parts)
-                        .filter((p) => allparts.includes(p));
-
-                    if (work == "Cutting") {
-                        parts = allparts.filter((p) => !existingParts.includes(p));
-                    } else {
-                        const showingParts = selectedArticle.production
-                            .filter((p) => p.work.title == work)
-                            .flatMap((p) => p.parts)
-                            .filter((p) => allparts.includes(p));
-
-                        const existingParts = selectedArticle.production
-                            .filter((p) => p.work.title == work)
-                            .filter((p) => p.receive_date !== null)
-                            .flatMap((p) => p.parts)
-                            .filter((p) => allparts.includes(p));
-
-                        parts = showingParts.filter((p) => !existingParts.includes(p));
-                    }
-                }
-
-                parts.forEach((part) => {
-                    if (part) {
-                        partsClutter += `
-                            <label class="flex items-center gap-2 cursor-pointer rounded-md border border-[var(--h-bg-color)] bg-[var(--h-bg-color)] px-2 py-[0.1875rem] shadow-sm transition hover:shadow-md hover:border-primary">
-                                <input
-                                    type="checkbox"
-                                    onchange="toggleThisCheckbox(this)"
-                                    data-checkbox="${part}"
-                                    class="checkbox appearance-none bg-[var(--secondary-bg-color)] w-4 h-4 border border-gray-600 rounded-sm checked:bg-[var(--primary-color)] transition"
-                                />
-                                <span class="text-sm font-medium text-[var(--secondary-text)] capitalize">
-                                    ${part}
-                                </span>
-                            </label>
-                        `;
-                    }
+                const selectedTicketName = document.querySelector('input[data-for="ticket"]')?.value || "";
+                const parts = await loadAvailableParts({
+                    articleId: selectedArticle.id,
+                    workId: selectedDbValue("work"),
+                    mode: "receive",
+                    ticket: selectedTicketName && selectedTicketName !== "-- Select Ticket --" ? selectedTicketName : "",
                 });
-
-                if (checkboxes_container) {
-                    checkboxes_container.innerHTML = partsClutter;
-                }
+                setAvailableParts(parts);
+                renderPartQuantityCheckboxes(checkboxes_container);
             };
 
             window.trackSelectRateState = function trackSelectRateState(elem) {
@@ -1316,21 +1457,25 @@
                 return true;
             };
 
-            let selectedPartsArray = [];
-
             window.toggleThisCheckbox = function toggleThisCheckbox(checkbox) {
-                const dbPartsInput = document.getElementById("dbParts");
-
                 const checkboxValue = checkbox.dataset.checkbox;
+                const quantityInput = checkbox.closest("label")?.querySelector(`[data-part-quantity="${checkboxValue}"]`);
+                const quantity = Number(quantityInput?.value || checkbox.dataset.max || 0);
+                selectedPartQuantities = selectedPartQuantities.filter((item) => item.part !== checkboxValue);
                 if (checkbox.checked) {
-                    if (!selectedPartsArray.includes(checkboxValue)) {
-                        selectedPartsArray.push(checkboxValue);
+                    if (quantityInput) {
+                        quantityInput.disabled = false;
+                    }
+                    if (quantity > 0) {
+                        selectedPartQuantities.push({ part: checkboxValue, quantity });
                     }
                 } else {
-                    selectedPartsArray = selectedPartsArray.filter((part) => part !== checkboxValue);
+                    if (quantityInput) {
+                        quantityInput.disabled = true;
+                    }
                 }
 
-                dbPartsInput.value = JSON.stringify(selectedPartsArray);
+                syncSelectedPartInputs();
             };
         }
     }

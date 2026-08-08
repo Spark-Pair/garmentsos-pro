@@ -4,9 +4,12 @@ namespace App\Services\Production;
 
 use App\Models\InventoryItem;
 use App\Models\InventoryTransaction;
+use App\Models\IssuedFabric;
 use App\Models\Production;
 use App\Models\ProductionMaterial;
 use App\Models\ProductionTag;
+use App\Models\ReturnFabric;
+use App\Services\Branches\ModuleBranchService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -155,6 +158,121 @@ class ProductionItemSyncService
             })
             ->filter(fn ($item) => $item['title'] !== '' && $item['quantity'] > 0)
             ->values();
+    }
+
+    public function workerTagBalances(array|Collection $workerIds, string $module = 'productions'): Collection
+    {
+        $workerIds = collect($workerIds)
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($workerIds->isEmpty()) {
+            return collect();
+        }
+
+        $balances = collect();
+        $branches = app(ModuleBranchService::class);
+
+        $addBalance = function (int $workerId, string $tag, float $quantity) use (&$balances) {
+            $tag = trim($tag);
+            if ($tag === '' || $quantity == 0.0) {
+                return;
+            }
+
+            $key = $workerId . '|' . $tag;
+            $current = $balances->get($key, [
+                'worker_id' => $workerId,
+                'tag' => $tag,
+                'issued_quantity' => 0.0,
+                'returned_quantity' => 0.0,
+                'production_quantity' => 0.0,
+                'available_quantity' => 0.0,
+            ]);
+
+            if ($quantity > 0) {
+                $current['issued_quantity'] += $quantity;
+            } elseif ($quantity < 0) {
+                $current['available_quantity'] += $quantity;
+            }
+
+            $balances->put($key, $current);
+        };
+
+        $issuedRows = $branches->applyRelatedScope(
+                IssuedFabric::query()->whereIn('worker_id', $workerIds),
+                'fabrics',
+                $module,
+            )
+            ->selectRaw('worker_id, tag, SUM(quantity) as total_quantity')
+            ->groupBy('worker_id', 'tag')
+            ->get();
+
+        foreach ($issuedRows as $row) {
+            $addBalance((int) $row->worker_id, (string) $row->tag, (float) $row->total_quantity);
+        }
+
+        $returnRows = $branches->applyRelatedScope(
+                ReturnFabric::query()->whereIn('worker_id', $workerIds),
+                'fabrics',
+                $module,
+            )
+            ->selectRaw('worker_id, tag, SUM(quantity) as total_quantity')
+            ->groupBy('worker_id', 'tag')
+            ->get();
+
+        foreach ($returnRows as $row) {
+            $key = (int) $row->worker_id . '|' . trim((string) $row->tag);
+            $current = $balances->get($key, [
+                'worker_id' => (int) $row->worker_id,
+                'tag' => trim((string) $row->tag),
+                'issued_quantity' => 0.0,
+                'returned_quantity' => 0.0,
+                'production_quantity' => 0.0,
+                'available_quantity' => 0.0,
+            ]);
+            $current['returned_quantity'] += (float) $row->total_quantity;
+            $current['available_quantity'] -= (float) $row->total_quantity;
+            $balances->put($key, $current);
+        }
+
+        if (Schema::hasTable('production_tags')) {
+            $productionRows = $branches->applyRelatedScope(
+                    ProductionTag::query()->whereIn('worker_id', $workerIds),
+                    'productions',
+                    $module,
+                )
+                ->selectRaw('worker_id, tag, SUM(quantity) as total_quantity, MAX(unit) as unit')
+                ->groupBy('worker_id', 'tag')
+                ->get();
+
+            foreach ($productionRows as $row) {
+                $key = (int) $row->worker_id . '|' . trim((string) $row->tag);
+                $current = $balances->get($key, [
+                    'worker_id' => (int) $row->worker_id,
+                    'tag' => trim((string) $row->tag),
+                    'issued_quantity' => 0.0,
+                    'returned_quantity' => 0.0,
+                    'production_quantity' => 0.0,
+                    'available_quantity' => 0.0,
+                ]);
+                $current['production_quantity'] += (float) $row->total_quantity;
+                $current['available_quantity'] -= (float) $row->total_quantity;
+                $current['unit'] = $row->unit ?: ($current['unit'] ?? null);
+                $balances->put($key, $current);
+            }
+        }
+
+        return $balances
+            ->map(function (array $row) {
+                $row['available_quantity'] = $row['issued_quantity'] - $row['returned_quantity'] - $row['production_quantity'];
+                return $row;
+            })
+            ->filter(fn (array $row) => $row['available_quantity'] > 0)
+            ->values()
+            ->groupBy('worker_id');
     }
 
     public function tablesReady(): bool

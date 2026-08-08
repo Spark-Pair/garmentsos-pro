@@ -30,6 +30,8 @@ class Production extends Model
         'ticket',
         'amount',
         'creator_id',
+        'issued_by_name',
+        'received_by_name',
     ];
 
     protected $casts = [
@@ -39,6 +41,7 @@ class Production extends Model
         'materials' => 'array',
         'parts' => 'array',
         'rate' => 'float',
+        'amount' => 'float',
     ];
 
     protected $hidden = [
@@ -91,5 +94,10 @@ class Production extends Model
     public function productionMaterials()
     {
         return $this->hasMany(ProductionMaterial::class);
+    }
+
+    public function productionFlows()
+    {
+        return $this->hasMany(ProductionFlow::class);
     }
 }
