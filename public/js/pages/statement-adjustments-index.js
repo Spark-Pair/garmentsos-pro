@@ -1,7 +1,7 @@
 (() => {
     function initStatementAdjustmentsIndex() {
         const config = window.__statementAdjustmentsIndex || {};
-        const canDeveloperManage = config.currentUserRole === 'developer';
+        const canDeveloperManage = isDeveloperUser('statement_adjustments');
 
         window.createRow = function createRow(data) {
             return `

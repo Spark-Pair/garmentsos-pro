@@ -10,11 +10,11 @@
         const selectAllCheckbox = document.getElementById("select-all-checkbox");
         const generateListBtn = document.getElementById("generateListBtn");
         const cargoListDOM = document.getElementById("cargo-list");
-        const finalTotalCottonsDOM = document.getElementById("finalTotalCottons");
-        if (!generateListBtn || !cargoListDOM || !finalTotalCottonsDOM) return;
+        const finalTotalCartonsDOM = document.getElementById("finalTotalCartons");
+        if (!generateListBtn || !cargoListDOM || !finalTotalCartonsDOM) return;
 
         generateListBtn.disabled = true;
-        let totalCottonCount = 0;
+        let totalCartonCount = 0;
         let isModalOpened = false;
         let invoiceModalData = null;
 
@@ -34,7 +34,7 @@
             return [
                 item.invoice_no,
                 item.date,
-                item.cotton_count,
+                item.carton_count,
                 item.cargo_name,
                 item.customer?.customer_name,
                 item.customer?.city?.title,
@@ -95,28 +95,28 @@
         }
 
         window.deselectThisInvoice = function deselectThisInvoice(index) {
-            totalCottonCount -= selectedInvoicesArray[index].cotton_count;
+            totalCartonCount -= selectedInvoicesArray[index].carton_count;
             deselectInvoiceAtIndex(index);
             renderList();
-            finalTotalCottonsDOM.textContent = totalCottonCount;
+            finalTotalCartonsDOM.textContent = totalCartonCount;
         };
 
         function renderList() {
             if (selectedInvoicesArray.length > 0) {
                 let clutter = "";
                 selectedInvoicesArray.forEach((selectedInvoice, index) => {
-                    let cottonCount =
-                        selectedInvoice.cotton_count ??
-                        `<input oninput="setCottonCount(${selectedInvoice.id}, this.value)" class="cotton_count_inp w-[80%] border border-gray-600 bg-[var(--h-bg-color)] py-0.5 px-2 rounded-md text-xs focus:outline-none" type="number"/>`;
+                    let cartonCount =
+                        selectedInvoice.carton_count ??
+                        `<input oninput="setCartonCount(${selectedInvoice.id}, this.value)" class="carton_count_inp w-[80%] border border-gray-600 bg-[var(--h-bg-color)] py-0.5 px-2 rounded-md text-xs focus:outline-none" type="number"/>`;
                     let cargoName =
                         selectedInvoice.cargo_name ??
-                        `<input oninput="setCargoName(${selectedInvoice.id}, this.value)" class="cotton_count_inp w-[80%] border border-gray-600 bg-[var(--h-bg-color)] py-0.5 px-2 rounded-md text-xs focus:outline-none" type="text" />`;
+                        `<input oninput="setCargoName(${selectedInvoice.id}, this.value)" class="carton_count_inp w-[80%] border border-gray-600 bg-[var(--h-bg-color)] py-0.5 px-2 rounded-md text-xs focus:outline-none" type="text" />`;
                     clutter += `
                         <div class="flex justify-between items-center border-t border-gray-600 py-3 px-4">
                             <div class="w-[7%]">${index + 1}</div>
                             <div class="w-1/6">${formatDate(selectedInvoice.date)}</div>
                             <div class="w-[11%]">${selectedInvoice.invoice_no}</div>
-                            <div class="w-[13%]">${cottonCount}</div>
+                            <div class="w-[13%]">${cartonCount}</div>
                             <div class="w-[17%] capitalize">${selectedInvoice.customer.customer_name}</div>
                             <div class="w-[10%]">${selectedInvoice.customer.city.title}</div>
                             <div class="w-1/6">
@@ -145,7 +145,7 @@
             let finalInovicesArray = selectedInvoicesArray.map((invoice) => {
                 return {
                     id: invoice.id,
-                    cottonCount: invoice.cottonCount,
+                    cartonCount: invoice.cartonCount,
                     biltyNo: invoice.biltyNo,
                     cargoName: invoice.cargoName,
                 };
@@ -201,7 +201,7 @@
                                             <div class="th text-sm font-medium w-[7%]">S.No</div>
                                             <div class="th text-sm font-medium w-1/6">Date</div>
                                             <div class="th text-sm font-medium w-1/6">Invoice No.</div>
-                                            <div class="th text-sm font-medium w-1/6">Cotton</div>
+                                            <div class="th text-sm font-medium w-1/6">Carton</div>
                                             <div class="th text-sm font-medium grow">Customer</div>
                                             <div class="th text-sm font-medium w-1/6">City</div>
                                         </div>
@@ -217,7 +217,7 @@
                                                         <div class="td text-sm font-semibold w-[7%]">${index + 1}.</div>
                                                         <div class="td text-sm font-semibold w-1/6">${invoice.date}</div>
                                                         <div class="td text-sm font-semibold w-1/6">${invoice.invoice_no}</div>
-                                                        <div class="td text-sm font-semibold w-1/6">${invoice.cotton_count}</div>
+                                                        <div class="td text-sm font-semibold w-1/6">${invoice.carton_count}</div>
                                                         <div class="td text-sm font-semibold grow">${invoice.customer.customer_name}</div>
                                                         <div class="td text-sm font-semibold w-1/6">${invoice.customer.city.title}</div>
                                                     </div>
@@ -262,7 +262,7 @@
             const index = selectedInvoicesArray.findIndex((invoice) => invoice.id === invoiceData.id);
             if (index === -1) {
                 selectedInvoicesArray.push(invoiceData);
-                totalCottonCount += invoiceData.cotton_count;
+                totalCartonCount += invoiceData.carton_count;
             }
             renderList();
         }
@@ -273,7 +273,7 @@
             const index = selectedInvoicesArray.findIndex((invoice) => invoice.id === invoiceData.id);
             if (index > -1) {
                 selectedInvoicesArray.splice(index, 1);
-                totalCottonCount -= invoiceData.cotton_count;
+                totalCartonCount -= invoiceData.carton_count;
             }
             renderList();
         }
@@ -284,7 +284,7 @@
             });
 
             selectedInvoicesArray = [];
-            totalCottonCount = 0;
+            totalCartonCount = 0;
             if (selectAllCheckbox) selectAllCheckbox.checked = false;
         }
 
@@ -293,10 +293,10 @@
             return true;
         };
 
-        window.setCottonCount = function setCottonCount(invoiceId, cottonCount) {
+        window.setCartonCount = function setCartonCount(invoiceId, cartonCount) {
             const invoice = selectedInvoicesArray.find((invoice) => invoice.id === invoiceId);
             if (invoice) {
-                invoice.cottonCount = cottonCount;
+                invoice.cartonCount = cartonCount;
             }
             updateInputInvoicesArray();
         };

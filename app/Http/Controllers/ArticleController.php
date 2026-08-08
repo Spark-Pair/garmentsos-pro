@@ -201,20 +201,22 @@ class ArticleController extends Controller
      */
     public function edit(Article $article)
     {
-        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin'])) {
-            return $resp;
+        if (!$this->checkRole(['developer', 'owner', 'admin']) && !app_can('articles', 'override')) {
+            return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         }
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($article, 'articles');
 
-        if (Auth::user()?->role !== 'developer' && $article->ordered_quantity != 0) {
+        $canArticleOverride = $this->canUseArticleDeveloperOverride();
+
+        if (!$canArticleOverride && $article->ordered_quantity != 0) {
             return redirect(route('articles.index'))->with("error", "This article can't be edited.");
         }
 
-        $developerImpact = Auth::user()?->role === 'developer'
+        $developerImpact = $canArticleOverride
             ? $this->articleDeveloperImpact($article)
             : [];
 
-        return view('articles.edit', compact('article', 'developerImpact'));
+        return view('articles.edit', compact('article', 'developerImpact', 'canArticleOverride'));
     }
 
     /**
@@ -222,12 +224,12 @@ class ArticleController extends Controller
      */
     public function update(Request $request, Article $article)
     {
-        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin'])) {
-            return $resp;
+        if (!$this->checkRole(['developer', 'owner', 'admin']) && !app_can('articles', 'update')) {
+            return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         }
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($article, 'articles');
 
-        if (Auth::user()?->role !== 'developer' && $article->ordered_quantity != 0) {
+        if (!$this->canUseArticleDeveloperOverride() && $article->ordered_quantity != 0) {
             return redirect(route('articles.index'))->with("error", "This article can't be edited.");
         }
 
@@ -293,8 +295,8 @@ class ArticleController extends Controller
      */
     public function destroy(Article $article)
     {
-        if ($resp = $this->denyIfNoRole(['developer'])) {
-            return $resp;
+        if (!$this->canUseArticleDeveloperOverride()) {
+            return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         }
 
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($article, 'articles');
@@ -316,6 +318,11 @@ class ArticleController extends Controller
         $article->delete();
 
         return redirect()->route('articles.index')->with('success', 'Article deleted successfully.');
+    }
+
+    private function canUseArticleDeveloperOverride(): bool
+    {
+        return Auth::user()?->role === 'developer' || app_can('articles', 'override');
     }
 
     private function articleDeveloperImpact(Article $article): array

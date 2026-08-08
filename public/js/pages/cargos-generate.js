@@ -13,9 +13,9 @@
     const generateListBtn = document.getElementById('generateListBtn');
     const dateInput = document.getElementById('date');
     const cargoListDOM = document.getElementById('cargo-list');
-    const finalTotalCottonsDOM = document.getElementById('finalTotalCottons');
+    const finalTotalCartonsDOM = document.getElementById('finalTotalCartons');
 
-    let totalCottonCount = 0;
+    let totalCartonCount = 0;
 
     window.trackStateOfgenerateBtn = function trackStateOfgenerateBtn(elem) {
         if (!generateListBtn) return;
@@ -206,8 +206,8 @@
     };
 
     function renderList() {
-        if (!cargoListDOM || !finalTotalCottonsDOM) return;
-        totalCottonCount = selectedInvoicesArray.reduce((sum, invoice) => sum + Number(invoice.cotton_count || 0), 0);
+        if (!cargoListDOM || !finalTotalCartonsDOM) return;
+        totalCartonCount = selectedInvoicesArray.reduce((sum, invoice) => sum + Number(invoice.carton_count || 0), 0);
         if (selectedInvoicesArray.length > 0) {
             let clutter = '';
             selectedInvoicesArray.forEach((selectedInvoice, index) => {
@@ -217,7 +217,7 @@
                             <div class="w-1/6">${formatDate(selectedInvoice.date)}</div>
                             <div class="w-[14%]">${selectedInvoice.invoice_no || '-'}</div>
                             <div class="w-[14%]">${selectedInvoice.shipment_no || '-'}</div>
-                            <div class="w-1/6">${selectedInvoice.cotton_count ?? '-'}</div>
+                            <div class="w-1/6">${selectedInvoice.carton_count ?? '-'}</div>
                             <div class="grow">${selectedInvoice.customer?.customer_name || '-'}</div>
                             <div class="w-[10%]">${selectedInvoice.customer?.city?.title || '-'}</div>
                             <div class="w-[10%] text-center">
@@ -234,7 +234,7 @@
             cargoListDOM.innerHTML =
                 '<div class="text-center bg-[var(--h-bg-color)] rounded-lg py-2 px-4">No Invoices Yet</div>';
         }
-        finalTotalCottonsDOM.textContent = totalCottonCount;
+        finalTotalCartonsDOM.textContent = totalCartonCount;
         updateInputinvoicesArray();
     }
 
@@ -290,7 +290,7 @@
                                 <div class="td text-sm font-semibold w-[16%]">${formatDate(invoice.date)}</div>
                                 <div class="td text-sm font-semibold w-[17%]">${invoice.invoice_no || '-'}</div>
                                 <div class="td text-sm font-semibold w-[17%]">${invoice.shipment_no || '-'}</div>
-                                <div class="td text-sm font-semibold w-[10%]">${invoice.cotton_count}</div>
+                                <div class="td text-sm font-semibold w-[10%]">${invoice.carton_count}</div>
                                 <div class="td text-sm font-semibold grow">${invoice.customer?.customer_name || '-'}</div>
                                 <div class="td text-sm font-semibold w-[12%]">${invoice.customer?.city?.title || '-'}</div>
                             </div>
@@ -338,7 +338,7 @@
                                             <div class="th text-sm font-medium w-[16%]">Date</div>
                                             <div class="th text-sm font-medium w-[17%]">Invoice No.</div>
                                             <div class="th text-sm font-medium w-[17%]">Shipment No.</div>
-                                            <div class="th text-sm font-medium w-[10%]">Cotton</div>
+                                            <div class="th text-sm font-medium w-[10%]">Carton</div>
                                             <div class="th text-sm font-medium grow">Customer</div>
                                             <div class="th text-sm font-medium w-[12%]">City</div>
                                         </div>

@@ -25,7 +25,7 @@ class SupplierPaymentController extends Controller
         $authLayout = $this->getAuthLayout($request->route()->getName(), 'table');
 
         if ($request->ajax()) {
-            $payments = SupplierPayment::with([
+            $payments = app(ModuleBranchService::class)->applyScope(SupplierPayment::with([
                 'bankAccount.bank',
                 'selfAccount.bank',
                 'cheque.paymentClearRecord.bankAccount.bank',
@@ -36,7 +36,7 @@ class SupplierPaymentController extends Controller
                 'cheque.customer.city',
                 'slip.customer.city',
                 'voucher',
-            ])->orderByDesc('id')->applyFilters($request);
+            ])->orderByDesc('id'), 'supplier_payments')->applyFilters($request);
 
             return response()->json(['data' => $payments, 'authLayout' => $authLayout]);
         }
@@ -89,7 +89,7 @@ class SupplierPaymentController extends Controller
      */
     public function destroy(SupplierPayment $supplierPayment)
     {
-        app(ModuleBranchService::class)->assertRecordInAllowedBranch($supplierPayment, 'supplier-payments');
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($supplierPayment, 'supplier_payments');
 
         if ($resp = $this->denyIfNoRole(['developer'])) {
             return $resp;

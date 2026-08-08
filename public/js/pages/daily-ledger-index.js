@@ -2,7 +2,7 @@
 function initDailyLedgerIndex() {
     const config = window.__dailyLedgerIndex || {};
     const csrfToken = config.csrfToken || document.querySelector('meta[name="csrf-token"]')?.content || "";
-    const isDeveloper = config.currentUserRole === "developer";
+    const isDeveloper = isDeveloperUser('daily_ledger');
     let totalDepositAmount = 0;
     let totalUseAmount = 0;
     let authLayout = 'table';

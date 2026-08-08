@@ -8,7 +8,8 @@
 
     $sizes_options = app('article')->sizes;
 
-    $isDeveloper = Auth::user()?->role === 'developer';
+    $isDeveloper = Auth::user()?->role === 'developer' || app_can('articles', 'override');
+    $canArticleOverride = $canArticleOverride ?? $isDeveloper;
     $connectedCount = collect($developerImpact ?? [])->sum('count');
 @endphp
     <!-- Main Content -->
@@ -36,10 +37,10 @@
                     <x-input
                         label="Article No"
                         value="{{ $article->article_no }}"
-                        :disabled="!$isDeveloper"
+                        :disabled="!$canArticleOverride"
                         name="article_no"
                     />
-                    @unless($isDeveloper)
+                    @unless($canArticleOverride)
                         <input type="hidden" name="article_no" id="article_no" value="{{ $article->article_no }}" />
                     @endunless
 
@@ -117,9 +118,9 @@
                     />
                 </div>
 
-                @if ($isDeveloper)
+                @if ($canArticleOverride)
                     <div class="rounded-xl border border-gray-600 bg-[var(--h-bg-color)] p-4 text-sm text-left">
-                        <div class="font-semibold text-[var(--text-color)]">Developer edit override</div>
+                        <div class="font-semibold text-[var(--text-color)]">Developer Mode</div>
                         <p class="mt-1 text-[var(--secondary-text)]">
                             This article can be edited by developer even when connected records exist. Review linked usage before changing article identity or deleting it.
                         </p>
@@ -238,12 +239,12 @@
             </div>
         </form>
 
-        @if ($isDeveloper)
+        @if ($canArticleOverride)
             <form action="{{ route('articles.destroy', $article) }}" method="POST"
                 class="bg-[var(--secondary-bg-color)] text-sm rounded-xl shadow-lg p-5 border border-[var(--glass-border-color)]/20 h-fit w-72">
                 @csrf
                 @method('DELETE')
-                <div class="font-semibold text-[var(--text-color)]">Developer delete</div>
+                <div class="font-semibold text-[var(--text-color)]">Delete Article</div>
                 <p class="mt-2 text-[var(--secondary-text)]">
                     @if ($connectedCount > 0)
                         This article has connected records. Force delete may remove related line records through database relationships.

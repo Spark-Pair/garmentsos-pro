@@ -96,7 +96,7 @@
         window.__customerPaymentsEdit = {
             customerPayment: @json($customerPaymentPayload),
             banksOptions: @json($banks_options),
-            isDeveloper: @json(Auth::user()?->role === 'developer'),
+            isDeveloper: @json(Auth::user()?->role === 'developer' || app_can('customer_payments', 'override')),
         };
     </script>
 @endpush

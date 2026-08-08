@@ -15,7 +15,7 @@ trait BiltyComputed
             'customer_name' => $this->invoice->customer->customer_name . ' | ' . $this->invoice->customer->city->title,
             'invoice_no' => $this->invoice->invoice_no,
             'cargo_name' => $this->invoice->cargo_name,
-            'bilty_no' => $this->bilty_no . ' | ' . $this->invoice->cotton_count,
+            'bilty_no' => $this->bilty_no . ' | ' . $this->invoice->carton_count,
         ];
     }
 

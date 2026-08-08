@@ -162,7 +162,7 @@
         window.__vouchersEdit = {
             voucherType: @json($voucherType),
             voucher: @json($voucherPayload),
-            isDeveloper: @json(Auth::user()?->role === 'developer'),
+            isDeveloper: @json(Auth::user()?->role === 'developer' || app_can('vouchers', 'override')),
             branchBranding: @json($branchBranding ?? null),
             companyData: @json($branchBranding ?? $client_company),
             companyLogoUrl: @json(($branchBranding['logo_url'] ?? null) ?: asset('images/' . $client_company->logo)),

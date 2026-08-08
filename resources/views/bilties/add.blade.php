@@ -31,7 +31,7 @@
                     <div class="w-[7%]">S.No.</div>
                     <div class="w-1/6">Date</div>
                     <div class="w-[11%]">Bill No.</div>
-                    <div class="w-[13%]">Cottons</div>
+                    <div class="w-[13%]">Cartons</div>
                     <div class="w-[17%]">Customer</div>
                     <div class="w-[10%]">City</div>
                     <div class="w-1/6">Bilty No.</div>
@@ -46,8 +46,8 @@
             <input type="hidden" name="invoices_array" id="invoices" value="">
             <div class="w-full grid grid-cols-1 text-sm mt-5 text-nowrap">
                 <div class="total-qty flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full">
-                    <div class="grow">Total Cottons</div>
-                    <div id="finalTotalCottons">0</div>
+                    <div class="grow">Total Cartons</div>
+                    <div id="finalTotalCartons">0</div>
                 </div>
             </div>
         </div>

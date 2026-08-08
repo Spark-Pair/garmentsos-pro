@@ -14,7 +14,7 @@ trait CargoComputed
             'invoice_no' => $invoice->invoice_no,
             'shipment_no' => $invoice->shipment_no,
             'date' => $invoice->date,
-            'cotton_count' => (int) ($invoice->cotton_count ?? 0),
+            'carton_count' => (int) ($invoice->carton_count ?? 0),
             'customer' => $invoice->customer ? [
                 'id' => $invoice->customer->id,
                 'customer_name' => $invoice->customer->customer_name,

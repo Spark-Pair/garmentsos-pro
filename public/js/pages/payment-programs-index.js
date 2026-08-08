@@ -312,6 +312,7 @@ function initPaymentProgramsIndex() {
                 data: {
                     _token: config.csrfToken,
                     category: value,
+                    module_key: 'payment_programs',
                 },
                 success: function (response) {
                     let items = [];

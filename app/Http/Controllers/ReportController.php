@@ -1216,7 +1216,9 @@ class ReportController extends Controller
 
     private function expenseStatementPayload(int $id): ?array
     {
-        $expense = Expense::with(['supplier:id,supplier_name', 'expenseSetups:id,title'])->find($id);
+        $expense = app(ModuleBranchService::class)
+            ->applyScope(Expense::with(['supplier:id,supplier_name', 'expenseSetups:id,title']), 'expenses')
+            ->find($id);
         if (!$expense) return null;
 
         if ($this->isSupplierRole() && $expense->supplier_id !== $this->currentSupplier()?->id) {
@@ -1231,7 +1233,7 @@ class ReportController extends Controller
 
     private function voucherStatementPayload(int $id): ?array
     {
-        $voucher = Voucher::with([
+        $voucher = app(ModuleBranchService::class)->applyScope(Voucher::with([
             'supplier:id,supplier_name',
             'payments.cheque.customer:id,customer_name,city_id',
             'payments.cheque.customer.city:id,short_title,title',
@@ -1241,7 +1243,7 @@ class ReportController extends Controller
             'payments.program.customer.city:id,short_title,title',
             'payments.bankAccount.bank:id,short_title',
             'payments.selfAccount.bank:id,short_title',
-        ])->find($id);
+        ]), 'vouchers')->find($id);
         if (!$voucher) return null;
 
         if ($this->isSupplierRole() && $voucher->supplier_id !== $this->currentSupplier()?->id) {
@@ -1256,7 +1258,7 @@ class ReportController extends Controller
 
     private function supplierPaymentStatementPayload(int $id): ?array
     {
-        $payment = SupplierPayment::with([
+        $payment = app(ModuleBranchService::class)->applyScope(SupplierPayment::with([
             'supplier:id,supplier_name',
             'voucher.supplier:id,supplier_name',
             'bankAccount.bank:id,short_title',
@@ -1273,7 +1275,7 @@ class ReportController extends Controller
             'slip.paymentClearRecord.bankAccount.bank',
             'slip.dr',
             'cr',
-        ])->find($id);
+        ]), 'supplier_payments')->find($id);
         if (!$payment) return null;
 
         if ($this->isSupplierRole() && $payment->supplier_id !== $this->currentSupplier()?->id) {
@@ -1288,7 +1290,9 @@ class ReportController extends Controller
 
     private function employeePaymentStatementPayload(int $id): ?array
     {
-        $payment = EmployeePayment::with('employee.type')->find($id);
+        $payment = app(ModuleBranchService::class)
+            ->applyScope(EmployeePayment::with('employee.type'), 'employee_payments')
+            ->find($id);
         if (!$payment) return null;
 
         return [
@@ -1299,13 +1303,13 @@ class ReportController extends Controller
 
     private function invoiceStatementPayload(int $id): ?array
     {
-        $invoice = Invoice::with([
+        $invoice = app(ModuleBranchService::class)->applyScope(Invoice::with([
             'order',
             'shipment',
             'invoiceArticles.article',
             'salesReturns',
             'customer.city',
-        ])->find($id);
+        ]), 'invoices')->find($id);
         if (!$invoice) return null;
 
         if ($this->isCustomerRole() && $invoice->customer_id !== $this->currentCustomer()?->id) {
@@ -1320,7 +1324,7 @@ class ReportController extends Controller
 
     private function customerPaymentStatementPayload(int $id): ?array
     {
-        $payment = CustomerPayment::whereNotNull('customer_id')
+        $payment = app(ModuleBranchService::class)->applyScope(CustomerPayment::whereNotNull('customer_id')
             ->with([
                 'customer.city',
                 'cheque.supplier',
@@ -1334,7 +1338,7 @@ class ReportController extends Controller
                 'paymentClearRecord.bankAccount.bank',
                 'paymentClearRecord.creator',
                 'dr',
-            ])->find($id);
+            ]), 'customer_payments')->find($id);
         if (!$payment) return null;
 
         if ($this->isCustomerRole() && $payment->customer_id !== $this->currentCustomer()?->id) {
@@ -1349,7 +1353,9 @@ class ReportController extends Controller
 
     private function statementAdjustmentPayload(int $id): ?array
     {
-        $adjustment = StatementAdjustment::with('adjustable')->find($id);
+        $adjustment = app(ModuleBranchService::class)
+            ->applyScope(StatementAdjustment::with('adjustable'), 'statement_adjustments')
+            ->find($id);
         if (!$adjustment) return null;
 
         return [

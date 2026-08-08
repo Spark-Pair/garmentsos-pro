@@ -2,7 +2,7 @@
     function initInventoryIndex() {
         const config = window.__inventoryIndex || {};
         window.authLayout = config.authLayout || "table";
-        const canDeveloperManage = config.currentUserRole === "developer";
+        const canDeveloperManage = isDeveloperUser('inventory');
 
         window.createRow = function createRow(data) {
             return `

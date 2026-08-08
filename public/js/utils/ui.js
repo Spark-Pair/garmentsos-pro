@@ -87,9 +87,17 @@ function submitResourceDelete(action, token = null) {
     form.submit();
 }
 
-function isDeveloperUser() {
-    return window.__appConfig?.authUserRole === 'developer'
-        || window.__currentUserRole === 'developer';
+function isDeveloperUser(moduleKey = null) {
+    if (window.__appConfig?.authUserRole === 'developer' || window.__currentUserRole === 'developer') {
+        return true;
+    }
+
+    const key = moduleKey || window.__appConfig?.currentModuleKey || window.__currentModuleKey || null;
+    const modules = Array.isArray(window.__appConfig?.developerModeModules)
+        ? window.__appConfig.developerModeModules
+        : [];
+
+    return Boolean(key && modules.includes(key));
 }
 
 function hideNotification(notificationElem) {

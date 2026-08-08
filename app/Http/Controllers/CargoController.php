@@ -98,7 +98,7 @@ class CargoController extends Controller
             'id' => $invoice->id,
             'invoice_no' => $invoice->invoice_no,
             'date' => $invoice->date?->format('Y-m-d'),
-            'cotton_count' => $invoice->cotton_count,
+            'carton_count' => $invoice->carton_count,
             'cargo_name' => $invoice->cargo_name,
             'shipment_no' => $invoice->shipment_no,
             'customer' => $invoice->customer ? [

@@ -56,6 +56,7 @@
                 data: {
                     _token: window.__paymentProgramsCreate?.csrfToken || '',
                     category: value,
+                    module_key: 'payment_programs',
                 },
                 success: function (response) {
                     let items = [];

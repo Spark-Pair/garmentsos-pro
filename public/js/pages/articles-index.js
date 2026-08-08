@@ -47,7 +47,7 @@
                 });
             }
 
-            if (config.currentUserRole === "developer") {
+            if (isDeveloperUser('articles')) {
                 contextMenuData.actions.push({
                     id: "delete",
                     text: "Delete",
@@ -104,7 +104,7 @@
                 ],
             };
 
-            if (data.ordered_quantity == 0 || config.currentUserRole === "developer") {
+            if (data.ordered_quantity == 0 || isDeveloperUser('articles')) {
                 modalData.bottomActions.push({
                     id: "edit",
                     text: "Edit",

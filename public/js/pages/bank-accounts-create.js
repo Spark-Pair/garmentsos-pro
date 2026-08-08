@@ -39,6 +39,7 @@
                 data: {
                     _token: csrfToken,
                     category: value,
+                    module_key: 'bank_accounts',
                 },
                 success: function (response) {
                     let clutter = '';

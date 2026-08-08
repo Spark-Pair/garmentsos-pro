@@ -2,7 +2,7 @@
 function initUtilityBillsIndex() {
     const config = window.__utilityBillsIndex || {};
     const csrfToken = config.csrfToken;
-    const canDeveloperManage = config.currentUserRole === 'developer';
+    const canDeveloperManage = isDeveloperUser('utility_bills');
     let authLayout = 'table';
     let today = formatDate(new Date(), false, true);
 
