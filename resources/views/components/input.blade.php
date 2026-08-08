@@ -40,6 +40,7 @@
     'checkBoxes' => [],
     'addBtnLink' => '',
     'showError' => true,
+    'listInput' => false,
 ])
 
 @if ($uppercased)
@@ -68,10 +69,12 @@
     // For custom selects, data-error-for is the real hidden database field name.
     $errorTargetName = $attributes->get('data-error-for') ?: $name;
     $hasServerError = $showError && $errors->has($errorTargetName);
-    $hasRightAccessory = $withImg;
-    $inputRightPadding = $showError
-        ? ($hasRightAccessory ? 'pr-14' : 'pr-3')
-        : ($hasRightAccessory ? 'pr-3' : '');
+    $hasRightAccessory = $withImg || $listInput;
+    $inputRightPadding = $listInput
+        ? 'pr-18'
+        : ($showError
+            ? ($hasRightAccessory ? 'pr-14' : 'pr-3')
+            : ($hasRightAccessory ? 'pr-3' : ''));
     $errorIconRight = $hasRightAccessory ? 'right-8' : 'right-3';
 @endphp
 
@@ -137,6 +140,7 @@
                 @if ($oninput) oninput="{{ $oninput }}" @endif
                 @if ($dataFilterPath) data-filter-path="{{ $dataFilterPath }}" @endif
                 @if ($dataClearable) data-clearable @endif
+                @if ($listInput) data-list-input @endif
                 @if ($showError) aria-describedby="{{ $errorTargetName }}-error" @endif
                 @if ($hasServerError) aria-invalid="true" @endif
             />
@@ -160,6 +164,22 @@
                 onclick="openArticleModal()">
         @endif
 
+        @if ($listInput)
+            <button type="button"
+                class="list-input-add-btn absolute right-9 top-1/2 z-10 flex size-7 -translate-y-1/2 items-center justify-center rounded-md bg-[var(--primary-color)] text-xs text-white transition-all duration-200 hover:bg-[var(--h-primary-color)]"
+                data-list-input-target="{{ $id }}"
+                title="Add to list">
+                <i class="fas fa-plus"></i>
+            </button>
+            <button type="button"
+                class="list-input-toggle-btn absolute right-1 top-1/2 z-10 flex size-7 -translate-y-1/2 items-center justify-center rounded-md border border-gray-600 bg-[var(--secondary-bg-color)] text-xs text-[var(--secondary-text)] transition-all duration-200 hover:bg-[var(--h-bg-color)]"
+                data-list-input-toggle="{{ $id }}"
+                title="Show list">
+                <i class="fas fa-list"></i>
+                <span class="list-input-count pointer-events-none absolute -right-1 -top-1 hidden min-w-[1rem] rounded-full bg-[var(--primary-color)] px-1 text-[10px] leading-4 text-white shadow-sm" data-list-input-count-for="{{ $id }}">0</span>
+            </button>
+        @endif
+
         @if ($withButton)
             <button id="{{ $btnId }}" type="button"
                 class="{{ $btnClass }} cursor-pointer rounded-lg bg-[var(--primary-color)] px-4 transition-all duration-300 hover:bg-[var(--h-primary-color)] disabled:cursor-not-allowed disabled:opacity-50 {{ $btnText === '+' ? 'text-lg font-bold' : 'text-nowrap' }}">
@@ -181,6 +201,10 @@
             </div>
         @endif
     </div>
+
+    @if ($listInput)
+        <div class="list-input-items absolute left-0 right-0 top-[calc(100%+0.45rem)] z-50 hidden max-h-[13rem] flex-col rounded-xl border border-gray-600 bg-[var(--secondary-bg-color)] p-1 text-sm text-[var(--text-color)] shadow-xl my-scrollbar-2" data-list-input-items-for="{{ $id }}"></div>
+    @endif
 
     @if ($list !== '')
         <datalist id="{{ $list }}">

@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 
 trait FabricComputed
 {
+    use SearchFilterHelpers;
+
     public function toFormattedArray()
     {
         return [
@@ -28,11 +30,14 @@ trait FabricComputed
     {
         switch ($key) {
             case 'supplier_name':
-                return $query->where(function ($query) use ($value) {
-                    $query->whereHas('supplier', function ($q) use ($value) {
-                        $q->where('supplier_name', 'like', "%{$value}%");
-                    });
-                });
+                $supplierIds = $this->searchFilterMatchingIds(\App\Models\Supplier::class, 'supplier_name', $value);
+
+                return $supplierIds->isEmpty()
+                    ? $query->whereRaw('1 = 0')
+                    : $query->whereIn('supplier_id', $supplierIds->all());
+
+            case 'employee_name':
+                return $query->whereRaw('1 = 0');
                 
             case 'type':
                 if ($value === 'Issued') {
@@ -46,6 +51,12 @@ trait FabricComputed
 
             case 'fabric':
                 return $query->where('fabric_id', $value);
+
+            case 'tag':
+            case 'remarks':
+            case 'color':
+            case 'unit':
+                return $this->searchFilterWhereLikeAny($query, $key, $value);
 
             case 'date':
                 $start = $value['start'] ?? null;

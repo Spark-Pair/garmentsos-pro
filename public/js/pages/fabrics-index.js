@@ -57,6 +57,7 @@
                 Date: data.date,
                 'Supplier / Worker': data.supplier_name ?? data.employee_name ?? '-',
                 Type: data.type ?? '-',
+                ...(data.type === 'Used in Production' ? { 'Article No': data.article_no ?? '-' } : {}),
                 Fabric: data.fabric ?? '-',
                 Color: data.color ?? '-',
                 Unit: data.unit ?? '-',

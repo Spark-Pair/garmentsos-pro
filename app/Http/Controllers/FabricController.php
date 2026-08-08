@@ -46,28 +46,41 @@ class FabricController extends Controller
 
             $productionTags = collect();
             if (Schema::hasTable('production_tags')) {
+                $sourceLotsByTag = $branches->applyScope(Fabric::with(['supplier', 'fabric']), 'fabrics')
+                    ->get()
+                    ->keyBy(fn (Fabric $fabric) => (string) $fabric->tag);
+
                 $productionTags = $branches->applyRelatedScope(
                         ProductionTag::with(['production.article', 'production.worker'])->orderByDesc('id'),
                         'productions',
                         'fabrics'
                     )
                     ->get()
-                    ->map(function (ProductionTag $tag) {
+                    ->map(function (ProductionTag $tag) use ($sourceLotsByTag) {
+                        $date = $tag->production?->issue_date ?? $tag->created_at;
+                        $source = $sourceLotsByTag->get((string) $tag->tag);
+
                         return [
                             'id' => 'production-tag-' . $tag->id,
                             'type' => 'Used in Production',
                             'tag' => $tag->tag,
                             'quantity' => $tag->quantity,
-                            'date' => optional($tag->production?->issue_date ?? $tag->created_at)->format('d-M-Y, D'),
-                            'supplier_name' => $tag->production?->worker?->employee_name,
+                            'date' => optional($date)->format('d-M-Y, D'),
+                            'filter_date' => optional($date)->toDateString(),
+                            'supplier_name' => $source?->supplier?->supplier_name,
+                            'supplier_id' => $source?->supplier_id,
                             'employee_name' => $tag->production?->worker?->employee_name,
-                            'fabric' => $tag->production?->article?->article_no,
-                            'color' => '-',
-                            'unit' => $tag->unit ?? '-',
+                            'article_no' => $tag->production?->article?->article_no,
+                            'fabric' => $source?->fabric?->title ?? $tag->production?->article?->article_no,
+                            'fabric_id' => $source?->fabric_id,
+                            'color' => $source?->color ?? '-',
+                            'unit' => $source?->unit ?? $tag->unit ?? '-',
                             'remarks' => 'Ticket: ' . ($tag->production?->ticket ?? '-'),
                             'created_at' => $tag->created_at,
                         ];
-                    });
+                    })
+                    ->filter(fn (array $item) => $this->fabricIndexCollectionMatchesFilters($item, $request))
+                    ->values();
             }
 
             // Combine arrays manually
@@ -94,6 +107,66 @@ class FabricController extends Controller
         // return $fabrics_options;
 
         return view('fabrics.index', compact('fabrics_options', 'authLayout'));
+    }
+
+    private function fabricIndexCollectionMatchesFilters(array $item, Request $request): bool
+    {
+        $filters = $request->except(['_token', 'limit', 'page']);
+        foreach ($filters as $key => $value) {
+            if (($value === null || $value === '') && $value !== '0') {
+                continue;
+            }
+
+            if ($key === 'date_range_start' || $key === 'date_range_end') {
+                continue;
+            }
+
+            if ($key === 'type' && (string) $value !== (string) ($item['type'] ?? '')) {
+                return false;
+            }
+
+            if ($key === 'supplier_name') {
+                if (!$this->collectionTextMatchesAny((string) ($item['supplier_name'] ?? ''), (string) $value)) {
+                    return false;
+                }
+
+                continue;
+            }
+
+            if ($key === 'fabric' && (string) $value !== '') {
+                if ((string) ($item['fabric_id'] ?? '') !== (string) $value) {
+                    return false;
+                }
+
+                continue;
+            }
+
+            if (in_array($key, ['employee_name', 'tag', 'remarks', 'color', 'unit'], true)
+                && !$this->collectionTextMatchesAny((string) ($item[$key] ?? ''), (string) $value)) {
+                return false;
+            }
+        }
+
+        $start = trim((string) $request->get('date_range_start', ''));
+        $end = trim((string) $request->get('date_range_end', ''));
+        if ($start !== '' && $end !== '') {
+            $date = $item['filter_date'] ?? optional(Carbon::parse($item['created_at'] ?? null))->toDateString();
+            if ($date < $start || $date > $end) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function collectionTextMatchesAny(string $text, string $value): bool
+    {
+        $tokens = collect(preg_split('/[,\r\n]+/', $value))
+            ->map(fn ($item) => trim($item))
+            ->filter();
+
+        return $tokens->isEmpty()
+            || $tokens->contains(fn ($token) => str_contains(mb_strtolower($text), mb_strtolower((string) $token)));
     }
 
     /**

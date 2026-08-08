@@ -4,18 +4,20 @@ namespace App\Traits;
 
 trait PhysicalQuantityComputed
 {
+    use SearchFilterHelpers;
+
     public function scopeApplyModelFilters($query, $key, $value)
     {
         switch ($key) {
             case 'article_no':
-                return $query->whereHas('article', fn ($q) =>
-                    $q->where('article_no', 'like', "%{$value}%")
-                );
+                $articleIds = $this->searchFilterMatchingIds(\App\Models\Article::class, 'article_no', $value);
+
+                return $articleIds->isEmpty()
+                    ? $query->whereRaw('1 = 0')
+                    : $query->whereIn('article_id', $articleIds->all());
 
             case 'processed_by':
-                return $query->whereHas('article', fn ($q) =>
-                    $q->where('processed_by', 'like', "%{$value}%")
-                );
+                return $query->whereHas('article', fn ($q) => $this->searchFilterWhereLikeAny($q, 'processed_by', $value));
 
             case 'shipment':
                 return $query->whereHas('article.shipmentArticles.shipment', function($q) use ($value) {

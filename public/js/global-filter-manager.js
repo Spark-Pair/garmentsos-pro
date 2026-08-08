@@ -72,7 +72,13 @@ const GlobalFilterManager = {
         window.clearAllSearchFields = () => {
             document.querySelectorAll('[data-clearable]').forEach(field => {
                 field.value = '';
+                if (field.matches?.('[data-list-input]')) {
+                    field.dataset.listInputValues = '';
+                }
             });
+            if (typeof window.refreshListInput === 'function') {
+                window.refreshListInput();
+            }
             this.clearSelectLabels();
             this.clearStorage('filters');
             this.loadInitialData();
@@ -254,7 +260,9 @@ const GlobalFilterManager = {
         const filters = {};
 
         document.querySelectorAll('[data-filter-path]').forEach(input => {
-            const value = input.value?.trim();
+            const value = input.matches?.('[data-list-input]') && typeof window.getListInputValue === 'function'
+                ? window.getListInputValue(input).trim()
+                : input.value?.trim();
 
             if (value && value !== '') {
                 // Use input id as filter key
@@ -314,6 +322,12 @@ const GlobalFilterManager = {
 
             if (input.classList.contains('dbInput')) {
                 this.syncSelectLabel(input);
+            }
+
+            if (input.matches?.('[data-list-input]') && typeof window.refreshListInput === 'function') {
+                input.dataset.listInputValues = value;
+                input.value = '';
+                window.refreshListInput(input);
             }
         });
     },

@@ -6,14 +6,15 @@
             "Article No" => [
                 "id" => "article_no",
                 "type" => "text",
-                "placeholder" => "Enter article no",
-                                "dataFilterPath" => "article_no",
+                "placeholder" => "Enter article no or 0001-0010",
+                "dataFilterPath" => "article_no",
+                "listInput" => true,
             ],
             "Processed By" => [
                 "id" => "processed_by",
                 "type" => "text",
                 "placeholder" => "Enter processed by",
-                                "dataFilterPath" => "processed_by",
+                "dataFilterPath" => "processed_by",
             ],
             'Shipment' => [
                 'id' => 'shipment',

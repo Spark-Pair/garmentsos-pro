@@ -8,6 +8,7 @@ use App\Models\ShipmentArticles;
 use App\Services\Branches\ModuleBranchService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Collection;
 
 class PhysicalQuantityReportService
@@ -19,8 +20,8 @@ class PhysicalQuantityReportService
     public function getIndexRows(Request|array $filters = [], ?int $limit = null, ?array $branchIds = null, bool $includeNullBranchRecords = false): Collection
     {
         $branches = app(ModuleBranchService::class);
-        $query = PhysicalQuantity::with('article')->orderByDesc('id');
-        if ($branchIds !== null && !empty($branchIds) && \Illuminate\Support\Facades\Schema::hasColumn('physical_quantities', 'branch_id')) {
+        $query = PhysicalQuantity::query()->orderByDesc('id');
+        if ($branchIds !== null && !empty($branchIds) && Schema::hasColumn('physical_quantities', 'branch_id')) {
             $query->where(function ($scope) use ($branchIds, $includeNullBranchRecords) {
                 $scope->whereIn('branch_id', $branchIds);
                 if ($includeNullBranchRecords) {
@@ -30,6 +31,10 @@ class PhysicalQuantityReportService
         } else {
             $query = $branches->applyScope($query, 'physical_quantities');
         }
+
+        $articleScope = $this->articleBranchScope($branchIds, $includeNullBranchRecords);
+        $query->whereHas('article', $articleScope)
+            ->with(['article' => $articleScope]);
 
         $this->applyFilters($query, $filters);
         $rows = $query->get()->filter(fn (PhysicalQuantity $row) => $row->article);
@@ -74,7 +79,7 @@ class PhysicalQuantityReportService
     public function getArticleOptions(?array $branchIds = null, bool $includeNullBranchRecords = false): array
     {
         $query = Article::query()->orderByDesc('id');
-        if ($branchIds !== null && !empty($branchIds) && \Illuminate\Support\Facades\Schema::hasColumn('articles', 'branch_id')) {
+        if ($branchIds !== null && !empty($branchIds) && Schema::hasColumn('articles', 'branch_id')) {
             $query->where(function ($scope) use ($branchIds, $includeNullBranchRecords) {
                 $scope->whereIn('branch_id', $branchIds);
                 if ($includeNullBranchRecords) {
@@ -98,6 +103,57 @@ class PhysicalQuantityReportService
                 ];
             })
             ->all();
+    }
+
+    protected function articleBranchScope(?array $branchIds = null, bool $includeNullBranchRecords = false): callable
+    {
+        return function ($articleQuery) use ($branchIds, $includeNullBranchRecords) {
+            if (!Schema::hasColumn('articles', 'branch_id')) {
+                return;
+            }
+
+            if ($branchIds !== null && !empty($branchIds)) {
+                $articleQuery->where(function ($scope) use ($branchIds, $includeNullBranchRecords) {
+                    $scope->whereIn('articles.branch_id', $branchIds);
+                    if ($includeNullBranchRecords) {
+                        $scope->orWhereNull('articles.branch_id');
+                    }
+                });
+                return;
+            }
+
+            $branches = app(ModuleBranchService::class);
+            if (!$branches->shouldFilterRelatedRecords('physical_quantities', 'articles')) {
+                return;
+            }
+
+            $branchIdsForPhysical = $branches->selectedBranchIdsForModule('physical_quantities');
+            if (empty($branchIdsForPhysical)) {
+                $articleQuery->whereRaw('1 = 0');
+                return;
+            }
+
+            $includeNullForMain = \App\Models\Branch::query()
+                ->whereIn('id', $branchIdsForPhysical)
+                ->where('is_main', true)
+                ->exists();
+
+            $articleQuery->where(function ($scope) use ($branchIdsForPhysical, $includeNullForMain) {
+                $scope->whereIn('articles.branch_id', $branchIdsForPhysical);
+                if ($includeNullForMain) {
+                    $scope->orWhereNull('articles.branch_id');
+                }
+            });
+        };
+    }
+
+    protected function selectedBranchIdsForModule(string $moduleKey): array
+    {
+        $branches = app(ModuleBranchService::class);
+
+        return $branches->shouldFilterRecords($moduleKey)
+            ? array_values(array_filter($branches->selectedBranchIdsForModule($moduleKey), fn ($id) => is_numeric($id)))
+            : [];
     }
 
     protected function applyFilters(Builder $query, Request|array $filters): void
@@ -144,10 +200,24 @@ class PhysicalQuantityReportService
             return collect();
         }
 
-        $shipmentCitiesMap = ShipmentArticles::query()
+        $shipmentCitiesQuery = ShipmentArticles::query()
             ->whereIn('article_id', $articleIds)
             ->whereHas('shipment')
-            ->with('shipment:id,city')
+            ->with('shipment:id,city,branch_id');
+
+        $shipmentBranchIds = $branchIds ?? $this->selectedBranchIdsForModule('physical_quantities');
+        if (!empty($shipmentBranchIds) && Schema::hasColumn('shipments', 'branch_id')) {
+            $shipmentCitiesQuery->whereHas('shipment', function (Builder $shipmentQuery) use ($shipmentBranchIds, $includeNullBranchRecords) {
+                $shipmentQuery->where(function (Builder $scope) use ($shipmentBranchIds, $includeNullBranchRecords) {
+                    $scope->whereIn('shipments.branch_id', $shipmentBranchIds);
+                    if ($includeNullBranchRecords) {
+                        $scope->orWhereNull('shipments.branch_id');
+                    }
+                });
+            });
+        }
+
+        $shipmentCitiesMap = $shipmentCitiesQuery
             ->get()
             ->groupBy('article_id')
             ->map(fn (Collection $items) => $items->pluck('shipment.city')->filter()->unique()->values());
