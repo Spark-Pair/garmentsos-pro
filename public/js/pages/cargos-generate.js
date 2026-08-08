@@ -4,8 +4,14 @@
     let lastCargo;
     let companyData;
     let invoices = [];
+    let isEdit = false;
+    let cargo = null;
+    let cardData = [];
+    let visibleCardData = [];
+    let invoicesLoading = false;
 
     const generateListBtn = document.getElementById('generateListBtn');
+    const dateInput = document.getElementById('date');
     const cargoListDOM = document.getElementById('cargo-list');
     const finalTotalCottonsDOM = document.getElementById('finalTotalCottons');
 
@@ -15,8 +21,12 @@
         if (!generateListBtn) return;
         if (elem.value != '') {
             generateListBtn.disabled = false;
+            loadInvoicesForDate(elem.value);
         } else {
             generateListBtn.disabled = true;
+            invoices = [];
+            selectedInvoicesArray = [];
+            renderList();
         }
     };
 
@@ -27,9 +37,19 @@
         });
     }
 
-    window.generateModal = function generateModal() {
+    function invoiceSearchText(item) {
+        return [
+            item.name,
+            item.data?.invoice_no,
+            item.data?.shipment_no,
+            item.data?.customer?.customer_name,
+            item.data?.customer?.city?.title,
+        ].filter(Boolean).join(' ').toLowerCase();
+    }
+
+    function buildInvoiceCards() {
         const data = invoices || [];
-        let cardData = [];
+        cardData = [];
 
         if (data.length > 0) {
             cardData.push(
@@ -37,6 +57,11 @@
                     return {
                         id: item.id,
                         name: item.invoice_no,
+                        details: {
+                            'Shipment No.': item.shipment_no || '-',
+                            Customer: item.customer?.customer_name || '-',
+                            City: item.customer?.city?.title || '-',
+                        },
                         data: item,
                         checkbox: true,
                         checked: selectedInvoicesArray.some(selected => selected.id === item.id),
@@ -45,14 +70,128 @@
                 })
             );
         }
+    }
+
+    async function loadInvoicesForDate(date) {
+        if (!date || invoicesLoading) return;
+
+        invoicesLoading = true;
+        if (generateListBtn) {
+            generateListBtn.disabled = true;
+            generateListBtn.textContent = 'Loading...';
+        }
+
+        try {
+            const url = new URL(window.__cargosGenerate.invoicesUrl || window.location.href, window.location.origin);
+            url.searchParams.set('date', date);
+            if (isEdit && cargo?.id) {
+                url.searchParams.set('cargo_id', cargo.id);
+            }
+
+            const response = await fetch(url.toString(), {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    Accept: 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const payload = await response.json();
+            invoices = Array.isArray(payload.invoices) ? payload.invoices : [];
+            const allowedIds = new Set(invoices.map(invoice => invoice.id));
+            selectedInvoicesArray = selectedInvoicesArray.filter(invoice => allowedIds.has(invoice.id));
+            renderList();
+        } catch (error) {
+            console.error('Error loading cargo invoices:', error);
+            invoices = [];
+            selectedInvoicesArray = [];
+            renderList();
+            if (window.showToast) {
+                window.showToast('Invoices could not be loaded for this date.', 'error');
+            } else if (window.appAlert) {
+                window.appAlert('Invoices could not be loaded for this date.');
+            }
+        } finally {
+            invoicesLoading = false;
+            if (generateListBtn) {
+                generateListBtn.disabled = !date;
+                generateListBtn.textContent = 'Select Invoices';
+            }
+        }
+    }
+
+    window.basicSearchCargoInvoices = function basicSearchCargoInvoices(searchValue) {
+        const needle = String(searchValue || '').trim().toLowerCase();
+        visibleCardData = needle
+            ? cardData.filter(item => invoiceSearchText(item).includes(needle))
+            : cardData;
+
+        renderCardsInModal({
+            id: 'modalForm',
+            cards: {
+                name: 'Invoices',
+                count: 3,
+                data: visibleCardData,
+            },
+        });
+        updateSelectAllInvoicesButton();
+    };
+
+    function updateSelectAllInvoicesButton() {
+        const button = document.getElementById('selectAllCargoInvoicesBtn');
+        if (!button) return;
+
+        const visibleIds = visibleCardData.map(item => item.id);
+        const selectedVisibleCount = visibleIds.filter(id =>
+            selectedInvoicesArray.some(selected => selected.id === id)
+        ).length;
+
+        button.disabled = visibleCardData.length === 0;
+        button.innerHTML = selectedVisibleCount === visibleCardData.length && visibleCardData.length > 0
+            ? '<i class="fas fa-square-minus text-xs"></i> Clear Visible'
+            : '<i class="fas fa-check-double text-xs"></i> Select All';
+    }
+
+    function enhanceInvoiceModalControls() {
+        const searchBox = document.querySelector('#modalForm-wrapper #basicSearch .relative');
+        if (!searchBox || document.getElementById('selectAllCargoInvoicesBtn')) return;
+
+        const button = document.createElement('button');
+        button.id = 'selectAllCargoInvoicesBtn';
+        button.type = 'button';
+        button.className = 'bg-[var(--secondary-bg-color)] border border-gray-600 px-4 rounded-lg hover:bg-[var(--h-bg-color)] transition-all duration-300 ease-in-out cursor-pointer text-nowrap disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2';
+        button.onclick = toggleAllVisibleInvoices;
+        searchBox.appendChild(button);
+        updateSelectAllInvoicesButton();
+    }
+
+    window.generateModal = function generateModal() {
+        if (invoicesLoading) return;
+        if (!dateInput?.value) {
+            if (window.showToast) {
+                window.showToast('Please select cargo date first.', 'error');
+            } else if (window.appAlert) {
+                window.appAlert('Please select cargo date first.');
+            }
+            return;
+        }
+
+        buildInvoiceCards();
+        visibleCardData = cardData;
 
         const modalData = {
             id: 'modalForm',
             class: 'h-[80%] w-full',
-            cards: { name: 'Invoices', count: 4, data: cardData },
+            basicSearch: true,
+            onBasicSearch: 'basicSearchCargoInvoices(this.value)',
+            cards: { name: 'Invoices', count: 3, data: visibleCardData },
         };
 
         createModal(modalData);
+        enhanceInvoiceModalControls();
     };
 
     function deselectInvoiceAtIndex(index) {
@@ -62,13 +201,13 @@
     }
 
     window.deselectThisInvoice = function deselectThisInvoice(index) {
-        totalCottonCount -= selectedInvoicesArray[index].cotton_count;
         deselectInvoiceAtIndex(index);
         renderList();
     };
 
     function renderList() {
         if (!cargoListDOM || !finalTotalCottonsDOM) return;
+        totalCottonCount = selectedInvoicesArray.reduce((sum, invoice) => sum + Number(invoice.cotton_count || 0), 0);
         if (selectedInvoicesArray.length > 0) {
             let clutter = '';
             selectedInvoicesArray.forEach((selectedInvoice, index) => {
@@ -76,10 +215,11 @@
                         <div class="flex justify-between items-center border-t border-gray-600 py-3 px-4">
                             <div class="w-[10%]">${index + 1}</div>
                             <div class="w-1/6">${formatDate(selectedInvoice.date)}</div>
-                            <div class="w-1/6">${selectedInvoice.invoice_no}</div>
+                            <div class="w-[14%]">${selectedInvoice.invoice_no || '-'}</div>
+                            <div class="w-[14%]">${selectedInvoice.shipment_no || '-'}</div>
                             <div class="w-1/6">${selectedInvoice.cotton_count ?? '-'}</div>
-                            <div class="grow">${selectedInvoice.customer.customer_name}</div>
-                            <div class="w-[10%]">${selectedInvoice.customer.city.title}</div>
+                            <div class="grow">${selectedInvoice.customer?.customer_name || '-'}</div>
+                            <div class="w-[10%]">${selectedInvoice.customer?.city?.title || '-'}</div>
                             <div class="w-[10%] text-center">
                                 <button onclick="deselectThisInvoice(${index})" type="button" class="text-[var(--danger-color)] cursor-pointer text-xs px-2 py-1 rounded-lg hover:text-[var(--h-danger-color)] transition-all duration-300 ease-in-out">
                                     <i class="fas fa-trash"></i>
@@ -127,7 +267,9 @@
     }
 
     window.generateCargoListPreview = function generateCargoListPreview() {
-        const cargoNo = (parseInt(lastCargo.cargo_no) + 1).toString().padStart(4, '0');
+        const cargoNo = isEdit && cargo?.cargo_no
+            ? cargo.cargo_no
+            : String(lastCargo?.cargo_no || '').padStart(4, '0');
         const cargoNameInpDom = document.getElementById('cargo_name');
         const dateInpDom = document.getElementById('date');
 
@@ -145,11 +287,12 @@
                             <hr class="w-full ${hrClass} border-gray-600">
                             <div class="tr flex justify-between w-full px-2 gap-2">
                                 <div class="td text-sm font-semibold w-[6%]">${serial++}.</div>
-                                <div class="td text-sm font-semibold w-[18%]">${formatDate(invoice.date)}</div>
-                                <div class="td text-sm font-semibold w-[19%]">${invoice.invoice_no}</div>
+                                <div class="td text-sm font-semibold w-[16%]">${formatDate(invoice.date)}</div>
+                                <div class="td text-sm font-semibold w-[17%]">${invoice.invoice_no || '-'}</div>
+                                <div class="td text-sm font-semibold w-[17%]">${invoice.shipment_no || '-'}</div>
                                 <div class="td text-sm font-semibold w-[10%]">${invoice.cotton_count}</div>
-                                <div class="td text-sm font-semibold grow">${invoice.customer.customer_name}</div>
-                                <div class="td text-sm font-semibold w-[14%]">${invoice.customer.city.title}</div>
+                                <div class="td text-sm font-semibold grow">${invoice.customer?.customer_name || '-'}</div>
+                                <div class="td text-sm font-semibold w-[12%]">${invoice.customer?.city?.title || '-'}</div>
                             </div>
                         </div>
                     `;
@@ -192,11 +335,12 @@
                                     <div class="thead w-full">
                                         <div class="tr flex justify-between w-full px-2 py-1.5 bg-[var(--primary-color)] text-white gap-2">
                                             <div class="th text-sm font-medium w-[6%]">S.No</div>
-                                            <div class="th text-sm font-medium w-[18%]">Date</div>
-                                            <div class="th text-sm font-medium w-[19%]">Invoice No.</div>
+                                            <div class="th text-sm font-medium w-[16%]">Date</div>
+                                            <div class="th text-sm font-medium w-[17%]">Invoice No.</div>
+                                            <div class="th text-sm font-medium w-[17%]">Shipment No.</div>
                                             <div class="th text-sm font-medium w-[10%]">Cotton</div>
                                             <div class="th text-sm font-medium grow">Customer</div>
-                                            <div class="th text-sm font-medium w-[14%]">City</div>
+                                            <div class="th text-sm font-medium w-[12%]">City</div>
                                         </div>
                                     </div>
                                     <div id="tbody" class="tbody w-full">
@@ -242,9 +386,14 @@
         const index = selectedInvoicesArray.findIndex(invoice => invoice.id === invoiceData.id);
         if (index == -1) {
             selectedInvoicesArray.push(invoiceData);
-            totalCottonCount += invoiceData.cotton_count;
         }
         renderList();
+        buildInvoiceCards();
+        visibleCardData = visibleCardData.map(item => ({
+            ...item,
+            checked: selectedInvoicesArray.some(selected => selected.id === item.id),
+        }));
+        updateSelectAllInvoicesButton();
     }
 
     function deselectInvoice(invoiceElem) {
@@ -253,10 +402,48 @@
         const index = selectedInvoicesArray.findIndex(invoice => invoice.id === invoiceData.id);
         if (index > -1) {
             selectedInvoicesArray.splice(index, 1);
-            totalCottonCount -= invoiceData.cotton_count;
         }
         renderList();
+        buildInvoiceCards();
+        visibleCardData = visibleCardData.map(item => ({
+            ...item,
+            checked: selectedInvoicesArray.some(selected => selected.id === item.id),
+        }));
+        updateSelectAllInvoicesButton();
     }
+
+    window.toggleAllVisibleInvoices = function toggleAllVisibleInvoices() {
+        const allVisibleSelected = visibleCardData.length > 0 && visibleCardData.every(item =>
+            selectedInvoicesArray.some(selected => selected.id === item.id)
+        );
+
+        if (allVisibleSelected) {
+            const visibleIds = new Set(visibleCardData.map(item => item.id));
+            selectedInvoicesArray = selectedInvoicesArray.filter(invoice => !visibleIds.has(invoice.id));
+        } else {
+            visibleCardData.forEach(item => {
+                if (!selectedInvoicesArray.some(selected => selected.id === item.id)) {
+                    selectedInvoicesArray.push(item.data);
+                }
+            });
+        }
+
+        buildInvoiceCards();
+        visibleCardData = visibleCardData.map(item => ({
+            ...item,
+            checked: selectedInvoicesArray.some(selected => selected.id === item.id),
+        }));
+        renderCardsInModal({
+            id: 'modalForm',
+            cards: {
+                name: 'Invoices',
+                count: 3,
+                data: visibleCardData,
+            },
+        });
+        renderList();
+        updateSelectAllInvoicesButton();
+    };
 
     window.validateForNextStep = function validateForNextStep() {
         generateCargoListPreview();
@@ -397,9 +584,15 @@
     }
 
     function initCargosGenerate(data) {
+        isEdit = Boolean(data?.isEdit);
+        cargo = data?.cargo || null;
         lastCargo = data?.lastCargo || null;
         companyData = data?.companyData || null;
         invoices = data?.invoices || [];
+        selectedInvoicesArray = Array.isArray(data?.selectedInvoices) ? [...data.selectedInvoices] : [];
+        if (generateListBtn) {
+            generateListBtn.disabled = !dateInput?.value;
+        }
         renderList();
         addListenerToPrintAndSaveBtn();
     }

@@ -12,6 +12,7 @@ trait CargoComputed
         $invoices = collect($this->invoices)->map(fn($invoice) => [
             'id' => $invoice->id,
             'invoice_no' => $invoice->invoice_no,
+            'shipment_no' => $invoice->shipment_no,
             'date' => $invoice->date,
             'cotton_count' => (int) ($invoice->cotton_count ?? 0),
             'customer' => $invoice->customer ? [

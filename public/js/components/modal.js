@@ -766,11 +766,12 @@ function createModal(data, animate = 'animate') {
             cargoPages.forEach((cargoChunk, pageIndex) => {
                 invoiceTableHeader = `
                     <div class="th text-sm font-medium w-[6%]">S.No</div>
-                    <div class="th text-sm font-medium w-[18%]">Date</div>
-                    <div class="th text-sm font-medium w-[19%]">Invoice No.</div>
+                    <div class="th text-sm font-medium w-[16%]">Date</div>
+                    <div class="th text-sm font-medium w-[17%]">Invoice No.</div>
+                    <div class="th text-sm font-medium w-[17%]">Shipment No.</div>
                     <div class="th text-sm font-medium w-[10%]">Cotton</div>
                     <div class="th text-sm font-medium grow">Customer</div>
-                    <div class="th text-sm font-medium w-[14%]">City</div>
+                    <div class="th text-sm font-medium w-[12%]">City</div>
                 `;
 
                 invoiceTableBody = cargoChunk.map((invoice, index) => {
@@ -780,11 +781,12 @@ function createModal(data, animate = 'animate') {
                         <hr class="w-full ${hrClass} border-black">
                         <div class="tr flex justify-between w-full px-2 gap-2">
                             <div class="td text-sm font-semibold w-[6%] truncate">${cargoSerial++}.</div>
-                            <div class="td text-sm font-semibold w-[18%] truncate">${formatDate(invoice.date)}</div>
-                            <div class="td text-sm font-semibold w-[19%] truncate">${invoice.invoice_no}</div>
+                            <div class="td text-sm font-semibold w-[16%] truncate">${formatDate(invoice.date)}</div>
+                            <div class="td text-sm font-semibold w-[17%] truncate">${invoice.invoice_no || '-'}</div>
+                            <div class="td text-sm font-semibold w-[17%] truncate">${invoice.shipment_no || '-'}</div>
                             <div class="td text-sm font-semibold w-[10%] truncate">${invoice.cotton_count}</div>
-                            <div class="td text-sm font-semibold grow truncate capitalize">${invoice.customer.customer_name}</div>
-                            <div class="td text-sm font-semibold w-[14%] truncate">${invoice.customer.city.title}</div>
+                            <div class="td text-sm font-semibold grow truncate capitalize">${invoice.customer?.customer_name || '-'}</div>
+                            <div class="td text-sm font-semibold w-[12%] truncate">${invoice.customer?.city?.title || '-'}</div>
                         </div>
                     </div>
                     `;

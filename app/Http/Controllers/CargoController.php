@@ -38,28 +38,58 @@ class CargoController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create()
+    public function create(Request $request)
     {
         if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant'])) {
             return $resp;
         }
 
-        $branches = app(ModuleBranchService::class);
+        if ($request->ajax()) {
+            $validated = $request->validate([
+                'date' => 'required|date',
+                'cargo_id' => 'nullable|integer|exists:cargos,id',
+            ]);
+            $cargo = isset($validated['cargo_id']) ? Cargo::find($validated['cargo_id']) : null;
+            if ($cargo) {
+                app(ModuleBranchService::class)->assertRecordInAllowedBranch($cargo, 'cargo');
+            }
 
-        $invoices = $branches->applyRelatedScope(Invoice::with('customer.city'), 'invoices', 'cargo')
-            ->whereNotNull('shipment_no')
-            ->where(function ($query) {
-                $query->whereNull('cargo_name')
-                    ->orWhere('cargo_name', '');
-            })
-            ->get()
-            ->map(fn ($invoice) => $this->formatInvoiceOptionPayload($invoice))
-            ->values();
+            return response()->json([
+                'invoices' => $this->availableInvoiceOptions($cargo, $validated['date']),
+            ]);
+        }
+
+        $invoices = collect();
 
         $last_cargo = new Cargo();
         $last_cargo->cargo_no = app(BranchSerialService::class)->next('cargo', Cargo::class, 'cargo_no', null, 4);
 
         return view('cargos.generate', compact('invoices', 'last_cargo'));
+    }
+
+    private function availableInvoiceOptions(?Cargo $cargo = null, ?string $date = null)
+    {
+        $branches = app(ModuleBranchService::class);
+        $selectedInvoiceIds = collect(json_decode($cargo?->invoices_array, true) ?: [])
+            ->pluck('id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        return $branches->applyRelatedScope(Invoice::with('customer.city'), 'invoices', 'cargo')
+            ->whereNotNull('shipment_no')
+            ->when($date, fn ($query) => $query->whereDate('date', '<=', $date))
+            ->where(function ($query) use ($selectedInvoiceIds) {
+                $query->whereNull('cargo_name')
+                    ->orWhere('cargo_name', '');
+
+                if ($selectedInvoiceIds->isNotEmpty()) {
+                    $query->orWhereIn('id', $selectedInvoiceIds);
+                }
+            })
+            ->get()
+            ->map(fn ($invoice) => $this->formatInvoiceOptionPayload($invoice))
+            ->values();
     }
 
     private function formatInvoiceOptionPayload(Invoice $invoice): array
@@ -142,6 +172,24 @@ class CargoController extends Controller
     public function edit(Cargo $cargo)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($cargo, 'cargo');
+
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant'])) {
+            return $resp;
+        }
+
+        $invoices = $this->availableInvoiceOptions($cargo, $cargo->date?->format('Y-m-d'));
+        $selectedInvoiceIds = collect(json_decode($cargo->invoices_array, true) ?: [])
+            ->pluck('id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->values();
+        $selectedInvoices = $invoices
+            ->whereIn('id', $selectedInvoiceIds)
+            ->sortBy(fn ($invoice) => $selectedInvoiceIds->search((int) $invoice['id']))
+            ->values();
+        $last_cargo = $cargo;
+
+        return view('cargos.generate', compact('cargo', 'invoices', 'selectedInvoices', 'last_cargo'));
     }
 
     /**
@@ -150,6 +198,52 @@ class CargoController extends Controller
     public function update(Request $request, Cargo $cargo)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($cargo, 'cargo');
+
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant'])) {
+            return $resp;
+        }
+
+        $validator = Validator::make($request->all(), [
+            'date' => 'required|date',
+            'cargo_name' => 'required|string',
+            'invoices_array' => 'required|json',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator)->withInput();
+        }
+
+        DB::transaction(function () use ($request, $cargo) {
+            $oldInvoiceIds = collect(json_decode($cargo->invoices_array, true) ?: [])
+                ->pluck('id')
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->values();
+            $newInvoiceIds = collect(json_decode($request->invoices_array, true) ?: [])
+                ->pluck('id')
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->values();
+
+            $removedInvoiceIds = $oldInvoiceIds->diff($newInvoiceIds)->values();
+            if ($removedInvoiceIds->isNotEmpty()) {
+                Invoice::whereIn('id', $removedInvoiceIds)->update(['cargo_name' => null]);
+            }
+
+            if ($newInvoiceIds->isNotEmpty()) {
+                Invoice::whereIn('id', $newInvoiceIds)->update([
+                    'cargo_name' => $request->cargo_name,
+                ]);
+            }
+
+            $cargo->update([
+                'date' => $request->date,
+                'cargo_name' => $request->cargo_name,
+                'invoices_array' => $request->invoices_array,
+            ]);
+        });
+
+        return redirect()->route('cargos.index')->with('success', 'Cargo List Updated Successfully!');
     }
 
     /**

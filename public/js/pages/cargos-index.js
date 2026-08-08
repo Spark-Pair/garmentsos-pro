@@ -158,7 +158,10 @@
             data: data,
             x: e.pageX,
             y: e.pageY,
-            actions: [{ id: 'print', text: 'Print Cargo List', onclick: 'printCargoList(this)' }],
+            actions: [
+                { id: 'edit-cargo', text: 'Edit', link: `/cargos/${data.id}/edit` },
+                { id: 'print', text: 'Print Cargo List', onclick: 'printCargoList(this)' },
+            ],
         };
 
         if (isDeveloperUser()) {
@@ -178,7 +181,10 @@
         const modalData = {
             id: 'modalForm',
             preview: { type: 'cargo_list', data: data.data, document: 'Cargo List' },
-            bottomActions: [{ id: 'print', text: 'Print Cargo List', onclick: 'printCargoList(this)' }],
+            bottomActions: [
+                { id: 'edit-cargo', text: 'Edit', link: `/cargos/${data.id}/edit` },
+                { id: 'print', text: 'Print Cargo List', onclick: 'printCargoList(this)' },
+            ],
         };
 
         if (isDeveloperUser()) {
