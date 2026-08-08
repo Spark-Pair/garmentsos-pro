@@ -180,6 +180,22 @@
             });
         }
 
+        function openEmployeePaymentStatementModal(data) {
+            if (!data) return;
+
+            createModal({
+                id: "modalForm",
+                name: data.name,
+                details: {
+                    Date: data.date,
+                    Category: data.details?.Category || "-",
+                    Type: data.type || "-",
+                    Method: data.details?.Method || "-",
+                    Amount: data.details?.Amount || "-",
+                },
+            });
+        }
+
         function openStatementAdjustmentModal(data) {
             if (!data) return;
 
@@ -213,6 +229,11 @@
 
             if (payload?.type === "supplier_payment") {
                 openSupplierPaymentStatementModal(payload.data);
+                return;
+            }
+
+            if (payload?.type === "employee_payment") {
+                openEmployeePaymentStatementModal(payload.data);
                 return;
             }
 
@@ -359,12 +380,14 @@
                                 displayText = item.customer_name + " | " + item.city?.title;
                             } else if (category === "supplier") {
                                 displayText = item.supplier_name || "";
+                            } else if (category === "employee") {
+                                displayText = [item.employee_name, item.type?.title].filter(Boolean).join(" | ");
                             } else if (category === "bank_account") {
                                 displayText = item.account_title || "";
                             }
 
                             clutter += `
-                                <li data-for="nameSelect" data-value="${item.id}" data-reg-date="${item.date}"
+                                <li data-for="nameSelect" data-value="${item.id}" data-reg-date="${item.joining_date || item.date || ""}"
                                     onmousedown="selectThisOption(this)"
                                     class="py-2 px-3 cursor-pointer rounded-lg transition hover:bg-[var(--h-bg-color)] text-nowrap overflow-x-auto scrollbar-hidden">
                                     ${displayText}
@@ -406,8 +429,10 @@
                 );
                 if (!selectedName) return;
 
-                const rawRegDate = parseLocalDate(selectedName.dataset.regDate);
-                regDate = localDateString(rawRegDate);
+                const rawRegDate = selectedName.dataset.regDate
+                    ? parseLocalDate(selectedName.dataset.regDate)
+                    : null;
+                regDate = rawRegDate ? localDateString(rawRegDate) : "";
                 dateFrom.min = regDate;
                 const todayLocal = new Date();
 
@@ -418,7 +443,7 @@
                     return months <= 0 ? 0 : months;
                 }
 
-                const monthsSinceReg = monthDiff(rawRegDate, todayLocal);
+                const monthsSinceReg = rawRegDate ? monthDiff(rawRegDate, todayLocal) : 999;
                 const ranges = [];
 
                 if (monthsSinceReg >= 0) ranges.push({ value: "current_month", label: "Current Month" });
@@ -466,8 +491,8 @@
 
             switch (rangeValue) {
                 case "custom":
-                    dateFrom.value = regDate;
-                    dateTo.value = localDateString();
+                    dateFrom.value = regDate || "";
+                    dateTo.value = "";
                     dateFrom.disabled = false;
                     dateTo.disabled = false;
                     return;
@@ -524,8 +549,8 @@
                     type: config.statementType,
                     category: category,
                     id: id,
-                    date_from: dateFromVal !== "" ? dateFromVal : regDate,
-                    date_to: dateToVal !== "" ? dateToVal : localDateString(today),
+                    date_from: dateFromVal,
+                    date_to: dateToVal,
                 },
                 success: function (response) {
                     renderStatement(response);

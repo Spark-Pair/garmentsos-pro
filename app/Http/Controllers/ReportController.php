@@ -7,6 +7,8 @@ use App\Models\BankAccount;
 use App\Models\Branch;
 use App\Models\Customer;
 use App\Models\CustomerPayment;
+use App\Models\Employee;
+use App\Models\EmployeePayment;
 use App\Models\Expense;
 use App\Models\Fabric;
 use App\Models\InvoiceArticles;
@@ -68,6 +70,9 @@ class ReportController extends Controller
 
 
             if ($request->withData) {
+                $dateFrom = filled($dateFrom) ? $dateFrom : '1900-01-01';
+                $dateTo = filled($dateTo) ? $dateTo : now()->toDateString();
+
                 // return $request;
                 if ($category === 'customer') {
                     $customer = Customer::find($id);
@@ -89,6 +94,20 @@ class ReportController extends Controller
                     }
 
                     $data = $supplier->getStatement($dateFrom, $dateTo, $type, $selectedBranchIds, $branchContext['include_null_main_records'] ?? false);
+
+                    $data['branch_scope_label'] = implode(', ', $selectedBranchLabels);
+                    $data['branch_scope_mode'] = $branchContext['mode'];
+
+                    return view("reports.statement", compact('data', 'statementBranches', 'selectedBranchIds', 'selectedBranchLabels', 'statementBranding'));
+                }
+
+                if ($category === 'employee') {
+                    $employee = Employee::find($id);
+                    if (!$employee) {
+                        return response()->json(['error' => 'Employee not found'], 404);
+                    }
+
+                    $data = $employee->getStatement($dateFrom, $dateTo, $type, $selectedBranchIds, $branchContext['include_null_main_records'] ?? false);
 
                     $data['branch_scope_label'] = implode(', ', $selectedBranchLabels);
                     $data['branch_scope_mode'] = $branchContext['mode'];
@@ -146,7 +165,7 @@ class ReportController extends Controller
         }
 
         $validated = $request->validate([
-            'type' => 'required|string|in:expense,voucher,supplier_payment,invoice,customer_payment,statement_adjustment',
+            'type' => 'required|string|in:expense,voucher,supplier_payment,employee_payment,invoice,customer_payment,statement_adjustment',
             'id' => 'required|integer|min:1',
         ]);
 
@@ -154,6 +173,7 @@ class ReportController extends Controller
             'expense' => $this->expenseStatementPayload((int) $validated['id']),
             'voucher' => $this->voucherStatementPayload((int) $validated['id']),
             'supplier_payment' => $this->supplierPaymentStatementPayload((int) $validated['id']),
+            'employee_payment' => $this->employeePaymentStatementPayload((int) $validated['id']),
             'invoice' => $this->invoiceStatementPayload((int) $validated['id']),
             'customer_payment' => $this->customerPaymentStatementPayload((int) $validated['id']),
             'statement_adjustment' => $this->statementAdjustmentPayload((int) $validated['id']),
@@ -221,6 +241,13 @@ class ReportController extends Controller
             return response()->json($suppliers->map(fn ($supplier) => $this->formatNameOptionPayload($supplier))->values());
         }
 
+        if ($category === 'employee') {
+            $employees = app(ModuleBranchService::class)
+                ->applyRelatedScope(Employee::with('type')->where('status', 'active'), 'employees', 'reports_statement')
+                ->get();
+            return response()->json($employees->map(fn ($employee) => $this->formatNameOptionPayload($employee))->values());
+        }
+
         if ($category === 'bank_account') {
             $bank_accounts = app(ModuleBranchService::class)->applyRelatedScope(BankAccount::with('bank')->where('status', 'active'), 'bank_accounts', 'reports_statement')->get();
             return response()->json($bank_accounts->map(fn ($account) => [
@@ -241,11 +268,19 @@ class ReportController extends Controller
 
     private function formatNameOptionPayload($record): array
     {
+        $employeeType = $record instanceof Employee ? $record->type : null;
+
         return [
             'id' => $record->id,
             'customer_name' => $record->customer_name ?? null,
             'supplier_name' => $record->supplier_name ?? null,
+            'employee_name' => $record->employee_name ?? null,
+            'type' => $employeeType ? [
+                'id' => $employeeType->id,
+                'title' => $employeeType->title,
+            ] : null,
             'date' => optional($record->date)->format('Y-m-d'),
+            'joining_date' => optional($record->joining_date)->format('Y-m-d'),
             'city' => $record->city ? [
                 'id' => $record->city->id,
                 'title' => $record->city->title,
@@ -1247,6 +1282,17 @@ class ReportController extends Controller
 
         return [
             'type' => 'supplier_payment',
+            'data' => $payment->toFormattedArray(),
+        ];
+    }
+
+    private function employeePaymentStatementPayload(int $id): ?array
+    {
+        $payment = EmployeePayment::with('employee.type')->find($id);
+        if (!$payment) return null;
+
+        return [
+            'type' => 'employee_payment',
             'data' => $payment->toFormattedArray(),
         ];
     }

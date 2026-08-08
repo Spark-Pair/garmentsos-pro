@@ -68,6 +68,7 @@
                     :options="[
                         'customer' => ['text' => 'Customer'],
                         'supplier' => ['text' => 'Supplier'],
+                        'employee' => ['text' => 'Employee'],
                         'bank_account' => ['text' => 'Bank Account'],
                     ]"
                     showDefault
@@ -98,7 +99,6 @@
                             'custom' => ['text' => 'Custom'],
                         ]"
                         showDefault
-                        required
                         disabled
                         onchange="applyRange(this.value)"
                     />
@@ -111,7 +111,6 @@
                         validateMax
                         max="{{ now()->toDateString() }}"
                         type="date"
-                        required
                         onchange="updateDateConstraints()"
                     />
 
@@ -123,7 +122,6 @@
                         validateMax
                         max="{{ now()->toDateString() }}"
                         type="date"
-                        required
                         onchange="updateDateConstraints()"
                     />
                 </div>
@@ -152,10 +150,16 @@
                     ]]);
                     $shouldUseActualOpeningEntryOnly = ((float) ($data['opening_balance'] ?? 0)) == 0.0 && $hasOpeningBalanceEntryRow;
                     $statementRows = $shouldUseActualOpeningEntryOnly ? $statements : $openingBalanceRow->merge($statements);
-                    $topSummaryLabel = ($data['category'] ?? null) === 'customer' ? 'Total Order Balance' : 'Total Pending Payment';
-                    $topSummaryValue = ($data['category'] ?? null) === 'customer'
-                        ? ($data['totals']['order_balance'] ?? 0)
-                        : ($data['totals']['pending_payment'] ?? 0);
+                    $topSummaryLabel = match ($data['category'] ?? null) {
+                        'customer' => 'Total Order Balance',
+                        'employee' => 'Total Employee Balance',
+                        default => 'Total Pending Payment',
+                    };
+                    $topSummaryValue = match ($data['category'] ?? null) {
+                        'customer' => $data['totals']['order_balance'] ?? 0,
+                        'employee' => $data['totals']['balance'] ?? 0,
+                        default => $data['totals']['pending_payment'] ?? 0,
+                    };
                     $datedStatementRows = $statements
                         ->pluck('date')
                         ->filter()
