@@ -332,7 +332,7 @@
                                         ${options.showOrderNo && previewData.order_no ? `<div class="number leading-none capitalize">Order No.: ${previewData.order_no}</div>` : options.showShipmentNo && previewData.shipment_no ? `<div class="number leading-none capitalize">Shipment No.: ${previewData.shipment_no}</div>` : ''}
                                         <input type="hidden" name="invoice_no" value="${previewData.invoice_no}" />
                                         <div class="preview-copy leading-none capitalize">Invoice Copy: ${copyLabel}</div>
-                                        <div class="number leading-none capitalize">Cotton: ${previewData.cotton_count || '-'}</div>
+                                        <div class="number leading-none capitalize">Carton: ${previewData.carton_count || '-'}</div>
                                     </div>
                                 </div>
                                 <hr class="w-full my-3 border-black">
@@ -378,9 +378,9 @@
             selectCustomersBtn.disabled = true;
 
             let selectedCustomersArray = [];
-            let ogMaxCottonCount = 0;
+            let ogMaxCartonCount = 0;
             let allCustomers = [];
-            let maxCottonCount = 0;
+            let maxCartonCount = 0;
             const previousApplyFilters =
                 typeof window.applyFilters === "function"
                     ? window.applyFilters
@@ -635,18 +635,18 @@
             }
 
             function calculateNoOfSelectableCustomers(articlesArray) {
-                let countOfCottonsOfArticles = [];
+                let countOfCartonsOfArticles = [];
 
                 articlesArray.forEach((article) => {
-                    countOfCottonsOfArticles.push(
+                    countOfCartonsOfArticles.push(
                         Math.floor(article.available_stock / article.shipment_pcs)
                     );
                 });
 
-                maxCottonCount = Math.min(...countOfCottonsOfArticles);
-                ogMaxCottonCount = maxCottonCount;
+                maxCartonCount = Math.min(...countOfCartonsOfArticles);
+                ogMaxCartonCount = maxCartonCount;
 
-                document.getElementById("max-cottons-count").value = maxCottonCount;
+                document.getElementById("max-cartons-count").value = maxCartonCount;
             }
 
             function generateModal(data, animate = "animate", fieldsHtml = null) {
@@ -677,7 +677,7 @@
                     calcBottom: [
                         { label: "Total Customers", name: "total-count", value: "0", disabled: true },
                         { label: "Selected Customers", name: "selected-count", value: "0", disabled: true },
-                        { label: "Max Cottons Count", name: "max-cottons-count", value: "0", disabled: true },
+                        { label: "Max Cartons Count", name: "max-cartons-count", value: "0", disabled: true },
                     ],
                 };
 
@@ -698,12 +698,12 @@
                                 class: "text-left pl-5 flex items-center w-[12%]",
                                 jsonData: item,
                                 input: {
-                                    name: "cotton_count",
-                                    class: "cottonCount",
+                                    name: "carton_count",
+                                    class: "cartonCount",
                                     type: "number",
-                                    value: selected?.cotton_count || "1",
+                                    value: selected?.carton_count || "1",
                                     min: "1",
-                                    oninput: "validateCottonCount(this)",
+                                    oninput: "validateCartonCount(this)",
                                     onclick: "this.select()",
                                 },
                             },
@@ -722,7 +722,7 @@
                 let finalCustomersArray = selectedCustomersArray.map((customer) => {
                     return {
                         id: customer.id,
-                        cotton_count: customer.cotton_count,
+                        carton_count: customer.carton_count,
                     };
                 });
                 customersArrayInput.value = JSON.stringify(finalCustomersArray);
@@ -841,15 +841,15 @@
                 const customerData = JSON.parse(customerRowDOM.dataset.json);
                 const customerId = customerData.id;
 
-                let cottonCountInput = customerRowDOM.querySelector("input.cottonCount");
-                let cottonCount = cottonCountInput.value;
-                cottonCountInput.value = 1;
+                let cartonCountInput = customerRowDOM.querySelector("input.cartonCount");
+                let cartonCount = cartonCountInput.value;
+                cartonCountInput.value = 1;
 
-                const availableCottonCount = getAvailableCottonCount(cottonCountInput);
+                const availableCartonCount = getAvailableCartonCount(cartonCountInput);
 
                 if (checkbox.checked) {
-                    if (availableCottonCount > 0) {
-                        customerData["cotton_count"] = cottonCount;
+                    if (availableCartonCount > 0) {
+                        customerData["carton_count"] = cartonCount;
                         selectedCustomersArray.push(customerData);
                     }
                 } else {
@@ -860,13 +860,13 @@
                         selectedCustomersArray.splice(index, 1);
                     }
 
-                    cottonCountInput.dataset.previousValue = 1;
+                    cartonCountInput.dataset.previousValue = 1;
                 }
                 updateCustomerRowsState();
             }
 
             function setOnInput(input) {
-                const cottonCount = parseInt(input.value);
+                const cartonCount = parseInt(input.value);
 
                 const customerRowDOM = input.closest(".row-toggle");
                 const customerData = JSON.parse(customerRowDOM.dataset.json);
@@ -874,17 +874,17 @@
                 const index = selectedCustomersArray.findIndex((customer) => customer.id === customerId);
 
                 if (index >= 0) {
-                    selectedCustomersArray[index]["cotton_count"] = cottonCount;
+                    selectedCustomersArray[index]["carton_count"] = cartonCount;
                 }
 
                 updateCustomerRowsState();
             }
 
-            window.validateCottonCount = function validateCottonCount(currentInput) {
+            window.validateCartonCount = function validateCartonCount(currentInput) {
                 currentInput.value = currentInput.value.replace(/[^\d]/g, "");
 
                 const min = 1;
-                const availableCottonCount = getAvailableCottonCount(currentInput);
+                const availableCartonCount = getAvailableCartonCount(currentInput);
 
                 if (currentInput.value === "") {
                     currentInput.value = min;
@@ -892,8 +892,8 @@
 
                 const value = parseInt(currentInput.value, 10);
 
-                if (value > availableCottonCount) {
-                    currentInput.value = availableCottonCount;
+                if (value > availableCartonCount) {
+                    currentInput.value = availableCartonCount;
                 } else if (value < min) {
                     currentInput.value = min;
                 }
@@ -901,9 +901,9 @@
                 setOnInput(currentInput);
             };
 
-            function getAvailableCottonCount(currentInput) {
+            function getAvailableCartonCount(currentInput) {
                 let sum = 0;
-                document.querySelectorAll(".cottonCount").forEach((input) => {
+                document.querySelectorAll(".cartonCount").forEach((input) => {
                     if (input !== currentInput) {
                         const style = window.getComputedStyle(input);
                         if (style.opacity === "0" || style.pointerEvents === "none") return;
@@ -913,16 +913,16 @@
                     }
                 });
 
-                let availableCottonCount = ogMaxCottonCount - sum;
-                return availableCottonCount;
+                let availableCartonCount = ogMaxCartonCount - sum;
+                return availableCartonCount;
             }
 
             function updateCustomerRowsState() {
                 const customerRows = document.querySelectorAll(".customer-row");
 
-                const availableCottonCount = getAvailableCottonCount();
+                const availableCartonCount = getAvailableCartonCount();
                 customerRows.forEach((customerRow) => {
-                    if (availableCottonCount > 0) {
+                    if (availableCartonCount > 0) {
                         customerRow.style.pointerEvents = "all";
                         customerRow.style.opacity = "1";
                         customerRow.style.cursor = "pointer";
@@ -948,7 +948,7 @@
                                 <input type="checkbox" name="selected_customers[]"
                                     class="row-checkbox shrink-0 w-3.5 h-3.5 appearance-none border border-gray-400 rounded-sm checked:bg-[var(--primary-color)] checked:border-transparent focus:outline-none transition duration-150 cursor-pointer" />
 
-                                <input class="cottonCount w-[70%] border border-gray-600 bg-[var(--h-bg-color)] py-0.5 px-2 rounded-md text-xs focus:outline-none opacity-0 pointer-events-none" type="number" name="cotton_count" value="1" min="1" oninput="validateCottonCount(this)" onclick="this.select()" />
+                                <input class="cartonCount w-[70%] border border-gray-600 bg-[var(--h-bg-color)] py-0.5 px-2 rounded-md text-xs focus:outline-none opacity-0 pointer-events-none" type="number" name="carton_count" value="1" min="1" oninput="validateCartonCount(this)" onclick="this.select()" />
                             </span>
                             <span class="capitalize grow">${customer.customer_name} | ${customer.city.title}</span>
                             <span class="w-[15%]">${customer.urdu_title}</span>
@@ -964,7 +964,7 @@
 
             let invoiceNo;
             let invoiceDate;
-            let cottonCount = 0;
+            let cartonCount = 0;
             const previewDom = document.getElementById("preview-container");
 
             function generateInvoiceNo() {
@@ -997,7 +997,7 @@
                 const customerData = selectedCustomersArray[0];
                 invoiceNo = generateInvoiceNo();
                 invoiceDate = new Date();
-                cottonCount = customerData?.cotton_count || 1;
+                cartonCount = customerData?.carton_count || 1;
 
                 if (shipmentArticles.length > 0) {
                     const normalizedCustomer = {
@@ -1012,7 +1012,7 @@
                         date: invoiceDate,
                         invoice_no: invoiceNo,
                         shipment_no: selectedShipmentNo(),
-                        cotton_count: cottonCount,
+                        carton_count: cartonCount,
                         discount: discount || 0,
                         branch_branding: companyData,
                         invoice_articles: sortArticleRows(shipmentArticles).map((article) => ({
@@ -1020,7 +1020,7 @@
                             description: article.description,
                             fabric_type: article.article?.fabric_type ?? article.fabric_type ?? '',
                             shipment_pcs: article.shipment_pcs,
-                            invoice_pcs: article.shipment_pcs * cottonCount,
+                            invoice_pcs: article.shipment_pcs * cartonCount,
                         })),
                     };
 
@@ -1040,14 +1040,14 @@
             }
 
             function buildInvoicePreviewLikeModal(previewData, copyLabel = 'Customer') {
-                const cotton = previewData.cotton_count || 0;
+                const carton = previewData.carton_count || 0;
                 const discountVal = Number(previewData.discount || 0);
                 const articles = Array.isArray(previewData.invoice_articles)
                     ? previewData.invoice_articles
                     : [];
 
                 return buildA5InvoicePreviewPages(previewData, copyLabel, articles, {
-                    showCotton: true,
+                    showCarton: true,
                     showShipmentNo: true,
                 });
 
@@ -1150,7 +1150,7 @@
                                         ${previewData.order_no ? `<div class="number leading-none capitalize">Order No.: ${previewData.order_no}</div>` : previewData.shipment_no ? `<div class="number leading-none capitalize">Shipment No.: ${previewData.shipment_no}</div>` : ''}
                                         <input type="hidden" name="invoice_no" value="${previewData.invoice_no}" />
                                         <div class="preview-copy leading-none capitalize">invoice Copy: ${copyLabel}</div>
-                                        <div class="number leading-none capitalize">Cotton: ${cotton || '-'}</div>
+                                        <div class="number leading-none capitalize">Carton: ${carton || '-'}</div>
                                     </div>
                                 </div>
                                 <hr class="w-full my-3 border-black">
@@ -1494,7 +1494,7 @@
                         invoice_no: invoiceNo,
                         order_no: selectedOrderNo(),
                         deliver_to: orderDeliverTo,
-                        cotton_count: 0,
+                        carton_count: 0,
                         discount: discount || 0,
                         netAmount: netAmount || null,
                         branch_branding: companyData,
@@ -1530,7 +1530,7 @@
 
                 return buildA5InvoicePreviewPages(previewData, copyLabel, articles, {
                     showOrderNo: true,
-                });
+                }).join('');
 
                 let totalAmountCalc = 0;
                 let totalPcsCalc = 0;
@@ -1631,7 +1631,7 @@
                                         ${previewData.order_no ? `<div class="number leading-none capitalize">Order No.: ${previewData.order_no}</div>` : previewData.shipment_no ? `<div class="number leading-none capitalize">Shipment No.: ${previewData.shipment_no}</div>` : ''}
                                         <input type="hidden" name="invoice_no" value="${previewData.invoice_no}" />
                                         <div class="preview-copy leading-none capitalize">invoice Copy: ${copyLabel}</div>
-                                        <div class="number leading-none capitalize">Cotton: ${previewData.cotton_count || '-'}</div>
+                                        <div class="number leading-none capitalize">Carton: ${previewData.carton_count || '-'}</div>
                                     </div>
                                 </div>
                                 <hr class="w-full my-3 border-black">

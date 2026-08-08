@@ -6,33 +6,34 @@
             "Invoice No" => [
                 "id" => "invoice_no",
                 "type" => "text",
-                "placeholder" => "Enter invoice no.",
-                                "dataFilterPath" => "invoice_no",
+                "placeholder" => "Enter invoice no. or 1590-1600",
+                "dataFilterPath" => "invoice_no",
+                "listInput" => true,
             ],
             "Reff. No." => [
                 "id" => "reff_no",
                 "type" => "text",
                 "placeholder" => "Enter reff. no.",
-                                "dataFilterPath" => "reff_no",
+                "dataFilterPath" => "reff_no",
             ],
             "Customer Name" => [
                 "id" => "customer_name",
                 "type" => "text",
                 "placeholder" => "Enter customer name",
-                                "dataFilterPath" => "customer_name",
+                "dataFilterPath" => "customer_name",
             ],
             "City" => [
                 "id" => "city",
                 "type" => "text",
                 "placeholder" => "Enter city",
-                                "dataFilterPath" => "city",
+                "dataFilterPath" => "city",
             ],
             "Date Range" => [
                 "id" => "date_range_start",
                 "type" => "date",
                 "id2" => "date_range_end",
                 "type2" => "date",
-                                "dataFilterPath" => "date",
+                "dataFilterPath" => "date",
             ]
         ];
     @endphp

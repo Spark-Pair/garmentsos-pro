@@ -675,7 +675,7 @@ function createModal(data, animate = 'animate') {
     // Preview section ko clean karo
     if (data.preview) {
         let previewData = data.preview.data;
-        let cottonCount = previewData.cotton_count || 0;
+        let cartonCount = previewData.carton_count || 0;
         let discount = previewData.discount || previewData.shipment?.discount || previewData.order?.discount;
         let netAmount = previewData.netAmount || previewData.shipment?.netAmount;
 
@@ -685,12 +685,14 @@ function createModal(data, animate = 'animate') {
 
         // Check if totals will be shown
         const hasTotal = ['order', 'invoice', 'shipment'].includes(data.preview.type);
-        const previewArticles = sortArticleRows(previewData.articles || previewData.invoice_articles || []);
+        const rawPreviewArticles = previewData.articles || previewData.invoice_articles || [];
+        const previewArticles = sortArticleRows(Array.isArray(rawPreviewArticles) ? rawPreviewArticles : Object.values(rawPreviewArticles || {}))
+            .filter(row => row && (row.article || row.article_no || row.article_id));
         const articlePages = previewArticles.length
             ? (['invoice', 'order', 'shipment'].includes(data.preview.type)
                 ? chunkInvoiceRows(previewArticles)
                 : chunkArray(previewArticles, 21, hasTotal))
-            : [];
+            : [['__empty__']];
 
         // Preview container start
         clutter += `<div id="preview-container" class="h-auto mx-auto relative flex flex-col">`;
@@ -756,7 +758,7 @@ function createModal(data, animate = 'animate') {
                 `;
             }
 
-            clutter += renderPreviewPage(data, previewData, cottonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, 0, 1);
+            clutter += renderPreviewPage(data, previewData, cartonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, 0, 1);
 
         } else if (data.preview.type == "cargo_list") {
             const cargoInvoices = Array.isArray(previewData.invoices) ? previewData.invoices : [];
@@ -769,7 +771,7 @@ function createModal(data, animate = 'animate') {
                     <div class="th text-sm font-medium w-[16%]">Date</div>
                     <div class="th text-sm font-medium w-[17%]">Invoice No.</div>
                     <div class="th text-sm font-medium w-[17%]">Shipment No.</div>
-                    <div class="th text-sm font-medium w-[10%]">Cotton</div>
+                    <div class="th text-sm font-medium w-[10%]">Carton</div>
                     <div class="th text-sm font-medium grow">Customer</div>
                     <div class="th text-sm font-medium w-[12%]">City</div>
                 `;
@@ -784,7 +786,7 @@ function createModal(data, animate = 'animate') {
                             <div class="td text-sm font-semibold w-[16%] truncate">${formatDate(invoice.date)}</div>
                             <div class="td text-sm font-semibold w-[17%] truncate">${invoice.invoice_no || '-'}</div>
                             <div class="td text-sm font-semibold w-[17%] truncate">${invoice.shipment_no || '-'}</div>
-                            <div class="td text-sm font-semibold w-[10%] truncate">${invoice.cotton_count}</div>
+                            <div class="td text-sm font-semibold w-[10%] truncate">${invoice.carton_count}</div>
                             <div class="td text-sm font-semibold grow truncate capitalize">${invoice.customer?.customer_name || '-'}</div>
                             <div class="td text-sm font-semibold w-[12%] truncate">${invoice.customer?.city?.title || '-'}</div>
                         </div>
@@ -793,11 +795,11 @@ function createModal(data, animate = 'animate') {
                 }).join('');
 
                 invoiceBottom = '';
-                clutter += renderPreviewPage(data, previewData, cottonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, pageIndex, cargoPages.length);
+                clutter += renderPreviewPage(data, previewData, cartonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, pageIndex, cargoPages.length);
             });
 
         } else if (data.preview.type == "form") {
-            clutter += renderPreviewPage(data, previewData, cottonCount, '', '', '', 0, 1);
+            clutter += renderPreviewPage(data, previewData, cartonCount, '', '', '', 0, 1);
 
         } else {
             // Order, Invoice, Shipment - with pagination
@@ -829,13 +831,17 @@ function createModal(data, animate = 'animate') {
                 `;
 
                 // Agar empty array hai (second page for totals only)
-                if (articlesChunk.length === 0) {
-                    invoiceTableBody = '';
+                if (articlesChunk.length === 0 || articlesChunk[0] === '__empty__') {
+                    invoiceTableBody = `
+                        <div class="px-4 py-6 text-center text-sm text-[var(--secondary-text)]">
+                            No invoice articles found for this document.
+                        </div>
+                    `;
                 } else {
                     invoiceTableBody = `
                         ${articlesChunk.map((orderedArticle, index) => {
-                            const article = orderedArticle.article;
-                            const salesRate = article.sales_rate;
+                            const article = orderedArticle.article || orderedArticle;
+                            const salesRate = Number(article?.sales_rate || 0);
                             const qtyPriority = {
                                 order: ['ordered_pcs', 'invoice_pcs', 'shipment_pcs'],
                                 shipment: ['shipment_pcs', 'ordered_pcs', 'invoice_pcs'],
@@ -844,11 +850,11 @@ function createModal(data, animate = 'animate') {
                             const qty = (qtyPriority[data.preview.type] || qtyPriority.default)
                                 .map(key => orderedArticle[key])
                                 .find(v => v !== null && v !== undefined) ?? 0;
-                            const total = parseInt(salesRate) * qty;
+                            const total = salesRate * Number(qty || 0);
                             const hrClass = index === 0 ? "mb-2" : "my-2";
 
                             totalAmount += total;
-                            totalPcs += qty;
+                            totalPcs += Number(qty || 0);
                             totalPackets += article?.pcs_per_packet ? Math.floor(qty / article.pcs_per_packet) : 0;
 
                             if (data.preview.type == 'invoice' || data.preview.type == 'order' || data.preview.type == 'shipment') {
@@ -862,10 +868,10 @@ function createModal(data, animate = 'animate') {
                                         <div class="tr invoice-item-main grid ${rowGridClass} justify-between w-full px-4 gap-0.5">
                                             <div class="td text-sm font-semibold truncate">${String(rowSerial++).padStart(2, '0')}</div>
                                             <div class="td invoice-article-cell text-sm font-semibold">
-                                                <div class="invoice-article-code">${article.article_no}</div>
+                                                <div class="invoice-article-code">${article?.article_no || '-'}</div>
                                             </div>
                                             <div class="td invoice-description-cell text-sm font-semibold">${detailLine}</div>
-                                            <div class="td text-sm font-semibold truncate">${article?.pcs_per_packet}</div>
+                                            <div class="td text-sm font-semibold truncate">${article?.pcs_per_packet || '-'}</div>
                                             <div class="td text-sm font-semibold truncate">${article?.pcs_per_packet ? Math.floor(qty / article.pcs_per_packet) : 0}</div>
                                             <div class="td text-sm font-semibold truncate">${qty}</div>
                                             <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(salesRate)}</div>
@@ -881,7 +887,7 @@ function createModal(data, animate = 'animate') {
                                     <hr class="w-full ${hrClass} border-black">
                                     <div class="tr grid grid-cols-${data.preview.type == 'shipment' ? '8' : '9'} justify-between w-full px-4 gap-0.5">
                                         <div class="td text-sm font-semibold truncate">${rowSerial++}.</div>
-                                        <div class="td text-sm font-semibold truncate">${article.article_no}</div>
+                                        <div class="td text-sm font-semibold truncate">${article?.article_no || '-'}</div>
                                         <div class="td text-sm font-semibold col-span-2 truncate capitalize">${orderedArticle.description}</div>
                                         ${data.preview.type == 'invoice' ? `<div class="td text-sm font-semibold truncate">${article?.pcs_per_packet}</div>` : ''}
                                         <div class="td text-sm font-semibold truncate">${article?.pcs_per_packet ? Math.floor(qty / article.pcs_per_packet) : 0}</div>
@@ -904,7 +910,7 @@ function createModal(data, animate = 'animate') {
                     invoiceBottom = documentTotalsHtml(data.preview.type, previewData, totalPackets, totalPcs, totalAmount, discount, discountAmount, netAmount);
                 }
 
-                clutter += renderPreviewPage(data, previewData, cottonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, pageIndex, articlePages.length);
+                clutter += renderPreviewPage(data, previewData, cartonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, pageIndex, articlePages.length);
             });
         }
 
@@ -913,7 +919,7 @@ function createModal(data, animate = 'animate') {
     }
 
     // Helper function - Preview page render karne ke liye
-    function renderPreviewPage(data, previewData, cottonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, pageIndex, totalPages = 1) {
+    function renderPreviewPage(data, previewData, cartonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, pageIndex, totalPages = 1) {
         const previewCompany = previewData?.branch_branding || companyData;
         const previewLogoUrl = previewCompany.logo_url || (previewCompany.logo ? `${companyLogoBase}images/${previewCompany.logo}` : '');
         const isCompactDocument = data.preview.size == "A5" || data.preview.type == "order" || data.preview.type == "invoice" || data.preview.type == "shipment" || data.preview.type == "cargo_list";
@@ -1006,7 +1012,7 @@ function createModal(data, animate = 'animate') {
                                     ${data.preview.type == 'invoice' && invoiceSourceNo ? `<div class="number leading-none capitalize">${invoiceSourceNo}</div>` : ''}
                                 ` : ''}
                                 ${data.preview.type != 'shipment' ? `<div class="preview-copy leading-none capitalize">${data.preview.type.replace('_', ' ')} Copy: ${(data.preview.type == 'voucher' && !previewData.supplier) ? 'Staff' : (data.preview.type == 'voucher' && previewData.supplier) ? 'Supplier' : data.preview.type == 'cargo_list' ? 'Cargo' : 'Customer'}</div>` : ''}
-                                ${data.preview.type == 'invoice' ? `<div class="number leading-none capitalize">Cotton: ${cottonCount || '-'}</div>` : ''}
+                                ${data.preview.type == 'invoice' ? `<div class="number leading-none capitalize">Carton: ${cartonCount || '-'}</div>` : ''}
                                 ${!['invoice', 'order', 'shipment'].includes(data.preview.type) ? `<div class="copy leading-none">Document: ${data.preview.document}</div>` : ''}
                             </div>
                         </div>

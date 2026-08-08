@@ -222,34 +222,30 @@
     }
 
     window.generateArticlesModal = function generateArticlesModal() {
-        const data = [...(articles || [])].sort((left, right) => (
+        const data = [...(articles || [])].filter(article => Number(article?.orderable_quantity || 0) > 0).sort((left, right) => (
             articleSortValue(left).localeCompare(articleSortValue(right), undefined, {
                 numeric: true,
                 sensitivity: 'base',
             })
         ));
 
-        if (data.length > 0 && cardData.length == 0) {
-            cardData.push(
-                ...data.map(item => {
-                    return {
-                        id: item.id,
-                        name: item.article_no,
-                        image:
-                            item.image == 'no_image_icon.png'
-                                ? '/images/no_image_icon.png'
-                                : `/storage/uploads/images/${item.image}`,
-                        details: {
-                            Category: item.category,
-                            Season: item.season,
-                            Size: item.size,
-                        },
-                        data: item,
-                        onclick: 'generateQuantityModal(this)',
-                    };
-                })
-            );
-        }
+        cardData = data.map(item => {
+            return {
+                id: item.id,
+                name: item.article_no,
+                image:
+                    item.image == 'no_image_icon.png'
+                        ? '/images/no_image_icon.png'
+                        : `/storage/uploads/images/${item.image}`,
+                details: {
+                    Category: item.category,
+                    Season: item.season,
+                    Size: item.size,
+                },
+                data: item,
+                onclick: 'generateQuantityModal(this)',
+            };
+        });
 
         const modalData = {
             id: 'modalForm',

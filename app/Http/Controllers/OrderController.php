@@ -11,6 +11,7 @@ use App\Models\OrderArticles;
 use App\Models\PaymentProgram;
 use App\Services\Branches\BranchSerialService;
 use App\Services\Branches\ModuleBranchService;
+use App\Services\Orders\OrderInvoiceSyncService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -418,7 +419,7 @@ class OrderController extends Controller
             $customers_options[(int) $order->customer->id] = $this->customerOption($order->customer);
         }
 
-        if (Auth::user()?->role === 'developer') {
+        if (Auth::user()?->role === 'developer' || app_can('orders', 'override')) {
             $branches = app(ModuleBranchService::class);
             $customers = $branches->applyRelatedScope(Customer::with('city'), 'customers', 'orders')
                 ->whereHas('user', function ($query) {
@@ -446,7 +447,7 @@ class OrderController extends Controller
         }
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($order, 'orders');
 
-        $isDeveloper = Auth::user()?->role === 'developer';
+        $isDeveloper = Auth::user()?->role === 'developer' || app_can('orders', 'override');
         $rules = [
             'discount'   => 'required|integer|min:0|max:100',
             'netAmount'  => 'required|string',
@@ -470,10 +471,8 @@ class OrderController extends Controller
             $netAmount = (int) str_replace(',', '', $request->netAmount);
             $articles = is_string($request->articles) ? json_decode($request->articles, true) : $request->articles;
             $articles = is_array($articles) ? $articles : [];
-            $existingDispatched = $order->articles()
-                ->get(['article_id', 'dispatched_pcs'])
-                ->groupBy('article_id')
-                ->map(fn ($lines) => (int) $lines->sum('dispatched_pcs'));
+            $sync = app(OrderInvoiceSyncService::class);
+            $existingDispatched = $sync->invoicedPcsByArticle($order);
 
             $this->validateOrderArticleStock($articles, $order->id, $existingDispatched);
 
@@ -516,13 +515,7 @@ class OrderController extends Controller
                 $usedDispatched->put($articleId, true);
             }
 
-            $order->load('articles');
-            $orderedPcs = (int) $order->articles->sum('ordered_pcs');
-            $dispatchedPcs = (int) $order->articles->sum('dispatched_pcs');
-            $order->status = $dispatchedPcs <= 0
-                ? 'pending'
-                : ($dispatchedPcs < $orderedPcs ? 'partially_invoiced' : 'invoiced');
-            $order->save();
+            $sync->recalculateOrderDispatch($order);
 
             $paymentProgramUpdates = ['amount' => $netAmount];
             if ($isDeveloper) {
@@ -540,13 +533,20 @@ class OrderController extends Controller
      */
     public function destroy(Order $order)
     {
-        if (Auth::user()?->role !== 'developer') {
+        if (Auth::user()?->role !== 'developer' && !app_can('orders', 'override')) {
             return redirect(route('orders.index'))->with('error', 'Only Developer can delete orders.');
         }
 
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($order, 'orders');
 
+        if ($order->invoices()->exists()) {
+            return redirect()->route('orders.index')
+                ->with('error', 'This order has invoices. Delete or edit the invoices first, then delete the order.');
+        }
+
         DB::transaction(function () use ($order) {
+            $order->articles()->delete();
+            $order->paymentPrograms()->delete();
             $order->delete();
         });
 
@@ -573,9 +573,9 @@ class OrderController extends Controller
             ]);
         }
 
-        $existingDispatched = collect($existingDispatched ?? []);
+        $existingDispatched = collect($existingDispatched ?? [])->mapWithKeys(fn ($pcs, $articleId) => [(int) $articleId => (int) $pcs]);
         foreach ($existingDispatched as $articleId => $dispatchedPcs) {
-            if ((int) $dispatchedPcs > 0 && (int) ($lines->get((int) $articleId) ?? 0) < (int) $dispatchedPcs) {
+            if ((int) $dispatchedPcs > 0 && (int) ($lines->get((int) $articleId, 0)) < (int) $dispatchedPcs) {
                 $article = Article::find((int) $articleId);
                 throw ValidationException::withMessages([
                     'articles' => 'Order quantity cannot be less than already invoiced quantity for article: ' . ($article?->article_no ?? $articleId),
@@ -603,7 +603,10 @@ class OrderController extends Controller
             }
 
             $dispatchedPcs = (int) ($existingDispatched->get((int) $articleId) ?? 0);
-            $maxOrderPcs = (int) ($stockMap->get((int) $articleId)['orderable_quantity_pcs'] ?? 0);
+            $currentOrderPcs = $excludeOrderId
+                ? (int) OrderArticles::where('order_id', $excludeOrderId)->where('article_id', (int) $articleId)->sum('ordered_pcs')
+                : 0;
+            $maxOrderPcs = (int) ($stockMap->get((int) $articleId)['orderable_quantity_pcs'] ?? 0) + $currentOrderPcs;
 
             if ($orderedPcs > $maxOrderPcs) {
                 $articleNo = $article?->article_no ?? $articleId;

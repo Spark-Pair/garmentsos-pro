@@ -28,7 +28,7 @@ class Invoice extends Model
         "branch_id",
         "date",
         "netAmount",
-        "cotton_count",
+        "carton_count",
         "cargo_name",
     ];
 

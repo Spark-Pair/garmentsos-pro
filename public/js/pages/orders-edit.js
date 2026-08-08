@@ -29,6 +29,17 @@
         return window.__ordersEdit?.canChangeCustomer === true;
     }
 
+    function showOrderEditError(message) {
+        if (typeof appAlert === 'function') {
+            appAlert(message, 'error');
+            return;
+        }
+
+        if (typeof messageBox === 'undefined') return;
+        messageBox.innerHTML = `<div class="alert-message bg-[var(--bg-error)] text-[var(--text-error)] ps-2 pe-5 py-2 rounded-2xl flex items-center gap-2 fade-in leading-none tracking-wide"><i class="fas fa-circle-exclamation text-lg mr-1"></i><p>${message}</p></div>`;
+        messageBoxAnimation();
+    }
+
     function orderDateForRequest(inputElem = null) {
         const explicitValue = String(inputElem?.value || '').trim();
         if (explicitValue && !inputElem?.disabled && /^\d{4}-\d{2}-\d{2}$/.test(explicitValue)) {
@@ -49,7 +60,8 @@
     }
 
     function mergeSelectedArticlesIntoModalData(availableArticles = []) {
-        const merged = [...(availableArticles || [])];
+        const merged = (availableArticles || [])
+            .filter(article => Number(article?.orderable_quantity || 0) > 0);
         const existingIds = new Set(merged.map(article => String(article?.id ?? '')));
 
         selectedArticles.forEach(selectedArticle => {
@@ -94,6 +106,34 @@
 
         const packets = pcsPerPacket ? Math.floor(dispatchedPcs / pcsPerPacket) : 0;
         return packets ? formatNumbersDigitLess(packets) : '';
+    }
+
+    function articlePacketCount(pcs, pcsPerPacket) {
+        const quantity = Number(pcs || 0);
+        const unit = Number(pcsPerPacket || 0);
+        return unit > 0 ? Math.floor(quantity / unit) : 0;
+    }
+
+    function editableArticleQuantityState(data = {}) {
+        const selectedArticle = selectedArticles.find(article => article.id == data.id);
+        const selectedQuantity = Number(selectedArticle?.ordered_pcs || 0);
+        const invoicedQuantity = Number(selectedArticle?.dispatched_pcs || data.dispatched_pcs || 0);
+        const pcsPerPacket = Number(data.pcs_per_packet || selectedArticle?.pcs_per_packet || 0);
+        const maxOrderQuantity = Math.max(
+            Number(data.orderable_quantity || 0),
+            selectedQuantity,
+            invoicedQuantity
+        );
+
+        return {
+            selectedArticle,
+            selectedQuantity,
+            invoicedQuantity,
+            pcsPerPacket,
+            maxOrderQuantity,
+            maxOrderPackets: articlePacketCount(maxOrderQuantity, pcsPerPacket),
+            stockPackets: articlePacketCount(data.current_stock, pcsPerPacket),
+        };
     }
 
     function orderQuantitySummary() {
@@ -204,6 +244,7 @@
             cards: { data: cardData.filter(item => item.name.toLowerCase().includes(searchValue.toLowerCase())) },
         };
         renderCardsInModal(modalData);
+        applySelectedArticleLabels();
     };
 
     if (generateOrderBtn) {
@@ -220,27 +261,23 @@
     window.generateArticlesModal = function generateArticlesModal() {
         const data = mergeSelectedArticlesIntoModalData(articles || []);
 
-        if (data.length > 0 && cardData.length == 0) {
-            cardData.push(
-                ...data.map(item => {
-                    return {
-                        id: item.id,
-                        name: item.article_no,
-                        image:
-                            item.image == 'no_image_icon.png'
-                                ? '/images/no_image_icon.png'
-                                : `/storage/uploads/images/${item.image}`,
-                        details: {
-                            Category: item.category,
-                            Season: item.season,
-                            Size: item.size,
-                        },
-                        data: item,
-                        onclick: 'generateQuantityModal(this)',
-                    };
-                })
-            );
-        }
+        cardData = data.map(item => {
+            return {
+                id: item.id,
+                name: item.article_no,
+                image:
+                    item.image == 'no_image_icon.png'
+                        ? '/images/no_image_icon.png'
+                        : `/storage/uploads/images/${item.image}`,
+                details: {
+                    Category: item.category,
+                    Season: item.season,
+                    Size: item.size,
+                },
+                data: item,
+                onclick: 'generateQuantityModal(this)',
+            };
+        });
 
         const modalData = {
             id: 'modalForm',
@@ -261,26 +298,7 @@
         totalQuantityDOM = document.querySelector('#modalForm #totalOrderQty');
         totalAmountDOM = document.querySelector('#modalForm #totalOrderAmount');
 
-        document.querySelectorAll('.card .quantity-label').forEach(previousQuantityLabel => {
-            previousQuantityLabel.remove();
-        });
-
-        if (selectedArticles.length > 0) {
-            selectedArticles.forEach(selectedArticle => {
-                const card = document.getElementById(selectedArticle.id);
-                const quantityLabelDom = card?.querySelector('.quantity-label');
-                if (card && !quantityLabelDom) {
-                    card.innerHTML += `
-                            <div
-                                class="quantity-label absolute text-xs text-[var(--border-success)] top-1 right-2 h-[1rem]">
-                                ${selectedArticle.ordered_pcs} Pcs
-                            </div>
-                        `;
-                } else if (quantityLabelDom) {
-                    quantityLabelDom.textContent = `${selectedArticle.ordered_pcs} Pcs`;
-                }
-            });
-        }
+        applySelectedArticleLabels();
 
         calculateTotalOrderedQuantity();
         calculateTotalOrderAmount();
@@ -292,11 +310,30 @@
         renderFinals();
     };
 
+    function applySelectedArticleLabels() {
+        document.querySelectorAll('#modalForm .card .quantity-label').forEach(previousQuantityLabel => {
+            previousQuantityLabel.remove();
+        });
+
+        selectedArticles.forEach(selectedArticle => {
+            const card = document.getElementById(selectedArticle.id);
+            if (!card) return;
+
+            const invoicedPcs = Number(selectedArticle.dispatched_pcs || 0);
+            const invoicedText = invoicedPcs > 0 ? ` | Inv ${formatNumbersDigitLess(invoicedPcs)}` : '';
+            card.innerHTML += `
+                <div class="quantity-label absolute text-xs text-[var(--border-success)] top-1 right-2 min-h-[1rem] rounded-md bg-[var(--secondary-bg-color)]/90 px-1.5 py-0.5">
+                    ${formatNumbersDigitLess(selectedArticle.ordered_pcs)} Pcs${invoicedText}
+                </div>
+            `;
+        });
+    }
+
     window.generateQuantityModal = function generateQuantityModal(elem) {
         const data = JSON.parse(elem.dataset.json).data;
         const alreadySelected = isArticleAlreadySelected(data.id);
-        const selectedArticle = selectedArticles.find(article => article.id == data.id);
-        const maxOrderQuantity = Number(data.orderable_quantity || 0);
+        const quantityState = editableArticleQuantityState(data);
+        const maxOrderQuantity = quantityState.maxOrderQuantity;
 
         if (limitOfArticles > 0 || alreadySelected) {
             const modalData = {
@@ -313,14 +350,14 @@
                     {
                         category: 'input',
                         label: 'Orderable Quantity',
-                        value: `${formatNumbersDigitLess(maxOrderQuantity)} Pcs | ${formatNumbersWithDigits(data.orderable_quantity_packets)} Pkts`,
+                        value: `${formatNumbersDigitLess(maxOrderQuantity)} Pcs | ${formatNumbersWithDigits(quantityState.maxOrderPackets)} Pkts`,
                         disabled: true,
                         full: true,
                     },
                     {
                         category: 'input',
                         label: 'Invoiceable Quantity (Current Stock)',
-                        value: `${formatNumbersDigitLess(data.current_stock)} Pcs | ${formatNumbersWithDigits(data.current_stock_packets)} Pkts`,
+                        value: `${formatNumbersDigitLess(data.current_stock)} Pcs | ${formatNumbersWithDigits(quantityState.stockPackets)} Pkts`,
                         disabled: true,
                         full: true,
                     },
@@ -376,12 +413,7 @@
 
             createModal(modalData);
 
-            const quantityLabel = document.getElementById(data.id)?.querySelector('.quantity-label');
-
-            if (quantityLabel) {
-                initializeArticleQuantityPair(data.pcs_per_packet, maxOrderQuantity, parseInt(quantityLabel.textContent.replace(/\D/g, '')));
-            }
-            syncArticleQuantityPair('pcs', data.pcs_per_packet, maxOrderQuantity);
+            initializeArticleQuantityPair(data.pcs_per_packet, maxOrderQuantity, quantityState.selectedQuantity);
 
             document.getElementById('quantity').focus();
             ['quantity', 'quantity_packets'].forEach(inputId => {
@@ -406,28 +438,24 @@
         if (limitOfArticles > 0 || alreadySelected) {
             const alreadySelectedArticle = selectedArticles.filter(c => c.id == cardData.id);
             const quantityInputDOM = document.getElementById('quantity');
-            const selectedArticle = selectedArticles.find(article => article.id == cardData.id);
-            const maxOrderQuantity = Math.max(Number(cardData.orderable_quantity || 0), Number(selectedArticle?.ordered_pcs || 0));
+            const quantityState = editableArticleQuantityState(cardData);
+            const invoicedQuantity = quantityState.invoicedQuantity;
+            const maxOrderQuantity = quantityState.maxOrderQuantity;
             if (!syncArticleQuantityPair('pcs', cardData.pcs_per_packet, maxOrderQuantity)) {
                 quantityInputDOM?.focus();
                 return;
             }
 
             closeModal('QuantityModalForm');
-            const quantity = quantityInputDOM.value;
+            const quantity = Number(quantityInputDOM.value || 0);
             const quantityLabel = targetCard.querySelector('.quantity-label');
 
-            if (quantity > 0) {
-                if (quantityLabel) {
-                    quantityLabel.textContent = `${quantity} Pcs`;
-                } else {
-                    targetCard.innerHTML += `
-                            <div class="quantity-label absolute text-xs text-[var(--border-success)] top-1 right-2 h-[1rem]">
-                                ${quantity} Pcs
-                            </div>
-                        `;
-                }
+            if (invoicedQuantity > 0 && quantity < invoicedQuantity) {
+                showOrderEditError(`This article already has invoice quantity ${invoicedQuantity} pcs. Edit invoice first, then reduce order quantity.`);
+                return;
+            }
 
+            if (quantity > 0) {
                 cardData.ordered_pcs = parseInt(quantity);
 
                 if (alreadySelectedArticle.length > 0) {
@@ -435,10 +463,16 @@
                 } else {
                     selectedArticles.push(cardData);
                 }
+                applySelectedArticleLabels();
             } else if (quantityLabel) {
+                if (invoicedQuantity > 0) {
+                    showOrderEditError(`This article already has invoice quantity ${invoicedQuantity} pcs. Edit invoice first, then remove it from order.`);
+                    return;
+                }
                 quantityLabel.remove();
                 const index = selectedArticles.findIndex(c => c.id === cardData.id);
                 deselectArticleAtIndex(index);
+                applySelectedArticleLabels();
             }
 
             generateDescription();
@@ -463,12 +497,22 @@
 
     function deselectArticleAtIndex(index) {
         if (index !== -1) {
+            const selectedArticle = selectedArticles[index];
+            const invoicedQuantity = Number(selectedArticle?.dispatched_pcs || 0);
+            if (invoicedQuantity > 0) {
+                showOrderEditError(`This article already has invoice quantity ${invoicedQuantity} pcs. Edit invoice first, then remove it from order.`);
+                return false;
+            }
             selectedArticles.splice(index, 1);
         }
+
+        return true;
     }
 
     window.deselectThisArticle = function deselectThisArticle(index) {
-        deselectArticleAtIndex(index);
+        if (!deselectArticleAtIndex(index)) {
+            return;
+        }
 
         renderList();
         generateOrder();
@@ -783,21 +827,7 @@
     };
 
     window.reRenderSelectedState = function reRenderSelectedState() {
-        const selectedIds = selectedArticles.map(card => card.id);
-
-        document.querySelectorAll('.card_container .card').forEach(card => {
-            const cardData = JSON.parse(card.getAttribute('data-json'));
-
-            if (selectedIds.includes(cardData.id)) {
-                const selectedCard = selectedArticles.find(item => item.id === cardData.id);
-
-                card.innerHTML += `
-                        <div class="quantity-label absolute text-xs text-[var(--border-success)] top-1 right-2 h-[1rem]">
-                            ${selectedCard.ordered_pcs} Pcs
-                        </div>
-                    `;
-            }
-        });
+        applySelectedArticleLabels();
     };
 
     window.reRenderSelectedStateTotal = function reRenderSelectedStateTotal() {

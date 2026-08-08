@@ -5,9 +5,9 @@
         $hideDocumentDiscount = (bool) ($branchBranding['discount_disabled'] ?? false);
     @endphp
 
-@php
-    $invoiceType = Auth::user()->invoice_type;
-@endphp
+    @php
+        $invoiceType = 'order';
+    @endphp
 
     @php
         $searchFields = [
@@ -68,7 +68,7 @@
         $errorAlertTemplate = view('components.alert', ['type' => 'error', 'messages' => '__MESSAGE__'])->render();
     @endphp
 
-    <div class="switch-btn-container flex absolute top-3 md:top-17 left-3 md:left-5 z-[100]">
+    <div class="switch-btn-container hidden absolute top-3 md:top-17 left-3 md:left-5 z-[100]">
         <div class="switch-btn relative flex border-3 border-[var(--secondary-bg-color)] bg-[var(--secondary-bg-color)] rounded-2xl overflow-hidden">
             <!-- Highlight rectangle -->
             <div id="highlight" class="absolute h-full rounded-xl bg-[var(--bg-color)] transition-all duration-300 ease-in-out z-0"></div>
@@ -82,15 +82,6 @@
             >
                 <div class="hidden md:block">Order</div>
                 <div class="block md:hidden"><i class="fas fa-cart-shopping text-xs"></i></div>
-            </button>
-            <button
-                id="shipmentBtn"
-                type="button"
-                class="relative z-10 px-3.5 md:px-5 py-1.5 md:py-2 cursor-pointer rounded-xl transition-colors duration-300"
-                onclick="setInvoiceType(this, 'shipment')"
-            >
-                <div class="hidden md:block">Shipment</div>
-                <div class="block md:hidden"><i class="fas fa-box-open text-xs"></i></div>
             </button>
         </div>
     </div>
@@ -109,7 +100,6 @@
         <x-form-title-bar title="Generate Invoice" />
 
         <!-- Step 1: Generate Invoice -->
-        @if($invoiceType == 'order')
             <div class="step1 space-y-4 ">
                 <div class="flex justify-between gap-4">
                     <input type="hidden" name="date" value='{{ now()->toDateString() }}'>
@@ -158,57 +148,6 @@
                     </div>
                 </div>
             </div>
-        @else
-            <div class="step1 space-y-4 ">
-                <div class="flex justify-between gap-4">
-                    <input type="hidden" name="date" value='{{ now()->toDateString() }}'>
-                    {{-- shipment_no --}}
-                    <div class="grow">
-                        <x-select label="Shipment Number" name="shipment_no" id="shipment_no" :options="$shipmentsOptions" required showDefault withButton btnId="selectCustomersBtn" btnText="Select Customers" />
-                    </div>
-                </div>
-                {{-- rate showing --}}
-                <div id="article-table" class="w-full text-left text-sm">
-                    <div class="flex justify-between items-center bg-[var(--h-bg-color)] rounded-lg py-2 px-4 mb-4">
-                        <div class="w-[5%]">#</div>
-                        <div class="w-[11%]">Article</div>
-                        <div class="w-[11%]">Packets</div>
-                        <div class="w-[10%]">Pcs</div>
-                        <div class="grow">Decs.</div>
-                        <div class="w-[8%]">Pcs/Pkt.</div>
-                        <div class="w-[12%] text-right">Rate/Pc</div>
-                        <div class="w-[15%] text-right">Amount</div>
-                    </div>
-                    <div id="article-list" class="h-[20rem] overflow-y-auto my-scrollbar-2">
-                        <div class="text-center bg-[var(--h-bg-color)] rounded-lg py-3 px-4">No Rates Added</div>
-                    </div>
-                </div>
-
-                <input type="hidden" name="customers_array" id="customers_array" value="">
-
-                <input type="hidden" name="printAfterSave" id="printAfterSave" value="0">
-
-                <div class="flex w-full grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-nowrap">
-                    <div class="total-qty flex justify-between items-center border border-gray-600 cursor-not-allowed rounded-lg py-2 px-4 w-full">
-                        <div class="grow">Total Quantity - Pcs</div>
-                        <div id="totalQuantityInForm">0</div>
-                    </div>
-                    <div class="final {{ $hideDocumentDiscount ? 'hidden' : '' }} flex justify-between items-center border border-gray-600 cursor-not-allowed rounded-lg py-2 px-4 w-full">
-                        <div class="grow">Gross Amount - Rs.</div>
-                        <div id="totalAmountInForm">0.0</div>
-                    </div>
-                    <div class="final {{ $hideDocumentDiscount ? 'hidden' : '' }} flex justify-between items-center border border-gray-600 cursor-not-allowed rounded-lg py-2 px-4 w-full">
-                        <div class="grow">Discount - %</div>
-                        <div id="dicountInForm">0</div>
-                    </div>
-                    <div class="final flex justify-between items-center border border-gray-600 cursor-not-allowed rounded-lg py-2 px-4 w-full">
-                        <div class="grow">Net Amount - Rs.</div>
-                        <input type="text" id="netAmountInForm" value="0.0" readonly
-                            class="text-right bg-transparent outline-none w-1/2 border-none" />
-                    </div>
-                </div>
-            </div>
-        @endif
 
         <!-- Step 2: view order -->
         <div class="step2 hidden space-y-4 text-black h-[35rem] overflow-y-auto my-scrollbar-2 bg-white rounded-md">

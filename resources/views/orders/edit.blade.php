@@ -5,7 +5,7 @@
         $hideDocumentDiscount = (bool) ($branchBranding['discount_disabled'] ?? false);
     @endphp
     @php
-        $isDeveloper = Auth::user()?->role === 'developer';
+        $isDeveloper = Auth::user()?->role === 'developer' || app_can('orders', 'override');
         $canChangeCustomer = $isDeveloper;
         $customerDisplay = trim(($order->customer?->customer_name ?? '-') . ' | ' . ($order->customer?->city?->title ?? '-'));
         $currentCustomerOption = !empty($customers_options) ? $customers_options : [
@@ -129,7 +129,7 @@
 
 
 @push('page-scripts')
-<script defer src="{{ asset('js/pages/orders-edit.js') }}"></script>
+<script defer src="{{ asset('js/pages/orders-edit.js') }}?v={{ @filemtime(public_path('js/pages/orders-edit.js')) }}"></script>
 <script>
         window.__ordersEdit = {
             order: @json($orderPayload),

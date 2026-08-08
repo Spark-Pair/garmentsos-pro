@@ -4,7 +4,7 @@
 @section('content')
     @php
         $hideDocumentDiscount = (bool) ($branchBranding['discount_disabled'] ?? false);
-        $invoiceType = $invoice->shipment_no ? 'shipment' : 'order';
+        $invoiceType = 'order';
         $grossAmount = $invoice->invoiceArticles->sum(function ($line) {
             return ((int) $line->invoice_pcs) * (float) ($line->article?->sales_rate ?? 0);
         });
@@ -12,7 +12,7 @@
         $discountPercent = $grossAmount > 0 ? max(0, round((($grossAmount - $netAmount) / $grossAmount) * 100, 2)) : 0;
     @endphp
 
-    <div class="switch-btn-container flex absolute top-3 md:top-17 left-3 md:left-5 z-[100]">
+    <div class="switch-btn-container hidden absolute top-3 md:top-17 left-3 md:left-5 z-[100]">
         <div class="switch-btn relative flex border-3 border-[var(--secondary-bg-color)] bg-[var(--secondary-bg-color)] rounded-2xl overflow-hidden">
             <div id="highlight" class="absolute h-full rounded-xl bg-[var(--bg-color)] transition-all duration-300 ease-in-out z-0"></div>
 
@@ -21,12 +21,6 @@
                 disabled>
                 <div class="hidden md:block">Order</div>
                 <div class="block md:hidden"><i class="fas fa-cart-shopping text-xs"></i></div>
-            </button>
-            <button id="shipmentBtn" type="button"
-                class="relative z-10 px-3.5 md:px-5 py-1.5 md:py-2 cursor-default rounded-xl transition-colors duration-300"
-                disabled>
-                <div class="hidden md:block">Shipment</div>
-                <div class="block md:hidden"><i class="fas fa-box-open text-xs"></i></div>
             </button>
         </div>
     </div>
@@ -51,13 +45,7 @@
         <div class="step1 space-y-4">
             <div class="flex justify-between gap-4">
                 <div class="grow">
-                    @if ($invoiceType === 'shipment')
-                        <x-select label="Shipment Number" name="shipment_no" id="shipment_no" :options="$shipmentsOptions" :value="old('shipment_no', $invoice->shipment_no)" required showDefault withButton btnId="loadInvoiceShipmentBtn" btnText="Load Articles" />
-                        <input type="hidden" name="order_no" id="order_no" value="{{ old('order_no', $invoice->order_no) }}">
-                    @else
-                        <x-select label="Order Number" name="order_no" id="order_no" :options="$ordersOptions" :value="old('order_no', $invoice->order_no)" required showDefault withButton btnId="loadInvoiceOrderBtn" btnText="Load Articles" />
-                        <input type="hidden" name="shipment_no" id="shipment_no" value="{{ old('shipment_no', $invoice->shipment_no) }}">
-                    @endif
+                    <x-select label="Order Number" name="order_no" id="order_no" :options="$ordersOptions" :value="old('order_no', $invoice->order_no)" required showDefault withButton btnId="loadInvoiceOrderBtn" btnText="Load Articles" />
                 </div>
             </div>
             <div id="invoiceEditSourceError" class="hidden rounded-lg border border-[var(--border-error)] bg-[var(--border-error)]/10 px-4 py-3 text-xs text-[var(--border-error)]"></div>
@@ -146,8 +134,8 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <x-input label="Invoice No" name="invoice_no" id="invoice_no" value="{{ old('invoice_no', $invoice->invoice_no) }}" required />
                 <x-input label="Date" name="date" id="date" type="date" value="{{ old('date', $invoice->date?->format('Y-m-d')) }}" required />
-                <x-select label="Customer" name="customer_id" id="customer_id" :options="$customers" :value="old('customer_id', $invoice->customer_id)" required showDefault />
-                <x-input label="Cotton Count" name="cotton_count" id="cotton_count" type="number" value="{{ old('cotton_count', $invoice->cotton_count) }}" />
+                <x-input label="Customer" id="customer_display" value="{{ $invoice->customer?->customer_name }} | {{ $invoice->customer?->city?->title ?? '-' }}" disabled />
+                <x-input label="Carton Count" name="carton_count" id="carton_count" type="number" value="{{ old('carton_count', $invoice->carton_count) }}" />
             </div>
         </div>
 
@@ -236,6 +224,26 @@
             visible.value = text;
             visible.dispatchEvent(new Event('input', { bubbles: true }));
         }
+
+        const display = document.getElementById('customer_display');
+        if (display && text) {
+            display.value = text;
+        }
+    }
+
+    function mergeInvoiceEditArticles(lines = []) {
+        lines.forEach((line) => {
+            const article = line.article || {};
+            const articleId = line.article_id || article.id;
+            if (!articleId || window.__invoiceEditArticles?.[articleId]) {
+                return;
+            }
+
+            window.__invoiceEditArticles[articleId] = {
+                text: `${article.article_no || articleId} | ${article.description || ''}`,
+                data_option: article,
+            };
+        });
     }
 
     function invoiceEditArticleOptions(selectedId) {
@@ -250,11 +258,12 @@
         const articleId = line.article_id || article.id || line.id || '';
         const pcsPerPacket = Number(article.pcs_per_packet || window.__invoiceEditArticles?.[articleId]?.data_option?.pcs_per_packet || 1);
         const packetQuantity = Number(line.total_quantity_in_packets || line.packets || 0);
+        const invoiceablePcs = packetQuantity > 0 ? packetQuantity * pcsPerPacket : 0;
         const pcs = Number(
             line.invoice_pcs
+            || invoiceablePcs
             || line.ordered_pcs
             || line.shipment_pcs
-            || (packetQuantity * pcsPerPacket)
             || 0
         );
 
@@ -333,52 +342,29 @@
                 _token: window.__invoiceEditCsrf,
                 order_no: orderNo,
                 allow_invoiced: 1,
+                current_invoice_id: @json($invoice->id),
             },
             success: function (response) {
                 if (response.error) {
-                    showInvoiceEditSourceError(response.error);
+                    if (document.querySelectorAll('.invoice-article-row').length > 0) {
+                        showInvoiceEditSourceError('');
+                        if (typeof appAlert === 'function') {
+                            appAlert(response.error, 'error');
+                        }
+                    } else {
+                        showInvoiceEditSourceError(response.error);
+                    }
                     return;
                 }
 
                 window.__invoiceEditDiscount = Number(response.discount || 0);
                 document.getElementById('dicountInForm').textContent = window.__invoiceEditDiscount;
+                mergeInvoiceEditArticles(response.articles || []);
                 setInvoiceEditCustomer(response.customer);
-                setInvoiceEditHiddenValue('shipment_no', '');
                 replaceInvoiceEditRows(response.articles || []);
             },
             error: function () {
                 showInvoiceEditSourceError('Could not load order articles. Please try again.');
-            },
-        });
-    }
-
-    function loadInvoiceEditShipmentArticles() {
-        const shipmentNo = invoiceEditSelectedValue('shipment_no');
-        if (!shipmentNo) {
-            showInvoiceEditSourceError('Please select a shipment first.');
-            return;
-        }
-
-        $.ajax({
-            url: '/get-shipment-details',
-            type: 'POST',
-            data: {
-                _token: window.__invoiceEditCsrf,
-                shipment_no: shipmentNo,
-            },
-            success: function (response) {
-                if (response.error) {
-                    showInvoiceEditSourceError(response.error);
-                    return;
-                }
-
-                window.__invoiceEditDiscount = Number(response.shipment?.discount || 0);
-                document.getElementById('dicountInForm').textContent = window.__invoiceEditDiscount;
-                setInvoiceEditHiddenValue('order_no', '');
-                replaceInvoiceEditRows(response.shipment?.articles || []);
-            },
-            error: function () {
-                showInvoiceEditSourceError('Could not load shipment articles. Please try again.');
             },
         });
     }
@@ -471,7 +457,6 @@
         const invoiceNo = document.getElementById('invoice_no')?.value || '-';
         const date = document.getElementById('date')?.value || '-';
         const orderNo = document.getElementById('order_no')?.value || '';
-        const shipmentNo = document.getElementById('shipment_no')?.value || '';
 
         preview.innerHTML = `
             <div class="p-5 h-full flex flex-col">
@@ -484,7 +469,6 @@
                         <div class="text-2xl font-bold text-blue-700">Sales Invoice</div>
                         <div class="font-semibold">Invoice No.: ${invoiceNo}</div>
                         ${orderNo ? `<div>Order No.: ${orderNo}</div>` : ''}
-                        ${shipmentNo ? `<div>Shipment No.: ${shipmentNo}</div>` : ''}
                     </div>
                 </div>
                 <div class="flex justify-between gap-5 py-3 border-b border-slate-700 text-sm">
@@ -540,7 +524,7 @@
     };
 
     function positionInvoiceEditSwitch() {
-        const activeButton = document.getElementById(@json($invoiceType === 'shipment' ? 'shipmentBtn' : 'orderBtn'));
+        const activeButton = document.getElementById('orderBtn');
         const highlight = document.getElementById('highlight');
         if (!activeButton || !highlight) {
             return;
@@ -552,14 +536,12 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.invoice-article-row').forEach((row) => refreshInvoiceEditRow(row));
-        ['invoice_no', 'date', 'customer_id', 'order_no', 'shipment_no'].forEach((id) => {
+        ['invoice_no', 'date', 'customer_id', 'order_no'].forEach((id) => {
             document.getElementById(id)?.addEventListener('change', refreshInvoiceEditTotals);
             document.getElementById(id)?.addEventListener('input', refreshInvoiceEditTotals);
         });
         document.querySelector('.dbInput[data-for="order_no"]')?.addEventListener('change', refreshInvoiceEditTotals);
-        document.querySelector('.dbInput[data-for="shipment_no"]')?.addEventListener('change', refreshInvoiceEditTotals);
         document.getElementById('loadInvoiceOrderBtn')?.addEventListener('click', loadInvoiceEditOrderArticles);
-        document.getElementById('loadInvoiceShipmentBtn')?.addEventListener('click', loadInvoiceEditShipmentArticles);
         positionInvoiceEditSwitch();
     });
     window.addEventListener('resize', positionInvoiceEditSwitch);

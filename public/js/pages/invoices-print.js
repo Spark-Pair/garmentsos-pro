@@ -100,7 +100,7 @@
 
             const customerData = invoice.customer || {};
             const invoiceArticles = invoice.invoice_articles || [];
-            const cottonCount = invoice.cotton_count || 0;
+            const cartonCount = invoice.carton_count || 0;
             const discount = invoice.discount ?? invoice.shipment?.discount ?? invoice.order?.discount ?? 0;
             let previewData = null;
 
@@ -119,7 +119,7 @@
                     shipment_no: invoice.shipment_no || null,
                     order_no: invoice.order_no || null,
                     deliver_to: invoice.deliver_to || invoice.order?.deliver_to || '',
-                    cotton_count: cottonCount,
+                    carton_count: cartonCount,
                     discount: discount,
                     netAmount: invoice.net_amount ?? null,
                     invoice_articles: invoiceArticles,
@@ -165,7 +165,7 @@
     function buildInvoicePreviewLikeModal(previewData, copyLabel = 'Customer') {
         const previewCompany = previewData.branch_branding || companyData || {};
         const previewLogoUrl = previewCompany.logo_url || (previewCompany.logo ? `${window.__invoicesPrint.companyLogoBase}/${previewCompany.logo}` : '');
-        const cotton = previewData.cotton_count || 0;
+        const carton = previewData.carton_count || 0;
         const discountVal = Number(previewData.discount || 0);
         const articles = Array.isArray(previewData.invoice_articles)
             ? previewData.invoice_articles
@@ -269,7 +269,7 @@
                                 <div class="date leading-none">Date: ${formatDate(previewData.date)}</div>
                                 ${previewData.order_no ? `<div class="number leading-none capitalize">Order No.: ${previewData.order_no}</div>` : previewData.shipment_no ? `<div class="number leading-none capitalize">Shipment No.: ${previewData.shipment_no}</div>` : ''}
                                 <div class="preview-copy leading-none capitalize">invoice Copy: ${copyLabel}</div>
-                                <div class="number leading-none capitalize">Cotton: ${cotton || '-'}</div>
+                                <div class="number leading-none capitalize">Carton: ${carton || '-'}</div>
                             </div>
                         </div>
                         <hr class="w-full my-3 border-black">

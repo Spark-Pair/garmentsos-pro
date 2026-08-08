@@ -1,7 +1,7 @@
 (function () {
     let pendingOpenOrderId = null;
     const canEditOrderRoles = ['developer', 'owner', 'admin', 'accountant'];
-    const isDeveloper = () => window.__currentUserRole === 'developer';
+    const isDeveloper = () => isDeveloperUser('orders');
 
     function setAuthLayout(data) {
         if (data?.authLayout) {
