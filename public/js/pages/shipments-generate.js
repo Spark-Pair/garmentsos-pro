@@ -29,23 +29,6 @@
         ));
     }
 
-    function companyLogoUrl() {
-        if (companyData?.logo_url) return companyData.logo_url;
-        if (companyData?.logo) return `${window.__shipmentsGenerate.companyLogoBase}/${companyData.logo}`;
-        return '';
-    }
-
-    function printDateTime() {
-        return new Date().toLocaleString('en-GB', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true,
-        }).replace(',', '');
-    }
-
     window.trackStateOfgenerateBtn = function trackStateOfgenerateBtn(value) {
         if (generateShipmentBtn) {
             generateShipmentBtn.disabled = value == '';
@@ -433,29 +416,6 @@
     let shipmentDate;
     const previewContainer = document.getElementById('preview-container');
 
-    function chunkA5Rows(rows) {
-        const source = Array.isArray(rows) ? rows : [];
-        const chunks = [];
-        let remaining = source.slice();
-        const maxRowsWithoutTotals = 13;
-        const maxRowsWithTotals = 11;
-
-        if (remaining.length <= maxRowsWithTotals) {
-            return [remaining];
-        }
-
-        while (remaining.length > maxRowsWithTotals) {
-            const take = remaining.length <= maxRowsWithoutTotals + maxRowsWithTotals
-                ? Math.min(maxRowsWithoutTotals, remaining.length - 1)
-                : maxRowsWithoutTotals;
-            chunks.push(remaining.slice(0, take));
-            remaining = remaining.slice(take);
-        }
-
-        chunks.push(remaining);
-        return chunks;
-    }
-
     function generateShipmentNo() {
         const shipmentNo = String(lastShipment?.shipment_no ?? '').trim();
         return shipmentNo && !shipmentNo.includes('NaN') ? shipmentNo : 'Will be generated on save';
@@ -503,116 +463,31 @@
 
         if (!previewContainer) return;
         if (selectedArticles.length > 0) {
-            const pages = chunkA5Rows(sortedSelectedArticles());
-            let serial = 1;
-
             previewContainer.className = 'h-auto mx-auto relative flex flex-col';
-            previewContainer.innerHTML = pages.map((pageArticles, pageIndex) => {
-                const isLastPage = pageIndex === pages.length - 1;
-                const bodyRows = pageArticles.map((article) => {
-                    const packets = article.pcs_per_packet ? Math.floor(article.shipmentQuantity / article.pcs_per_packet) : 0;
-                    const currentSerial = String(serial++).padStart(2, '0');
-
-                    return `
-                        <div class="invoice-item-row">
-                            <div class="tr invoice-item-main grid grid-cols-8 justify-between w-full px-4 gap-0.5">
-                                <div class="td text-sm font-semibold truncate">${currentSerial}</div>
-                                <div class="td invoice-article-cell text-sm font-semibold">
-                                    <div class="invoice-article-code">${article.article_no}</div>
-                                </div>
-                                <div class="td invoice-description-cell text-sm font-semibold">${shipmentDetailLine(article)}</div>
-                                <div class="td text-sm font-semibold truncate">${article.pcs_per_packet || 0}</div>
-                                <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(packets)}</div>
-                                <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(article.shipmentQuantity)}</div>
-                                <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(article.sales_rate)}</div>
-                                <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(parseFormattedNumber(article.sales_rate) * article.shipmentQuantity)}</div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-
-                return `
-                    <div id="preview" class="preview w-[148mm] h-[210mm] gos-a5-document gos-a5-invoice overflow-hidden flex flex-col">
-                    <div id="shipment" class="shipment flex flex-col h-full">
-                        <div id="banner" class="banner w-full flex justify-between items-center px-5">
-                            <div class="left">
-                                <div class="logo flex flex-col">
-                                    ${companyLogoUrl() ? `<img src="${companyLogoUrl()}" alt="garmentsos-pro"
-                                        class="w-[12rem]" />` : ''}
-                                    <div class="mt-2 text-sm text-gray-600">${companyData.phone_number || ''}</div>
-                                </div>
-                            </div>
-                            <div class="right">
-                                <div class="logo text-right">
-                                    <h1 class="text-2xl font-medium text-[var(--h-primary-color)]">Shipment</h1>
-                                    <div class="document-number mt-1 text-right">Shipment No.: ${shipmentNo}</div>
-                                </div>
-                            </div>
-                        </div>
-                        <hr class="w-full my-3 border-black">
-                        <div id="header" class="header w-full flex justify-between px-5">
-                            <div class="left w-50 space-y-1">
-                                <div class="address text-md leading-none capitalize">City: ${getShipmentCityLabel()}</div>
-                                <input type="hidden" name="shipment_no" value="${shipmentNo}" />
-                            </div>
-                            <div class="right w-50 my-auto text-right text-sm text-black space-y-1.5">
-                                <div class="date leading-none">Date: ${shipmentDate}</div>
-                            </div>
-                        </div>
-                        <hr class="w-full my-3 border-black">
-                        <div id="shipment-body" class="body w-full px-5 grow mx-auto">
-                            <div class="table w-full">
-                                <div class="table w-full border border-black rounded-lg pb-2.5 overflow-hidden">
-                                    <div class="thead w-full">
-                                        <div class="tr grid grid-cols-8 w-full px-4 py-1.5 bg-[var(--primary-color)] text-white">
-                                            <div class="th text-sm font-medium">S.#</div>
-                                            <div class="th text-sm font-medium">Article</div>
-                                            <div class="th text-sm font-medium">Description</div>
-                                            <div class="th text-sm font-medium">Unit</div>
-                                            <div class="th text-sm font-medium">Pkts</div>
-                                            <div class="th text-sm font-medium">Pcs.</div>
-                                            <div class="th text-sm font-medium">Rate</div>
-                                            <div class="th text-sm font-medium">Amount</div>
-                                        </div>
-                                    </div>
-                                    <div id="tbody" class="tbody w-full">
-                                        ${bodyRows}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        ${isLastPage ? `
-                        <hr class="w-full my-3 border-black">
-                        <div class="grid grid-cols-2 gap-2 px-5">
-                            <div class="total flex justify-between items-center border border-black rounded-lg py-2 px-4 w-full">
-                                <div class="text-nowrap">Total Quantity</div>
-                                <div class="w-1/4 text-right grow">${formatNumbersDigitLess(totalShipmentPackets())} | ${formatNumbersDigitLess(parseFormattedNumber(totalShipmentQuantity))}</div>
-                            </div>
-                            <div class="total flex justify-between items-center border border-black rounded-lg py-2 px-4 w-full">
-                                <div class="text-nowrap">Gross Amount</div>
-                                <div class="w-1/4 text-right grow">${formatNumbersWithDigits(totalShipmentAmount, 1, 1)}</div>
-                            </div>
-                            <div class="total flex justify-between items-center border border-black rounded-lg py-2 px-4 w-full">
-                                <div class="text-nowrap">Discount ${discountDOM?.value || 0}%</div>
-                                <div class="w-1/4 text-right grow">${formatNumbersWithDigits((totalShipmentAmount * Number(discountDOM?.value || 0)) / 100, 1, 1)}</div>
-                            </div>
-                            <div class="total flex justify-between items-center border border-black rounded-lg py-2 px-4 w-full">
-                                <div class="text-nowrap">Net Amount</div>
-                                <div class="w-1/4 text-right grow">${finalNetAmount.value}</div>
-                            </div>
-                        </div>
-                        ` : ''}
-                        <hr class="w-full my-3 border-black">
-                        <div class="footer flex w-full text-sm px-5 justify-between text-black">
-                            <p class="leading-none">Powered by SparkPair</p>
-                            <p class="leading-none text-sm">Page ${pageIndex + 1} of ${pages.length}</p>
-                            <p class="leading-none text-sm">Printed: ${printDateTime()}</p>
-                            <p class="leading-none text-sm">&copy; ${new Date().getFullYear()} SparkPair | +92 316 5825495</p>
-                        </div>
-                    </div>
-                    </div>
-                `;
-            }).join('');
+            previewContainer.innerHTML = window.DocumentPreview.render({
+                preview: {
+                    type: 'shipment',
+                    size: 'A5',
+                    document: 'Shipment',
+                    data: {
+                        shipment_no: shipmentNo,
+                        date: document.getElementById('date')?.value,
+                        city: getShipmentCityLabel(),
+                        discount: discountDOM?.value || 0,
+                        netAmount: parseFormattedNumber(finalNetAmount?.value ?? 0),
+                        branch_branding: companyData,
+                        articles: sortedSelectedArticles().map(article => ({
+                            ...article,
+                            shipment_pcs: Number(article.shipmentQuantity || 0),
+                            description: shipmentDetailLine(article),
+                        })),
+                    },
+                },
+            }, {
+                companyData,
+                companyLogoBase: window.__shipmentsGenerate?.companyLogoBase,
+            });
+            previewContainer.insertAdjacentHTML('beforeend', `<input type="hidden" name="shipment_no" value="${shipmentNo}" />`);
         } else {
             previewContainer.className = 'w-[148mm] h-[210mm] mx-auto overflow-hidden relative';
             previewContainer.innerHTML =
@@ -685,80 +560,12 @@
             const preview = document.getElementById('preview-container');
             if (!form || !preview) return;
 
-            const oldIframe = document.getElementById('printIframe');
-            if (oldIframe) oldIframe.remove();
-
-            const printIframe = document.createElement('iframe');
-            printIframe.id = 'printIframe';
-            printIframe.style.position = 'absolute';
-            printIframe.style.width = '0px';
-            printIframe.style.height = '0px';
-            printIframe.style.border = 'none';
-            printIframe.style.display = 'none';
-            document.body.appendChild(printIframe);
-
-            const printDocument = printIframe.contentDocument || printIframe.contentWindow.document;
-            printDocument.open();
-            printDocument.write(`
-                <html>
-                    <head>
-                        <title>Print Shipment</title>
-                        ${document.head.innerHTML}
-                        <style>
-                            @page {
-                                size: A5 portrait;
-                                margin: 3mm;
-                            }
-
-                            @media print {
-                                html,
-                                body {
-                                    margin: 0;
-                                    padding: 0;
-                                    width: auto;
-                                    min-height: 0;
-                                }
-
-                                #preview-container {
-                                    width: auto !important;
-                                    height: auto !important;
-                                    max-height: none !important;
-                                    overflow: visible !important;
-                                }
-
-                                .preview {
-                                    width: 148mm !important;
-                                    height: 210mm !important;
-                                    max-width: 148mm !important;
-                                    max-height: 210mm !important;
-                                    overflow: hidden !important;
-                                    break-after: page;
-                                    page-break-after: always;
-                                    page-break-inside: avoid;
-                                }
-
-                                #preview-container .preview:last-child {
-                                    break-after: auto;
-                                    page-break-after: auto;
-                                }
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <div id="preview-container" class="preview-container">${preview.innerHTML}</div>
-                    </body>
-                </html>
-            `);
-            printDocument.close();
-
-            printIframe.onload = () => {
-                printIframe.contentWindow.onafterprint = () => form.submit();
-
-                setTimeout(() => {
-                    printIframe.contentWindow.focus();
-                    printIframe.contentWindow.print();
-                }, 1000);
-            };
+            window.DocumentPrint.printPreview({
+                title: 'Print Shipment',
+                preview,
+                delay: 1000,
+                afterPrint: () => form.submit(),
+            });
         });
     }
 

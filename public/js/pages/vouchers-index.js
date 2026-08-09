@@ -31,93 +31,27 @@ function initVouchersIndex() {
     window.printVoucher = function(elem) {
         closeAllDropdowns();
 
-        if (elem.parentElement.tagName.toLowerCase() === 'li') {
+        const openedFromContextMenu = elem.parentElement.tagName.toLowerCase() === 'li';
+        if (openedFromContextMenu) {
             elem.parentElement.parentElement.querySelector('#show-details').click();
-            document.getElementById('modalForm').parentElement.classList.add('hidden');
+            document.getElementById('modalForm')?.parentElement.classList.add('hidden');
         }
 
         const preview = document.getElementById('preview-container');
+        if (!preview) return;
 
-        let oldIframe = document.getElementById('printIframe');
-        if (oldIframe) {
-            oldIframe.remove();
-        }
-
-        let printIframe = document.createElement('iframe');
-        printIframe.id = "printIframe";
-        printIframe.style.position = "absolute";
-        printIframe.style.width = "0px";
-        printIframe.style.height = "0px";
-        printIframe.style.border = "none";
-        printIframe.style.display = "none";
-
-        document.body.appendChild(printIframe);
-
-        let printDocument = printIframe.contentDocument || printIframe.contentWindow.document;
-        printDocument.open();
-
-        const headContent = document.head.innerHTML;
-
-        printDocument.write(`
-            <html>
-                <head>
-                    <title>Print Voucher</title>
-                    ${headContent}
-                    <style>
-                        @media print {
-
-                            body {
-                                margin: 0;
-                                padding: 0;
-                                width: 210mm;
-                                height: 297mm;
-
-                            }
-
-                            .preview-container, .preview-container * {
-                                page-break-inside: avoid;
-                            }
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="preview-container">${preview.innerHTML}</div>
-                    <div id="preview-container" class="preview-container">${preview.innerHTML}</div>
-                </body>
-            </html>
-        `);
-
-        printDocument.close();
-
-        printIframe.onload = () => {
-            printDocument
-                .querySelectorAll('.preview')
-                .forEach(p => p.classList.remove('py-6'));
-
-            printDocument
-                .querySelectorAll('#banner')
-                .forEach(p => p.classList.remove('mt-8'));
-
-            printDocument
-                .querySelectorAll('.footer')
-                .forEach(p => p.classList.remove('mb-4'));
-
-            let shipmentCopy = printDocument.querySelector('#preview-container .preview-copy');
-            if (shipmentCopy) {
-                shipmentCopy.textContent = "Shipment Copy: Office";
-            }
-
-            printIframe.contentWindow.onafterprint = () => {
-                // no-op
-            };
-
-            setTimeout(() => {
-                printIframe.contentWindow.focus();
-                printIframe.contentWindow.print();
-            }, 1000);
-
-            document.getElementById('modalForm').parentElement.remove();
-        };
+        window.DocumentPrint.printPreview({
+            title: 'Print Voucher',
+            preview,
+            delay: 1000,
+            beforePrint: printDocument => {
+                const voucherCopy = printDocument.querySelector('#preview-container .preview-copy');
+                if (voucherCopy) voucherCopy.textContent = 'Voucher Copy: Office';
+            },
+            afterPrint: () => {
+                if (openedFromContextMenu) document.getElementById('modalForm')?.parentElement.remove();
+            },
+        });
     }
 
     window.generateContextMenu = function(e) {

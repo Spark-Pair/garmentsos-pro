@@ -123,77 +123,40 @@
 
             const preview = document.getElementById("preview-container");
 
-            let oldIframe = document.getElementById("printIframe");
-            if (oldIframe) {
-                oldIframe.remove();
-            }
+            window.DocumentPrint.printHtml({
+                title: "Print Employee Form",
+                html: `<div class="preview-container">${preview.innerHTML}</div>`,
+                delay: 1000,
+                style: `
+                    @page {
+                        size: A5 portrait;
+                        margin: 0;
+                    }
 
-            let printIframe = document.createElement("iframe");
-            printIframe.id = "printIframe";
-            printIframe.style.position = "absolute";
-            printIframe.style.width = "0px";
-            printIframe.style.height = "0px";
-            printIframe.style.border = "none";
-            printIframe.style.display = "none";
+                    body {
+                        padding: 0.08in 0.25in 0.08in 0.25in;
+                        margin: 0;
+                        width: 148mm;
+                        height: 210mm;
+                    }
 
-            document.body.appendChild(printIframe);
+                    .preview-container .banner {
+                        margin-top: 0;
+                    }
 
-            let printDocument = printIframe.contentDocument || printIframe.contentWindow.document;
-            printDocument.open();
-
-            const headContent = document.head.innerHTML;
-
-            printDocument.write(`
-                <html>
-                    <head>
-                        <title>Print Employee Form</title>
-                        ${headContent}
-                        <style>
-                            @page {
-                                size: A5 portrait;
-                                margin: 0;
-                            }
-
-                            body {
-                                padding: 0.08in 0.25in 0.08in 0.25in;
-                                margin: 0;
-                                width: 148mm;
-                                height: 210mm;
-                            }
-
-                            .preview-container .banner {
-                                margin-top: 0;
-                            }
-
-                            .preview-container .footer {
-                                margin-top: 0;
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="preview-container">${preview.innerHTML}</div>
-                    </body>
-                </html>
-            `);
-
-            printDocument.close();
-
-            printIframe.onload = () => {
-                printDocument.querySelectorAll(".preview").forEach((p) => p.classList.remove("py-6"));
-
-                printDocument.querySelectorAll("#banner").forEach((p) => p.classList.remove("mt-8"));
-
-                printDocument.querySelectorAll(".footer").forEach((p) => p.classList.remove("mb-4"));
-
-                printIframe.contentWindow.onafterprint = () => {};
-
-                setTimeout(() => {
-                    printIframe.contentWindow.focus();
-                    printIframe.contentWindow.print();
-                }, 1000);
-
-                document.getElementById("modalForm").parentElement.remove();
-            };
+                    .preview-container .footer {
+                        margin-top: 0;
+                    }
+                `,
+                beforePrint: printDocument => {
+                    printDocument.querySelectorAll(".preview").forEach(p => p.classList.remove("py-6"));
+                    printDocument.querySelectorAll("#banner").forEach(p => p.classList.remove("mt-8"));
+                    printDocument.querySelectorAll(".footer").forEach(p => p.classList.remove("mb-4"));
+                },
+                afterPrint: () => {
+                    document.getElementById("modalForm")?.parentElement?.remove();
+                },
+            });
         };
     }
 

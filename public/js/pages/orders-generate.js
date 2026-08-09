@@ -22,17 +22,6 @@
         return selectedArticles.some(a => a.id == articleId);
     }
 
-    function customerTitlePhoneLine(customer = {}) {
-        const title = String(customer?.urdu_title ?? '').trim();
-        const phone = String(customer?.phone_number ?? '').trim();
-        return [title, phone].filter(Boolean).join(' | ');
-    }
-
-    function deliverToLine() {
-        const deliverTo = String(document.getElementById('deliver_to')?.value ?? '').trim();
-        return `Deliver To: ${deliverTo || '-'}`;
-    }
-
     function articleSortValue(article = {}) {
         return String(article?.article_no ?? article?.article?.article_no ?? '').trim();
     }
@@ -46,84 +35,12 @@
         ));
     }
 
-    function printDateTime() {
-        return new Date().toLocaleString('en-GB', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true,
-        }).replace(',', '');
-    }
-
-    function previewText(value) {
-        return String(value ?? '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    }
-
     function truthySetting(value) {
         return value === true || value === 1 || value === '1' || value === 'true';
     }
 
     function orderDiscountDisabled() {
         return truthySetting(companyData?.discount_disabled);
-    }
-
-    function orderDocumentTotalsHtml() {
-        if (orderDiscountDisabled()) {
-            const note = String(companyData?.document_note || '').trim();
-            return `
-                <div class="flex flex-col space-y-2">
-                    ${note ? `
-                        <div class="tr flex justify-between w-full px-2 gap-2 text-sm">
-                            <div class="total flex justify-center items-center border border-gray-600 rounded-lg py-2 px-4 w-full text-center font-semibold">
-                                ${previewText(note)}
-                            </div>
-                        </div>
-                    ` : ''}
-                    <div id="order-total" class="tr flex justify-between w-full px-2 gap-2 text-sm">
-                        <div class="total flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full">
-                            <div class="text-nowrap">Total Quantity</div>
-                            <div class="w-1/4 text-right grow">${orderQuantitySummary()}</div>
-                        </div>
-                        <div class="total flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full">
-                            <div class="text-nowrap font-semibold">Net Amount</div>
-                            <div class="w-1/4 text-right grow font-semibold">${totalAmountDOM.value}</div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        return `
-            <div class="flex flex-col space-y-2">
-                <div id="order-total" class="tr flex justify-between w-full px-2 gap-2 text-sm">
-                    <div class="total flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full">
-                        <div class="text-nowrap">Total Quantity</div>
-                        <div class="w-1/4 text-right grow">${orderQuantitySummary()}</div>
-                    </div>
-                    <div class="total flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full">
-                        <div class="text-nowrap">Total Amount</div>
-                        <div class="w-1/4 text-right grow">${totalAmountDOM.value}</div>
-                    </div>
-                </div>
-                <div id="order-total" class="tr flex justify-between w-full px-2 gap-2 text-sm">
-                    <div class="total flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full">
-                        <div class="text-nowrap">Discount %</div>
-                        <div class="w-1/4 text-right grow">${discountDOM?.value || 0}</div>
-                    </div>
-                    <div class="total flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full">
-                        <div class="text-nowrap">Net Amount</div>
-                        <div class="w-1/4 text-right grow">${finalNetAmount.value}</div>
-                    </div>
-                </div>
-            </div>
-        `;
     }
 
     window.trackCustomerState = function trackCustomerState(elem) {
@@ -604,30 +521,7 @@
     let orderDate;
     const previewContainer = document.getElementById('preview-container');
 
-    function chunkA5Rows(rows) {
-        const source = Array.isArray(rows) ? rows : [];
-        const chunks = [];
-        let remaining = source.slice();
-        const maxRowsWithoutTotals = 13;
-        const maxRowsWithTotals = 11;
-
-        if (remaining.length <= maxRowsWithTotals) {
-            return [remaining];
-        }
-
-        while (remaining.length > maxRowsWithTotals) {
-            const take = remaining.length <= maxRowsWithoutTotals + maxRowsWithTotals
-                ? Math.min(maxRowsWithoutTotals, remaining.length - 1)
-                : maxRowsWithoutTotals;
-            chunks.push(remaining.slice(0, take));
-            remaining = remaining.slice(take);
-        }
-
-        chunks.push(remaining);
-        return chunks;
-    }
-
-    function generateOrderNo() {
+function generateOrderNo() {
         return safeDocumentNumberPreview(
             window.__ordersGenerate?.nextOrderNo || incrementDocumentNumber(lastOrder?.order_no, 1)
         );
@@ -651,101 +545,32 @@
 
         if (!previewContainer) return;
         if (selectedArticles.length > 0) {
-            const pages = chunkA5Rows(sortedSelectedArticles());
-            let serial = 1;
-
             previewContainer.className = 'h-auto mx-auto relative flex flex-col';
-            previewContainer.innerHTML = pages.map((pageArticles, pageIndex) => {
-                const isLastPage = pageIndex === pages.length - 1;
-                const bodyRows = pageArticles.map((article) => {
-                    const detailLine = orderDetailLine(article);
-                    const dispatched = orderDispatchText(article);
-                    const currentSerial = String(serial++).padStart(2, '0');
-
-                    return `
-                        <div class="invoice-item-row">
-                            <div class="tr invoice-item-main grid grid-cols-9 justify-between w-full px-4 gap-0.5">
-                                <div class="td text-sm font-semibold truncate">${currentSerial}</div>
-                                <div class="td invoice-article-cell text-sm font-semibold">
-                                    <div class="invoice-article-code">${article.article_no}</div>
-                                </div>
-                                <div class="td invoice-description-cell text-sm font-semibold">${detailLine}</div>
-                                <div class="td text-sm font-semibold truncate">${article?.pcs_per_packet ?? 0}</div>
-                                <div class="td text-sm font-semibold truncate">${article?.pcs_per_packet ? Math.floor(article.orderedQuantity / article.pcs_per_packet) : 0}</div>
-                                <div class="td text-sm font-semibold truncate">${article.orderedQuantity}</div>
-                                <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(article.sales_rate)}</div>
-                                <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(parseFormattedNumber(article.sales_rate) * article.orderedQuantity)}</div>
-                                <div class="td text-sm font-semibold text-center">${dispatched}</div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-
-                return `
-                    <div id="preview" class="preview w-[148mm] h-[210mm] gos-a5-document gos-a5-invoice overflow-hidden flex flex-col">
-                        <div id="order" class="order flex flex-col h-full">
-                        <div id="banner" class="banner w-full flex justify-between items-center px-5">
-                            <div class="left">
-                                <div class="logo">
-                                    <img src="${companyData.logo_url || `${window.__ordersGenerate.companyLogoBase}/${companyData.logo}`}" alt="garmentsos-pro"
-                                        class="w-[12rem]" />
-                                    <div class='mt-1'>${companyData.phone_number || companyData.phone || ""}</div>
-                                </div>
-                            </div>
-                            <div class="logo text-right">
-                                <h1 class="text-2xl font-medium text-[var(--h-primary-color)]">Sales Order</h1>
-                                <div class="document-number mt-1 text-right">Order No.: ${orderNo}</div>
-                            </div>
-                        </div>
-                        <hr class="w-full my-3 border-gray-600">
-                        <div id="header" class="header w-full flex justify-between px-5">
-                            <div class="left grow min-w-0 pr-3 space-y-1">
-                                <div class="customer text-lg leading-none capitalize font-medium text-nowrap">M/s: ${customerData.customer_name}</div>
-                                <div class="person text-md text-lg leading-none">${customerTitlePhoneLine(customerData)}</div>
-                                <div class="address text-md leading-none">${customerData.address}, ${customerData.city.title}</div>
-                                <div class="phone text-md leading-none">${deliverToLine()}</div>
-                            </div>
-                            <div class="right shrink-0 min-w-[38%] my-auto text-right text-sm text-gray-600 space-y-1.5">
-                                <div class="date leading-none">Date: ${orderDate}</div>
-                                <input type="hidden" name="order_no" value="${orderNo}" />
-                                <div class="preview-copy leading-none">Order Copy: Customer</div>
-                            </div>
-                        </div>
-                        <hr class="w-full my-3 border-gray-600">
-                        <div id="body" class="body w-[95%] grow mx-auto">
-                            <div class="order-table w-full">
-                                <div class="table w-full border border-gray-600 rounded-lg pb-2.5 overflow-hidden">
-                                    <div class="thead w-full">
-                                        <div class="tr grid grid-cols-9 w-full px-4 py-1.5 bg-[var(--primary-color)] text-white">
-                                            <div class="th text-sm font-medium">S.#</div>
-                                            <div class="th text-sm font-medium">Article</div>
-                                            <div class="th text-sm font-medium">Description</div>
-                                            <div class="th text-sm font-medium">Unit</div>
-                                            <div class="th text-sm font-medium">Pkts</div>
-                                            <div class="th text-sm font-medium">Pcs.</div>
-                                            <div class="th text-sm font-medium">Rate</div>
-                                            <div class="th text-sm font-medium">Amount</div>
-                                            <div class="th text-sm font-medium text-center">Dispatch</div>
-                                        </div>
-                                    </div>
-                                    <div id="tbody" class="tbody w-full">
-                                        ${bodyRows}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        ${isLastPage ? `<hr class="w-full my-3 border-gray-600">${orderDocumentTotalsHtml()}` : ''}
-                        <hr class="w-full my-3 border-gray-600">
-                        <div class="tfooter flex w-full text-sm px-4 justify-between text-gray-600">
-                            <P class="leading-none">Powered by SparkPair</P>
-                            <p class="leading-none text-sm">Page ${pageIndex + 1} of ${pages.length}</p>
-                            <p class="leading-none text-sm">Printed: ${printDateTime()}</p>
-                            <p class="leading-none text-sm">&copy; ${new Date().getFullYear()} SparkPair | +92 316 5825495</p>
-                        </div>
-                    </div>
-                    </div>
-                `;
-            }).join('');
+            previewContainer.innerHTML = window.DocumentPreview.render({
+                preview: {
+                    type: 'order',
+                    size: 'A5',
+                    document: 'Sales Order',
+                    data: {
+                        order_no: orderNo,
+                        date: document.getElementById('date')?.value,
+                        customer: customerData,
+                        deliver_to: document.getElementById('deliver_to')?.value || '',
+                        discount: discountDOM?.value || 0,
+                        netAmount: parseFormattedNumber(finalNetAmount?.value ?? netAmount ?? 0),
+                        branch_branding: companyData,
+                        articles: sortedSelectedArticles().map(article => ({
+                            ...article,
+                            ordered_pcs: Number(article.orderedQuantity || 0),
+                            description: orderDetailLine(article),
+                        })),
+                    },
+                },
+            }, {
+                companyData,
+                companyLogoBase: window.__ordersGenerate?.companyLogoBase,
+            });
+            previewContainer.insertAdjacentHTML('beforeend', `<input type="hidden" name="order_no" value="${orderNo}" />`);
         } else {
             previewContainer.className = 'w-[148mm] h-[210mm] mx-auto overflow-hidden relative';
             previewContainer.innerHTML =
@@ -812,83 +637,16 @@
             const preview = document.getElementById('preview-container');
             if (!form || !preview) return;
 
-            const oldIframe = document.getElementById('printIframe');
-            if (oldIframe) oldIframe.remove();
-
-            const printIframe = document.createElement('iframe');
-            printIframe.id = 'printIframe';
-            printIframe.style.position = 'absolute';
-            printIframe.style.width = '0px';
-            printIframe.style.height = '0px';
-            printIframe.style.border = 'none';
-            printIframe.style.display = 'none';
-            document.body.appendChild(printIframe);
-
-            const printDocument = printIframe.contentDocument || printIframe.contentWindow.document;
-            printDocument.open();
-            printDocument.write(`
-                <html>
-                    <head>
-                        <title>Print Order</title>
-                        ${document.head.innerHTML}
-                        <style>
-                            @page {
-                                size: A5 portrait;
-                                margin: 3mm;
-                            }
-
-                            @media print {
-                                html,
-                                body {
-                                    margin: 0;
-                                    padding: 0;
-                                    width: auto;
-                                    min-height: 0;
-                                }
-
-                                #preview-container {
-                                    width: auto !important;
-                                    height: auto !important;
-                                    max-height: none !important;
-                                    overflow: visible !important;
-                                }
-
-                                .preview {
-                                    width: 148mm !important;
-                                    height: 210mm !important;
-                                    max-width: 148mm !important;
-                                    max-height: 210mm !important;
-                                    overflow: hidden !important;
-                                    break-after: page;
-                                    page-break-after: always;
-                                    page-break-inside: avoid;
-                                }
-
-                                #preview-container .preview:last-child {
-                                    break-after: auto;
-                                    page-break-after: auto;
-                                }
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <div id="preview-container" class="preview-container">${preview.innerHTML}</div>
-                    </body>
-                </html>
-            `);
-            printDocument.close();
-
-            printIframe.onload = () => {
-                const orderCopy = printDocument.querySelector('#preview-container .preview-copy');
-                if (orderCopy) orderCopy.textContent = 'Order Copy: Office';
-
-                printIframe.contentWindow.onafterprint = () => form.submit();
-
-                setTimeout(() => {
-                    printIframe.contentWindow.focus();
-                    printIframe.contentWindow.print();
-                }, 1000);
-            };
+            window.DocumentPrint.printPreview({
+                title: 'Print Order',
+                preview,
+                delay: 1000,
+                beforePrint: printDocument => {
+                    const orderCopy = printDocument.querySelector('#preview-container .preview-copy');
+                    if (orderCopy) orderCopy.textContent = 'Order Copy: Office';
+                },
+                afterPrint: () => form.submit(),
+            });
         });
     }
 

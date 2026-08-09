@@ -756,64 +756,36 @@
     window.printProductionTicket = function printProductionTicket(data = currentProductionTicket) {
         if (!data) return;
 
-        const oldIframe = document.getElementById("printIframe");
-        if (oldIframe) oldIframe.remove();
+        window.DocumentPrint.printHtml({
+            title: `Production Ticket ${escapeText(data.ticket)}`,
+            html: buildProductionTicketHtml(data),
+            delay: 300,
+            style: `
+                @page {
+                    size: A5 portrait;
+                    margin: 0;
+                }
 
-        const printIframe = document.createElement("iframe");
-        printIframe.id = "printIframe";
-        printIframe.style.position = "absolute";
-        printIframe.style.width = "0";
-        printIframe.style.height = "0";
-        printIframe.style.border = "0";
-        printIframe.style.display = "none";
-        document.body.appendChild(printIframe);
+                html,
+                body {
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    width: 148mm !important;
+                    height: 210mm !important;
+                    background: #ffffff !important;
+                    overflow: hidden !important;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
 
-        const printDocument = printIframe.contentDocument || printIframe.contentWindow.document;
-
-        printDocument.open();
-        printDocument.write(`
-            <html>
-                <head>
-                    <title>Production Ticket ${escapeText(data.ticket)}</title>
-                    ${document.head.innerHTML}
-                    <style>
-                        @page {
-                            size: A5 portrait;
-                            margin: 0;
-                        }
-
-                        html,
-                        body {
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            width: 148mm !important;
-                            height: 210mm !important;
-                            background: #ffffff !important;
-                            overflow: hidden !important;
-                            -webkit-print-color-adjust: exact !important;
-                            print-color-adjust: exact !important;
-                        }
-
-                        #production-ticket-preview {
-                            width: 148mm !important;
-                            height: 210mm !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            box-shadow: none !important;
-                        }
-                    </style>
-                </head>
-                <body>${buildProductionTicketHtml(data)}</body>
-            </html>
-        `);
-
-        printDocument.close();
-
-        printIframe.onload = () => {
-            setTimeout(() => {
-                printIframe.contentWindow.focus();
-                printIframe.contentWindow.print();
-            }, 300);
-        };
+                #production-ticket-preview {
+                    width: 148mm !important;
+                    height: 210mm !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    box-shadow: none !important;
+                }
+            `,
+        });
     };
 })();

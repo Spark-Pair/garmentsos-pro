@@ -196,7 +196,6 @@
 
     .gos-a5-document .table.border {
         padding-bottom: 0 !important;
-        border-radius: 8px !important;
     }
 
     .gos-a5-document > .flex > .grid.grid-cols-2 {

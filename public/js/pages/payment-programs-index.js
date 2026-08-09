@@ -515,31 +515,10 @@ function initPaymentProgramsIndex() {
             return;
         }
 
-        let oldIframe = document.getElementById('printIframe');
-        if (oldIframe) oldIframe.remove();
-
-        let printIframe = document.createElement('iframe');
-        printIframe.id = "printIframe";
-        printIframe.style.position = "absolute";
-        printIframe.style.width = "0px";
-        printIframe.style.height = "0px";
-        printIframe.style.border = "none";
-        printIframe.style.display = "none";
-        document.body.appendChild(printIframe);
-
-        let printDocument = printIframe.contentDocument || printIframe.contentWindow.document;
-        printDocument.open();
-
-        printDocument.write(renderPaymentDetailsPrintHtml(buildPaymentProgramPrintData(lastPaymentProgramDetails)));
-
-        printDocument.close();
-
-        printIframe.onload = () => {
-            setTimeout(() => {
-                printIframe.contentWindow.focus();
-                printIframe.contentWindow.print();
-            }, 500);
-        };
+        window.DocumentPrint.printDocumentHtml({
+            html: renderPaymentDetailsPrintHtml(buildPaymentProgramPrintData(lastPaymentProgramDetails)),
+            delay: 500,
+        });
     }
 
     window.goToAddPayment = function(program) {

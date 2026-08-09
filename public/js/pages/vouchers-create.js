@@ -820,126 +820,72 @@ function initVouchersCreate() {
     }
 
     const previewDom = document.getElementById('preview');
+    function voucherPreviewPayments(dateValue) {
+        return paymentDetailsArray.map(payment => {
+            const selected = payment.selected ? JSON.parse(payment.selected || '{}') : {};
+            const selectedBank = selected.bank_account || (selected.account_title ? {
+                account_title: selected.account_title,
+                bank: selected.bank || { short_title: selected.bank_short_title },
+            } : null);
+            const selectedSelfAccount = selected.self_account || (payment.self_account_id_name ? { account_title: payment.self_account_id_name } : null);
+
+            return {
+                ...payment,
+                date: dateValue,
+                amount: parseFormattedNumber(payment.amount),
+                program: payment.program || selected.program,
+                cheque: payment.cheque || selected.cheque,
+                slip: payment.slip || selected.slip,
+                bank_account: payment.bank_account || selectedBank,
+                self_account: payment.self_account || selectedSelfAccount,
+                cheque_no: payment.cheque_no || selected.cheque_no,
+                slip_no: payment.slip_no || selected.slip_no,
+                reff_no: payment.reff_no || selected.reff_no,
+                transaction_id: payment.transaction_id || selected.transaction_id,
+            };
+        });
+    }
+
     function generateVoucherPreview() {
-        let voucherNo = generateVoucherNo();
+        const voucherNo = generateVoucherNo();
         const dateInpDom = document.getElementById("date");
         const isSupplier = voucherType === 'supplier';
+        const previewContainer = document.getElementById('preview-container');
 
-        if (allPayments.length > 0) {
-            const supplierSection = isSupplier
-                ? `<div class="center my-auto">
-                        <div class="supplier-name capitalize font-semibold text-md">Supplier Name: ${selectedSupplier.supplier_name}</div>
-                    </div>`
-                : '';
+        if (!previewContainer) return;
 
+        if (paymentDetailsArray.length > 0) {
             const rawBalance = selectedSupplier?.balance_at_date ?? selectedSupplier?.balance ?? 0;
             const supplierBalance = Number(rawBalance.toString().replace(/,/g, '')) || 0;
             const safeTotalPayment = Number((totalPayment ?? 0).toString().replace(/,/g, '')) || 0;
-            const totalsSection = isSupplier
-                ? `
-                    <div class="total flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full">
-                        <div class="text-nowrap">Previous Balance - Rs</div>
-                        <div class="w-1/4 text-right grow">${formatNumbersWithDigits(supplierBalance, 1, 1)}</div>
-                    </div>
-                    <div class="total flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full">
-                        <div class="text-nowrap">Total Payment - Rs</div>
-                        <div class="w-1/4 text-right grow">${formatNumbersWithDigits(safeTotalPayment, 1, 1)}</div>
-                    </div>
-                    <div class="total flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full">
-                        <div class="text-nowrap">Current Balance - Rs</div>
-                        <div class="w-1/4 text-right grow">${formatNumbersWithDigits(supplierBalance - safeTotalPayment, 1, 1)}</div>
-                    </div>
-                `
-                : `
-                    <div class="total flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full">
-                        <div class="text-nowrap">Total Payment - Rs</div>
-                        <div class="w-1/4 text-right grow">${formatNumbersWithDigits(safeTotalPayment, 1, 1)}</div>
-                    </div>
-                `;
 
-            previewDom.innerHTML = `
-                <div id="preview-document" class="preview-document flex flex-col h-full">
-                    <div id="preview-banner" class="preview-banner w-full flex justify-between items-center mt-8 pl-5 pr-8">
-                        <div class="left">
-                            <div class="company-logo">
-                                <img src="${companyLogoUrl}" alt="garmentsos-pro"
-                                    class="w-[12rem]" />
-                                <div class='mt-1'>${ companyData.phone_number }</div>
-                            </div>
-                        </div>
-                        <div class="right">
-                            <div>
-                                <h1 class="text-2xl font-medium text-[var(--primary-color)] pr-2">Voucher</h1>
-                            </div>
-                        </div>
-                    </div>
-                    <hr class="w-full my-3 border-gray-600">
-                    <div id="preview-header" class="preview-header w-full flex justify-between px-5">
-                        <div class="left my-auto pr-3 text-sm text-gray-600 space-y-1.5">
-                            <div class="voucher-date leading-none">Date: ${formatDate(dateInpDom.value)}</div>
-                            <div class="voucher-number leading-none">Voucher No.: ${voucherNo}</div>
-                            <input type="hidden" name="voucher_no" value="${voucherNo}" />
-                        </div>
-                        ${supplierSection}
-                        <div class="right my-auto pr-3 text-sm text-gray-600 space-y-1.5">
-                            <div class="preview-copy leading-none">Voucher Copy: Supplier</div>
-                            <div class="preview-doc leading-none">Document: Voucher</div>
-                        </div>
-                    </div>
-                    <hr class="w-full my-3 border-gray-600">
-                    <div id="preview-body" class="preview-body w-[95%] grow mx-auto">
-                        <div class="preview-table w-full">
-                            <div class="table w-full border border-gray-600 rounded-lg pb-2.5 overflow-hidden">
-                                <div class="thead w-full">
-                                    <div class="tr flex justify-between w-full px-4 py-1.5 bg-[var(--primary-color)] text-white">
-                                        <div class="th text-sm font-medium w-[7%]">S.No</div>
-                                        <div class="th text-sm font-medium w-[11%]">Method</div>
-                                        <div class="th text-sm font-medium w-1/5">Customer</div>
-                                        <div class="th text-sm font-medium w-1/4">Account</div>
-                                        <div class="th text-sm font-medium w-[14%]">Date</div>
-                                        <div class="th text-sm font-medium w-[14%]">Reff. No.</div>
-                                        <div class="th text-sm font-medium w-[10%]">Amount</div>
-                                    </div>
-                                </div>
-                                <div id="tbody" class="tbody w-full">
-                                    ${paymentDetailsArray.map((payment, index) => {
-                                        let selected = JSON.parse(payment.selected || '{}');
-                                        const hrClass = index === 0 ? "mb-2.5" : "my-2.5";
-                                        return `
-                                                <div>
-                                                    <hr class="w-full ${hrClass} border-gray-600">
-                                                    <div class="tr flex justify-between w-full px-4 text-nowrap gap-0.5">
-                                                        <div class="td text-sm font-semibold w-[7%]">${index + 1}.</div>
-                                                        <div class="td text-sm font-semibold w-[11%] capitalize">${payment.method ?? '-'}</div>
-                                                        <div class="td text-sm font-semibold w-1/5">${selected?.program?.customer?.customer_name ? selected?.program?.customer?.customer_name : selected.customer?.customer_name ? selected.customer?.customer_name : '-'}</div>
-                                                        <div class="td text-sm font-semibold w-1/4">${(selected?.bank_account?.account_title ?? selected?.account_title ?? '-') + ' | ' + (selected?.bank_account?.bank?.short_title ?? selected?.bank?.short_title ?? '-')}</div>
-                                                        <div class="td text-sm font-semibold w-[14%]">${formatDate(dateInpDom.value, true) ?? '-'}</div>
-                                                        <div class="td text-sm font-semibold w-[14%]">${selected?.cheque_no ?? selected?.slip_no ?? selected?.transaction_id ?? selected?.reff_no ?? '-'}</div>
-                                                        <div class="td text-sm font-semibold w-[10%]">${formatNumbersWithDigits(payment.amount, 1, 1) ?? '-'}</div>
-                                                    </div>
-                                                </div>
-                                            `;
-                                    }).join('')}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <hr class="w-full my-3 border-gray-600">
-                    <div class="flex flex-col space-y-2">
-                        <div id="total" class="tr flex justify-between w-full px-2 gap-2 text-sm">
-                            ${totalsSection}
-                        </div>
-                    </div>
-                    <hr class="w-full my-3 border-gray-600">
-                    <div class="tfooter flex w-full text-sm px-4 justify-between mb-4 text-gray-600">
-                        <P class="leading-none">Powered by SparkPair</P>
-                        <p class="leading-none text-sm">&copy; ${new Date().getFullYear()} SparkPair | +92 316 5825495</p>
-                    </div>
-                </div>
-            `;
+            previewContainer.className = 'h-auto mx-auto relative flex flex-col';
+            previewContainer.innerHTML = window.DocumentPreview.render({
+                preview: {
+                    type: 'voucher',
+                    size: 'A5',
+                    document: 'Voucher',
+                    data: {
+                        voucher_no: voucherNo,
+                        date: dateInpDom?.value,
+                        supplier: isSupplier ? selectedSupplier : null,
+                        previous_balance: supplierBalance,
+                        total_payment: safeTotalPayment,
+                        payments: voucherPreviewPayments(dateInpDom?.value),
+                        branch_branding: companyData,
+                    },
+                },
+            }, {
+                companyData,
+                companyLogoBase: config.companyLogoBase,
+            });
+            previewContainer.insertAdjacentHTML('beforeend', `<input type="hidden" name="voucher_no" value="${voucherNo}" />`);
         } else {
-            previewDom.innerHTML = `
-                <h1 class="text-[var(--border-error)] font-medium text-center mt-5">No Preview avalaible.</h1>
+            previewContainer.className = 'w-[148mm] h-[210mm] mx-auto overflow-hidden relative';
+            previewContainer.innerHTML = `
+                <div id="preview" class="preview w-[148mm] h-[210mm] gos-a5-document gos-a5-invoice overflow-hidden flex flex-col">
+                    <h1 class="text-[var(--border-error)] font-medium text-center mt-5">No Preview avalaible.</h1>
+                </div>
             `;
         }
     }

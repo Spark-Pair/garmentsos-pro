@@ -423,107 +423,39 @@
         shipmentNo = generateShipmentNo();
         shipmentDate = getShipmentDate();
 
-        if (!previewDom) return;
+        const previewContainer = document.getElementById('preview-container');
+        if (!previewContainer) return;
+
         if (selectedArticles.length > 0) {
-            previewDom.innerHTML = `
-                    <div id="shipment" class="shipment flex flex-col h-full">
-                        <div id="banner" class="banner w-full flex justify-between items-center px-5">
-                            <div class="left">
-                                <div class="logo flex flex-col">
-                                    <img src="${window.__shipmentsEdit.companyLogoBase}/${companyData.logo}" alt="garmentsos-pro"
-                                        class="w-[12rem]" />
-                                    <div class="mt-2 text-sm text-gray-600">${companyData.phone_number || ''}</div>
-                                </div>
-                            </div>
-                            <div class="right">
-                                <div class="logo text-right">
-                                    <h1 class="text-2xl font-medium text-[var(--h-primary-color)]">Shipment</h1>
-                                    <div class="mt-1 text-right">Shipment No.: ${shipmentNo}</div>
-                                </div>
-                            </div>
-                        </div>
-                        <hr class="w-full my-3 border-black">
-                        <div id="header" class="header w-full flex justify-between px-5">
-                            <div class="left w-50 space-y-1">
-                                <div class="address text-md leading-none capitalize">City: ${getShipmentCityLabel()}</div>
-                            </div>
-                            <div class="right w-50 my-auto text-right text-sm text-black space-y-1.5">
-                                <div class="date leading-none">Date: ${shipmentDate}</div>
-                            </div>
-                        </div>
-                        <hr class="w-full my-3 border-black">
-                        <div id="shipment-body" class="body w-full px-5 grow mx-auto">
-                            <div class="table w-full">
-                                <div class="table w-full border border-black rounded-lg pb-2.5 overflow-hidden">
-                                    <div class="thead w-full">
-                                        <div class="tr grid grid-cols-8 w-full px-4 py-1.5 bg-[var(--primary-color)] text-white">
-                                            <div class="th text-sm font-medium">S.#</div>
-                                            <div class="th text-sm font-medium">Article</div>
-                                            <div class="th text-sm font-medium">Description</div>
-                                            <div class="th text-sm font-medium">Unit</div>
-                                            <div class="th text-sm font-medium">Pkts</div>
-                                            <div class="th text-sm font-medium">Pcs.</div>
-                                            <div class="th text-sm font-medium">Rate</div>
-                                            <div class="th text-sm font-medium">Amt.</div>
-                                        </div>
-                                    </div>
-                                    <div id="tbody" class="tbody w-full">
-                                        ${selectedArticles
-                                            .map((article, index) => {
-                                                const hrClass = index === 0 ? 'mb-2.5' : 'my-2.5';
-                                                const packets = article.pcs_per_packet ? Math.floor(article.shipmentQuantity / article.pcs_per_packet) : 0;
-                                                return `
-                                                <div class="invoice-item-row">
-                                                    <hr class="w-full ${hrClass} border-black">
-                                                    <div class="tr invoice-item-main grid grid-cols-8 justify-between w-full px-4 gap-0.5">
-                                                        <div class="td text-sm font-semibold truncate">${String(index + 1).padStart(2, '0')}</div>
-                                                        <div class="td invoice-article-cell text-sm font-semibold">
-                                                            <div class="invoice-article-code">${article.article_no}</div>
-                                                        </div>
-                                                        <div class="td invoice-description-cell text-sm font-semibold">${shipmentDetailLine(article)}</div>
-                                                        <div class="td text-sm font-semibold truncate">${article.pcs_per_packet || 0}</div>
-                                                        <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(packets)}</div>
-                                                        <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(article.shipmentQuantity)}</div>
-                                                        <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(article.sales_rate)}</div>
-                                                        <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(parseFormattedNumber(article.sales_rate) * article.shipmentQuantity)}</div>
-                                                    </div>
-                                                </div>
-                                            `;
-                                            })
-                                            .join('')}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <hr class="w-full my-3 border-black">
-                        <div class="grid grid-cols-2 gap-2 px-5">
-                            <div class="total flex justify-between items-center border border-black rounded-lg py-2 px-4 w-full">
-                                <div class="text-nowrap">Total Quantity</div>
-                                <div class="w-1/4 text-right grow">${formatNumbersDigitLess(totalShipmentPackets())} | ${formatNumbersDigitLess(parseFormattedNumber(totalShipmentQuantity))}</div>
-                            </div>
-                            <div class="total flex justify-between items-center border border-black rounded-lg py-2 px-4 w-full">
-                                <div class="text-nowrap">Gross Amount</div>
-                                <div class="w-1/4 text-right grow">${formatNumbersWithDigits(totalShipmentAmount, 1, 1)}</div>
-                            </div>
-                            <div class="total flex justify-between items-center border border-black rounded-lg py-2 px-4 w-full">
-                                <div class="text-nowrap">Discount ${discountDOM?.value || 0}%</div>
-                                <div class="w-1/4 text-right grow">${formatNumbersWithDigits((totalShipmentAmount * Number(discountDOM?.value || 0)) / 100, 1, 1)}</div>
-                            </div>
-                            <div class="total flex justify-between items-center border border-black rounded-lg py-2 px-4 w-full">
-                                <div class="text-nowrap">Net Amount</div>
-                                <div class="w-1/4 text-right grow">${finalNetAmount.value}</div>
-                            </div>
-                        </div>
-                        <hr class="w-full my-3 border-black">
-                        <div class="footer flex w-full text-sm px-5 justify-between text-black">
-                            <p class="leading-none">Powered by SparkPair</p>
-                            <p class="leading-none text-sm">&copy; ${new Date().getFullYear()} SparkPair | +92 316 5825495</p>
-                        </div>
-                    </div>
-                `;
+            previewContainer.className = 'h-auto mx-auto relative flex flex-col';
+            previewContainer.innerHTML = window.DocumentPreview.render({
+                preview: {
+                    type: 'shipment',
+                    size: 'A5',
+                    document: 'Shipment',
+                    data: {
+                        shipment_no: shipmentNo,
+                        date: document.getElementById('date')?.value,
+                        city: getShipmentCityLabel(),
+                        discount: discountDOM?.value || 0,
+                        netAmount: parseFormattedNumber(finalNetAmount?.value ?? 0),
+                        branch_branding: companyData,
+                        articles: [...selectedArticles].map(article => ({
+                            ...article,
+                            shipment_pcs: Number(article.shipmentQuantity || 0),
+                            description: shipmentDetailLine(article),
+                        })),
+                    },
+                },
+            }, {
+                companyData,
+                companyLogoBase: window.__shipmentsEdit?.companyLogoBase,
+            });
+            previewContainer.insertAdjacentHTML('beforeend', `<input type="hidden" name="shipment_no" value="${shipmentNo}" />`);
         } else {
-            previewDom.innerHTML =
-                '<h1 class="text-[var(--border-error)] font-medium text-center mt-5">No Preview avalaible.</h1>';
+            previewContainer.className = 'w-[148mm] h-[210mm] mx-auto overflow-hidden relative';
+            previewContainer.innerHTML =
+                '<div id="preview" class="preview w-[148mm] h-[210mm] gos-a5-document gos-a5-invoice overflow-hidden flex flex-col"><h1 class="text-[var(--border-error)] font-medium text-center mt-5">No Preview avalaible.</h1></div>';
         }
     };
 

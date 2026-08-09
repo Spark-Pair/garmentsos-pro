@@ -128,56 +128,22 @@
 
             clone.querySelectorAll(":scope > hr").forEach((hr) => hr.remove());
 
-            let oldIframe = document.getElementById("printIframe");
-            if (oldIframe) {
-                oldIframe.remove();
-            }
+            window.DocumentPrint.printHtml({
+                title: "Print Attendance Slip",
+                html: clone.innerHTML,
+                style: `
+                    @page {
+                        size: A4 landscape;
+                        margin: 0;
+                    }
 
-            let printIframe = document.createElement("iframe");
-            printIframe.id = "printIframe";
-            printIframe.style.position = "absolute";
-            printIframe.style.width = "0px";
-            printIframe.style.height = "0px";
-            printIframe.style.border = "none";
-            printIframe.style.display = "none";
-
-            document.body.appendChild(printIframe);
-
-            let printDocument = printIframe.contentDocument || printIframe.contentWindow.document;
-            printDocument.open();
-
-            const headContent = document.head.innerHTML;
-
-            printDocument.write(`
-                <html>
-                    <head>
-                        <title>Print Statement</title>
-                        ${headContent}
-                        <style>
-                            @page {
-                                size: A4 landscape;
-                                margin: 0;
-                            }
-
-                            body {
-                                margin: 0;
-                                padding: 0;
-                                background: #fff;
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        ${clone.innerHTML}
-                    </body>
-                </html>
-            `);
-
-            printDocument.close();
-
-            printIframe.onload = () => {
-                printIframe.contentWindow.focus();
-                printIframe.contentWindow.print();
-            };
+                    body {
+                        margin: 0;
+                        padding: 0;
+                        background: #fff;
+                    }
+                `,
+            });
         };
     }
 

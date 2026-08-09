@@ -656,96 +656,40 @@
     function generateOrder() {
         orderDate = getOrderDate();
 
-        if (!previewDom) return;
+        const previewContainer = document.getElementById('preview-container');
+        if (!previewContainer) return;
+
         if (selectedArticles.length > 0) {
-            previewDom.innerHTML = `
-                    <div id="order" class="order flex flex-col h-full">
-                        <div id="banner" class="banner w-full flex justify-between items-center px-5">
-                            <div class="left">
-                                <div class="logo">
-                                    <img src="${companyData.logo_url || `${window.__ordersEdit.companyLogoBase}/${companyData.logo}`}" alt="garmentsos-pro"
-                                        class="w-[12rem]" />
-                                    <div class='mt-1'>${companyData.phone_number || companyData.phone || ""}</div>
-                                </div>
-                            </div>
-                            <div class="logo text-right">
-                                <h1 class="text-2xl font-medium text-[var(--h-primary-color)]">Sales Order</h1>
-                                <div class="mt-1 text-right">Order No.: ${order.order_no}</div>
-                            </div>
-                        </div>
-                        <hr class="w-full my-3 border-gray-600">
-                        <div id="header" class="header w-full flex justify-between px-5">
-                            <div class="left w-50 space-y-1">
-                                <div class="customer text-lg leading-none capitalize font-medium text-nowrap">M/s: ${customerData.customer_name}</div>
-                                <div class="person text-md text-lg leading-none">${customerTitlePhoneLine(customerData)}</div>
-                                <div class="address text-md leading-none">${customerData.address}, ${customerData.city.title}</div>
-                                <div class="phone text-md leading-none">${deliverToLine()}</div>
-                            </div>
-                            <div class="right w-50 my-auto text-right text-sm text-gray-600 space-y-1.5">
-                                <div class="date leading-none">Date: ${orderDate}</div>
-                                <input type="hidden" name="order_no" value="${order.order_no}" />
-                                <div class="preview-copy leading-none">Order Copy: Customer</div>
-                            </div>
-                        </div>
-                        <hr class="w-full my-3 border-gray-600">
-                        <div id="body" class="body w-[95%] grow mx-auto">
-                            <div class="order-table w-full">
-                                <div class="table w-full border border-gray-600 rounded-lg pb-2.5 overflow-hidden">
-                                    <div class="thead w-full">
-                                        <div class="tr grid grid-cols-9 w-full px-4 py-1.5 bg-[var(--primary-color)] text-white">
-                                            <div class="th text-sm font-medium">S.#</div>
-                                            <div class="th text-sm font-medium">Article</div>
-                                            <div class="th text-sm font-medium">Description</div>
-                                            <div class="th text-sm font-medium">Unit</div>
-                                            <div class="th text-sm font-medium">Pkts</div>
-                                            <div class="th text-sm font-medium">Pcs.</div>
-                                            <div class="th text-sm font-medium">Rate</div>
-                                            <div class="th text-sm font-medium">Amt.</div>
-                                            <div class="th text-sm font-medium text-center">Dispatch</div>
-                                        </div>
-                                    </div>
-                                    <div id="tbody" class="tbody w-full">
-                                        ${selectedArticles
-                                            .map((article, index) => {
-                                                const hrClass = index === 0 ? 'mb-2.5' : 'my-2.5';
-                                                const detailLine = orderDetailLine(article);
-                                                const dispatched = orderDispatchText(article);
-                                                return `
-                                                    <div class="invoice-item-row">
-                                                        <hr class="w-full ${hrClass} border-gray-600">
-                                                        <div class="tr invoice-item-main grid grid-cols-9 justify-between w-full px-4 gap-0.5">
-                                                            <div class="td text-sm font-semibold truncate">${String(index + 1).padStart(2, '0')}</div>
-                                                            <div class="td invoice-article-cell text-sm font-semibold">
-                                                                <div class="invoice-article-code">${article.article_no}</div>
-                                                            </div>
-                                                            <div class="td invoice-description-cell text-sm font-semibold">${detailLine}</div>
-                                                            <div class="td text-sm font-semibold truncate">${article?.pcs_per_packet ?? 0}</div>
-                                                            <div class="td text-sm font-semibold truncate">${article?.pcs_per_packet ? Math.floor(article.ordered_pcs / article.pcs_per_packet) : 0}</div>
-                                                            <div class="td text-sm font-semibold truncate">${article.ordered_pcs}</div>
-                                                            <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(article.sales_rate)}</div>
-                                                            <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(parseFormattedNumber(article.sales_rate) * article.ordered_pcs)}</div>
-                                                            <div class="td text-sm font-semibold text-center">${dispatched}</div>
-                                                        </div>
-                                                    </div>
-                                                    `;
-                                            })
-                                            .join('')}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <hr class="w-full my-3 border-gray-600">
-                        ${orderDocumentTotalsHtml()}
-                        <hr class="w-full my-3 border-gray-600">
-                        <div class="tfooter flex w-full text-sm px-4 justify-between text-gray-600">
-                            <P class="leading-none">Powered by SparkPair</P>
-                            <p class="leading-none text-sm">&copy; ${new Date().getFullYear()} SparkPair | +92 316 5825495</p>
-                        </div>
-                    </div>
-                `;
+            previewContainer.className = 'h-auto mx-auto relative flex flex-col';
+            previewContainer.innerHTML = window.DocumentPreview.render({
+                preview: {
+                    type: 'order',
+                    size: 'A5',
+                    document: 'Sales Order',
+                    data: {
+                        order_no: order.order_no,
+                        date: orderDateForRequest(),
+                        customer: customerData,
+                        deliver_to: document.getElementById('deliver_to')?.value || order?.deliver_to || '',
+                        discount: discountDOM?.value || 0,
+                        netAmount: parseFormattedNumber(finalNetAmount?.value ?? netAmount ?? 0),
+                        branch_branding: companyData,
+                        articles: [...selectedArticles].map(article => ({
+                            ...article,
+                            ordered_pcs: Number(article.ordered_pcs || article.orderedQuantity || 0),
+                            description: orderDetailLine(article),
+                        })),
+                    },
+                },
+            }, {
+                companyData,
+                companyLogoBase: window.__ordersEdit?.companyLogoBase,
+            });
+            previewContainer.insertAdjacentHTML('beforeend', `<input type="hidden" name="order_no" value="${order.order_no}" />`);
         } else {
-            previewDom.innerHTML =
-                '<h1 class="text-[var(--border-error)] font-medium text-center mt-5">No Preview avalaible.</h1>';
+            previewContainer.className = 'w-[148mm] h-[210mm] mx-auto overflow-hidden relative';
+            previewContainer.innerHTML =
+                '<div id="preview" class="preview w-[148mm] h-[210mm] gos-a5-document gos-a5-invoice overflow-hidden flex flex-col"><h1 class="text-[var(--border-error)] font-medium text-center mt-5">No Preview avalaible.</h1></div>';
         }
     }
 

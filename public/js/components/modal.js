@@ -1,91 +1,4 @@
 function createModal(data, animate = 'animate') {
-    const invoiceDetailLine = (orderedArticle, article) => {
-        const description = String(orderedArticle?.description ?? '').trim();
-        const fabricType = String(article?.fabric_type ?? orderedArticle?.fabric_type ?? orderedArticle?.article?.fabric_type ?? orderedArticle?.articles?.fabric_type ?? '').trim();
-        const parts = [description, fabricType].filter((part, index, list) => (
-            part && list.findIndex(item => item.toLowerCase() === part.toLowerCase()) === index
-        ));
-
-        return parts.length ? parts.join(' | ') : '';
-    };
-
-    const dispatchText = (orderedArticle, article) => {
-        const dispatchedPcs = Number(orderedArticle?.dispatched_pcs || 0);
-        const pcsPerPacket = Number(article?.pcs_per_packet || 0);
-        if (!dispatchedPcs) return '';
-
-        const packets = pcsPerPacket ? Math.floor(dispatchedPcs / pcsPerPacket) : 0;
-        return packets ? formatNumbersDigitLess(packets) : '';
-    };
-
-    const customerTitlePhoneLine = (customer = {}) => {
-        const title = String(customer?.urdu_title ?? '').trim();
-        const phone = String(customer?.phone_number ?? '').trim();
-        return [title, phone].filter(Boolean).join(' | ');
-    };
-
-    const deliverToLine = previewData => {
-        const deliverTo = String(previewData?.deliver_to ?? previewData?.order?.deliver_to ?? '').trim();
-        return `Deliver To: ${deliverTo || '-'}`;
-    };
-
-    const previewText = value => String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-
-    const truthySetting = value => value === true || value === 1 || value === '1' || value === 'true';
-
-    const documentSettings = previewData => previewData?.branch_branding || {};
-
-    const documentDiscountDisabled = (type, previewData) => (
-        ['order', 'invoice'].includes(type) && truthySetting(documentSettings(previewData).discount_disabled)
-    );
-
-    const documentNote = previewData => String(documentSettings(previewData).document_note || '').trim();
-
-    const documentTotalsHtml = (type, previewData, totalPackets, totalPcs, totalAmount, discount, discountAmount, netAmount) => {
-        if (documentDiscountDisabled(type, previewData)) {
-            const note = documentNote(previewData);
-            return `
-                ${note ? `
-                    <div class="total col-span-2 flex justify-center items-center border border-black rounded-lg py-1.5 px-4 w-full text-center font-semibold">
-                        ${previewText(note)}
-                    </div>
-                ` : ''}
-                <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-4 w-full">
-                    <div class="text-nowrap">Total Quantity</div>
-                    <div class="w-1/4 text-right grow">${formatNumbersDigitLess(totalPackets)} | ${formatNumbersDigitLess(totalPcs)}</div>
-                </div>
-                <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-4 w-full">
-                    <div class="text-nowrap font-semibold">Net Amount</div>
-                    <div class="w-1/4 text-right grow font-semibold">${formatNumbersWithDigits(totalAmount, 1, 1)}</div>
-                </div>
-            `;
-        }
-
-        return `
-            <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-4 w-full">
-                <div class="text-nowrap">Total Quantity</div>
-                <div class="w-1/4 text-right grow">${formatNumbersDigitLess(totalPackets)} | ${formatNumbersDigitLess(totalPcs)}</div>
-            </div>
-            <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-4 w-full">
-                <div class="text-nowrap">Gross Amount</div>
-                <div class="w-1/4 text-right grow">${formatNumbersWithDigits(totalAmount, 1, 1)}</div>
-            </div>
-            <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-4 w-full">
-                <div class="text-nowrap">Discount ${discount}%</div>
-                <div class="w-1/4 text-right grow">${formatNumbersWithDigits(discountAmount, 1, 1)}</div>
-            </div>
-            <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-4 w-full">
-                <div class="text-nowrap">Net Amount</div>
-                <div class="w-1/4 text-right grow">${formatNumbersWithDigits(netAmount, 1, 1)}</div>
-            </div>
-        `;
-    };
-
     const statusColor = {
         active: ['[var(--bg-success)]', '[var(--h-bg-success)]', '[var(--border-success)]'],
         transparent: ['transparent', 'transparent', 'transparent'],
@@ -116,7 +29,7 @@ function createModal(data, animate = 'animate') {
     let clutter = `
         <form id="${data.id}" method="${data.method ?? 'POST'}" action="${data.action}" enctype="multipart/form-data" class="w-full h-full flex flex-col space-y-4 relative items-center justify-center ${animate == 'animate' ? 'scale-in' : ''} ${data.class}">
             <input type="hidden" name="_token" value="${document.querySelector('meta[name=\'csrf-token\']')?.content}">
-            <div class="${data.class} ${data.preview ? `bg-white text-black ${isA5Preview ? "w-[calc(148mm+5rem)] max-w-[calc(100vw-2rem)]" : "max-w-4xl"} h-[35rem] py-0` : 'bg-[var(--secondary-bg-color)]'} ${data.cards ? (isMenuModal ? 'h-[42rem] max-w-6xl' : 'h-[40rem] max-w-6xl') : (explicitMaxWidth || isA5Preview ? '' : 'max-w-2xl')} rounded-2xl shadow-lg ${isA5Preview ? '' : 'w-full'} ${isMenuModal ? 'p-4 sm:p-5' : 'p-6'} flex relative">
+            <div class="${data.class} ${data.preview ? `bg-white text-black ${isA5Preview ? "w-[calc(148mm+5rem)] max-w-[calc(100vw-2rem)]" : "max-w-4xl"} h-[35rem] py-0` : (isMenuModal ? 'bg-transparent' : 'bg-[var(--secondary-bg-color)]')} ${data.cards ? (isMenuModal ? 'h-[42rem] max-w-7xl' : 'h-[40rem] max-w-6xl') : (explicitMaxWidth || isA5Preview ? '' : 'max-w-2xl')} rounded-2xl ${isMenuModal ? 'shadow-none' : 'shadow-lg'} ${isA5Preview ? '' : 'w-full'} ${isMenuModal ? 'p-0' : 'p-6'} flex relative">
                 <div id="modal-close" onclick="closeModal('${data.id}')" tabindex="-1"
                     class="absolute top-0 -right-4 translate-x-full bg-[var(--secondary-bg-color)] rounded-2xl shadow-lg w-auto p-3 text-sm transition-all duration-300 ease-in-out hover:scale-[0.95] cursor-pointer">
                     <button type="button" tabindex="-1" data-modal-close-button="true"
@@ -129,7 +42,7 @@ function createModal(data, animate = 'animate') {
                 </div>
 
                 ${data.info ?
-                    `<div class="${data.id}Info absolute z-10 ${data.calcBottom?.length > 0 ? 'bottom-14' : isMenuModal ? 'bottom-9.5 left-9.5' : 'bottom-4 left-4 '} border border-[var(--glass-border-color)]/10 group bg-[var(--glass-border-color)]/5 backdrop-blur-md rounded-lg cursor-pointer flex items-center justify-end p-1 overflow-hidden h-auto pr-3 transition-all duration-300 ease-in-out shadow-md pointer-events-auto" >
+                    `<div class="${data.id}Info absolute z-10 ${data.calcBottom?.length > 0 ? 'bottom-14' : isMenuModal ? 'bottom-4.5 left-4.5' : 'bottom-4 left-4 '} border border-[var(--glass-border-color)]/10 group bg-[var(--glass-border-color)]/5 backdrop-blur-md rounded-lg cursor-pointer flex items-center justify-end p-1 overflow-hidden h-auto pr-3 transition-all duration-300 ease-in-out shadow-md pointer-events-auto" >
                         <div class="flex items-center justify-center bg-[var(--bg-color)] border border-[var(--glass-border-color)]/20 rounded-md p-2" >
                             <div class="transition-all duration-300 ease-in-out size-2.5 relative" >
                                 <i class="fas fa-info text-xs absolute top-1/2 left-1/2 -translate-1/2" ></i>
@@ -409,7 +322,7 @@ function createModal(data, animate = 'animate') {
     if (data.cards && isMenuModal) {
         clutter += `
             <div class="flex-1 flex flex-col ${data.image ? 'ml-8' : ''} h-full w-full overflow-hidden">
-                <div class="rounded-3xl border border-[var(--glass-border-color)]/25 bg-[var(--h-secondary-bg-color)]/80 shadow-sm overflow-hidden flex h-full flex-col">
+                <div class="rounded-3xl border border-[var(--glass-border-color)]/25 bg-[var(--h-secondary-bg-color)] shadow-sm overflow-hidden flex h-full flex-col">
                     <div class="flex flex-col gap-4 border-b border-[var(--glass-border-color)]/20 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
                         <div class="flex items-center gap-3">
                             <span class="h-10 w-1.5 shrink-0 rounded-full bg-[var(--primary-color)]/80"></span>
@@ -419,9 +332,9 @@ function createModal(data, animate = 'animate') {
                             </div>
                         </div>
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                            <div class="${data.id}Info rounded-lg border border-[var(--glass-border-color)]/20 bg-[var(--h-bg-color)] px-3 py-2 text-xs font-semibold text-[var(--secondary-text)] shadow-sm">
+                            ${!isMenuModal && data.info ? `<div class="${data.id}Info rounded-lg border border-[var(--glass-border-color)]/20 bg-[var(--h-bg-color)] px-3 py-2 text-xs font-semibold text-[var(--secondary-text)] shadow-sm">
                                 ${data.info || ''}
-                            </div>
+                            </div>` : ''}
                             ${data.basicSearch ? `<div class="form-group relative" id="basicSearch">
                                 <div class="relative flex gap-2 min-w-[17rem] pt-0.5">
                                     <input
@@ -595,476 +508,18 @@ function createModal(data, animate = 'animate') {
         clutter += '</div>';
     }
 
-    function chunkArray(array, size, hasTotal = false) {
-        const total = array.length;
-        const chunks = [];
-
-        if (size <= 11) {
-            for (let i = 0; i < total; i += size) {
-                chunks.push(array.slice(i, i + size));
-            }
-            return chunks;
-        }
-
-        if (!hasTotal || total <= 18) {
-            for (let i = 0; i < total; i += size) {
-                chunks.push(array.slice(i, i + size));
-            }
-            return chunks;
-        }
-
-        let startIndex = 0;
-
-        while (total - startIndex > 18) {
-            chunks.push(array.slice(startIndex, startIndex + size));
-            startIndex += size;
-        }
-
-        chunks.push(array.slice(startIndex));
-
-        return chunks;
-    }
-
-    function chunkInvoiceRows(array) {
-        const rows = Array.isArray(array) ? array : [];
-        const chunks = [];
-        let remaining = rows.slice();
-        const maxRowsWithoutTotals = 13;
-        const maxRowsWithTotals = 11;
-
-        if (remaining.length <= maxRowsWithTotals) {
-            return [remaining];
-        }
-
-        while (remaining.length > maxRowsWithTotals) {
-            const take = remaining.length <= maxRowsWithoutTotals + maxRowsWithTotals
-                ? Math.min(maxRowsWithoutTotals, remaining.length - 1)
-                : maxRowsWithoutTotals;
-            chunks.push(remaining.slice(0, take));
-            remaining = remaining.slice(take);
-        }
-
-        chunks.push(remaining);
-        return chunks;
-    }
-
-    function articleSortValue(row = {}) {
-        return String(row?.article?.article_no ?? row?.article_no ?? '').trim();
-    }
-
-    function sortArticleRows(rows) {
-        return [...(Array.isArray(rows) ? rows : [])].sort((left, right) => (
-            articleSortValue(left).localeCompare(articleSortValue(right), undefined, {
-                numeric: true,
-                sensitivity: 'base',
-            })
-        ));
-    }
-
-    function printDateTime() {
-        return new Date().toLocaleString('en-GB', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true,
-        }).replace(',', '');
-    }
-
-    // Preview section ko clean karo
     if (data.preview) {
-        let previewData = data.preview.data;
-        let cartonCount = previewData.carton_count || 0;
-        let discount = previewData.discount || previewData.shipment?.discount || previewData.order?.discount;
-        let netAmount = previewData.netAmount || previewData.shipment?.netAmount;
-
-        let invoiceTableHeader = "";
-        let invoiceTableBody = "";
-        let invoiceBottom = "";
-
-        // Check if totals will be shown
-        const hasTotal = ['order', 'invoice', 'shipment'].includes(data.preview.type);
-        const rawPreviewArticles = previewData.articles || previewData.invoice_articles || [];
-        const previewArticles = sortArticleRows(Array.isArray(rawPreviewArticles) ? rawPreviewArticles : Object.values(rawPreviewArticles || {}))
-            .filter(row => row && (row.article || row.article_no || row.article_id));
-        const articlePages = previewArticles.length
-            ? (['invoice', 'order', 'shipment'].includes(data.preview.type)
-                ? chunkInvoiceRows(previewArticles)
-                : chunkArray(previewArticles, 21, hasTotal))
-            : [['__empty__']];
-
-        // Preview container start
-        clutter += `<div id="preview-container" class="h-auto mx-auto relative flex flex-col">`;
-
-        if (data.preview.type == "voucher") {
-            invoiceTableHeader = `
-                <div class="th text-sm font-medium w-[7%]">S.No</div>
-                <div class="th text-sm font-medium w-[11%]">Method</div>
-                ${previewData.supplier ? '<div class="th text-sm font-medium w-1/5">Customer</div>' : ''}
-                <div class="th text-sm font-medium w-1/4">Account</div>
-                <div class="th text-sm font-medium w-[14%]">Date</div>
-                <div class="th text-sm font-medium w-[14%]">Reff. No.</div>
-                <div class="th text-sm font-medium w-[10%]">Amount</div>
-            `;
-
-            invoiceTableBody = `
-                ${previewData.payments.map((payment, index) => {
-                    const hrClass = index === 0 ? "mb-2" : "my-2";
-                    return `
-                    <div>
-                        <hr class="w-full ${hrClass} border-gray-600">
-                        <div class="tr flex justify-between w-full px-4 gap-0.5">
-                            <div class="td text-sm font-semibold w-[7%] truncate">${index + 1}.</div>
-                            <div class="td text-sm font-semibold w-[11%] truncate capitalize">${payment.method ?? '-'}</div>
-                            ${previewData.supplier ? `<div class="td text-sm font-semibold w-1/5 truncate">${payment.program?.customer?.customer_name ? payment.program?.customer?.customer_name : payment.cheque?.customer?.customer_name ? payment.cheque?.customer?.customer_name : payment.slip?.customer?.customer_name ? payment.slip?.customer?.customer_name : '-'}</div>` : ''}
-                            ${previewData.supplier ? `<div class="td text-sm font-semibold w-1/4 truncate">${(payment.bank_account?.account_title?.split('|')[0] ?? '-') + ' | ' + (payment.bank_account?.bank?.short_title ?? '-')}</div>` :
-                                `<div class="td text-sm font-semibold w-1/4 truncate">${(payment.self_account?.account_title?.split('|')[0] ?? '-') + ' | ' + (payment.self_account?.bank?.short_title ?? '-')}</div>
-                            `}
-                            <div class="td text-sm font-semibold w-[14%] truncate">${formatDate(payment.date, true) ?? '-'}</div>
-                            <div class="td text-sm font-semibold w-[14%] truncate">${payment.cheque?.cheque_no ?? payment.cheque_no ?? payment.reff_no ?? payment.slip?.slip_no ?? payment.transaction_id ?? payment.reff_no ?? '-'}</div>
-                            <div class="td text-sm font-semibold w-[10%] truncate">${formatNumbersWithDigits(payment.amount, 1, 1) ?? '-'}</div>
-                        </div>
-                    </div>
-                    `;
-                }).join('')}
-            `;
-
-            invoiceBottom = '';
-            const prevBalance = parseFormattedNumber(previewData.previous_balance);
-            const totalPaymentVal = Number((previewData.total_payment ?? 0).toString().replace(/,/g, '')) || 0;
-            if (previewData.supplier) {
-                invoiceBottom += `
-                    <div class="total flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full">
-                        <div class="text-nowrap">Previous Balance - Rs</div>
-                        <div class="w-1/4 text-right grow">${formatNumbersWithDigits(prevBalance, 1, 1)}</div>
-                    </div>
-                `;
-            }
-
-            invoiceBottom += `
-                <div class="total flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full">
-                    <div class="text-nowrap">Total Payment - Rs</div>
-                    <div class="w-1/4 text-right grow">${formatNumbersWithDigits(totalPaymentVal, 1, 1)}</div>
-                </div>
-            `;
-
-            if (previewData.supplier) {
-                invoiceBottom += `
-                    <div class="total flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full">
-                        <div class="text-nowrap">Current Balance - Rs</div>
-                        <div class="w-1/4 text-right grow">${formatNumbersWithDigits(prevBalance - totalPaymentVal, 1, 1)}</div>
-                    </div>
-                `;
-            }
-
-            clutter += renderPreviewPage(data, previewData, cartonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, 0, 1);
-
-        } else if (data.preview.type == "cargo_list") {
-            const cargoInvoices = Array.isArray(previewData.invoices) ? previewData.invoices : [];
-            const cargoPages = chunkArray(cargoInvoices, 26, false);
-            let cargoSerial = 1;
-
-            cargoPages.forEach((cargoChunk, pageIndex) => {
-                invoiceTableHeader = `
-                    <div class="th text-sm font-medium w-[6%]">S.No</div>
-                    <div class="th text-sm font-medium w-[16%]">Date</div>
-                    <div class="th text-sm font-medium w-[17%]">Invoice No.</div>
-                    <div class="th text-sm font-medium w-[17%]">Shipment No.</div>
-                    <div class="th text-sm font-medium w-[10%]">Carton</div>
-                    <div class="th text-sm font-medium grow">Customer</div>
-                    <div class="th text-sm font-medium w-[12%]">City</div>
-                `;
-
-                invoiceTableBody = cargoChunk.map((invoice, index) => {
-                    const hrClass = index === 0 ? "mb-2" : "my-2";
-                    return `
-                    <div>
-                        <hr class="w-full ${hrClass} border-black">
-                        <div class="tr flex justify-between w-full px-2 gap-2">
-                            <div class="td text-sm font-semibold w-[6%] truncate">${cargoSerial++}.</div>
-                            <div class="td text-sm font-semibold w-[16%] truncate">${formatDate(invoice.date)}</div>
-                            <div class="td text-sm font-semibold w-[17%] truncate">${invoice.invoice_no || '-'}</div>
-                            <div class="td text-sm font-semibold w-[17%] truncate">${invoice.shipment_no || '-'}</div>
-                            <div class="td text-sm font-semibold w-[10%] truncate">${invoice.carton_count}</div>
-                            <div class="td text-sm font-semibold grow truncate capitalize">${invoice.customer?.customer_name || '-'}</div>
-                            <div class="td text-sm font-semibold w-[12%] truncate">${invoice.customer?.city?.title || '-'}</div>
-                        </div>
-                    </div>
-                    `;
-                }).join('');
-
-                invoiceBottom = '';
-                clutter += renderPreviewPage(data, previewData, cartonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, pageIndex, cargoPages.length);
-            });
-
-        } else if (data.preview.type == "form") {
-            clutter += renderPreviewPage(data, previewData, cartonCount, '', '', '', 0, 1);
-
+        if (window.DocumentPreview?.render) {
+            clutter += window.DocumentPreview.render(data, { companyData, companyLogoBase });
         } else {
-            // Order, Invoice, Shipment - with pagination
-            let totalAmount = 0;
-            let totalPcs = 0;
-            let totalPackets = 0;
-            let rowSerial = 1;
-
-            articlePages.forEach((articlesChunk, pageIndex) => {
-                invoiceTableHeader = data.preview.type == 'invoice' || data.preview.type == 'order' || data.preview.type == 'shipment' ? `
-                    <div class="th text-sm font-medium ">S.#</div>
-                    <div class="th text-sm font-medium ">Article</div>
-                    <div class="th text-sm font-medium ">Description</div>
-                    <div class="th text-sm font-medium ">Unit</div>
-                    <div class="th text-sm font-medium ">Pkts</div>
-                    <div class="th text-sm font-medium ">Pcs.</div>
-                    <div class="th text-sm font-medium ">Rate</div>
-                    <div class="th text-sm font-medium ">Amount</div>
-                    ${data.preview.type == 'order' ? '<div class="th text-sm font-medium text-center">Dispatch</div>' : ''}
-                ` : `
-                    <div class="th text-sm font-medium ">S.No</div>
-                    <div class="th text-sm font-medium ">Article</div>
-                    <div class="th text-sm font-medium col-span-2">Description</div>
-                    <div class="th text-sm font-medium ">Packets</div>
-                    <div class="th text-sm font-medium ">Pcs.</div>
-                    <div class="th text-sm font-medium ">Rate/Pc.</div>
-                    <div class="th text-sm font-medium ">Amount</div>
-                    ${data.preview.type == 'order' ? '<div class="th text-sm font-medium text-center ">Dispatch</div>' : ''}
-                `;
-
-                // Agar empty array hai (second page for totals only)
-                if (articlesChunk.length === 0 || articlesChunk[0] === '__empty__') {
-                    invoiceTableBody = `
-                        <div class="px-4 py-6 text-center text-sm text-[var(--secondary-text)]">
-                            No invoice articles found for this document.
-                        </div>
-                    `;
-                } else {
-                    invoiceTableBody = `
-                        ${articlesChunk.map((orderedArticle, index) => {
-                            const article = orderedArticle.article || orderedArticle;
-                            const salesRate = Number(article?.sales_rate || 0);
-                            const qtyPriority = {
-                                order: ['ordered_pcs', 'invoice_pcs', 'shipment_pcs'],
-                                shipment: ['shipment_pcs', 'ordered_pcs', 'invoice_pcs'],
-                                default: ['invoice_pcs', 'ordered_pcs', 'shipment_pcs'],
-                            };
-                            const qty = (qtyPriority[data.preview.type] || qtyPriority.default)
-                                .map(key => orderedArticle[key])
-                                .find(v => v !== null && v !== undefined) ?? 0;
-                            const total = salesRate * Number(qty || 0);
-                            const hrClass = index === 0 ? "mb-2" : "my-2";
-
-                            totalAmount += total;
-                            totalPcs += Number(qty || 0);
-                            totalPackets += article?.pcs_per_packet ? Math.floor(qty / article.pcs_per_packet) : 0;
-
-                            if (data.preview.type == 'invoice' || data.preview.type == 'order' || data.preview.type == 'shipment') {
-                                const detailLine = invoiceDetailLine(orderedArticle, article);
-                                const rowGridClass = data.preview.type == 'order' ? 'grid-cols-9' : 'grid-cols-8';
-                                const dispatched = dispatchText(orderedArticle, article);
-
-                                return `
-                                    <div class="invoice-item-row">
-                                        <hr class="w-full ${hrClass} border-black">
-                                        <div class="tr invoice-item-main grid ${rowGridClass} justify-between w-full px-4 gap-0.5">
-                                            <div class="td text-sm font-semibold truncate">${String(rowSerial++).padStart(2, '0')}</div>
-                                            <div class="td invoice-article-cell text-sm font-semibold">
-                                                <div class="invoice-article-code">${article?.article_no || '-'}</div>
-                                            </div>
-                                            <div class="td invoice-description-cell text-sm font-semibold">${detailLine}</div>
-                                            <div class="td text-sm font-semibold truncate">${article?.pcs_per_packet || '-'}</div>
-                                            <div class="td text-sm font-semibold truncate">${article?.pcs_per_packet ? Math.floor(qty / article.pcs_per_packet) : 0}</div>
-                                            <div class="td text-sm font-semibold truncate">${qty}</div>
-                                            <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(salesRate)}</div>
-                                            <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(total)}</div>
-                                            ${data.preview.type == 'order' ? `<div class="td text-sm font-semibold text-center">${dispatched}</div>` : ''}
-                                        </div>
-                                    </div>
-                                `;
-                            }
-
-                            return `
-                                <div>
-                                    <hr class="w-full ${hrClass} border-black">
-                                    <div class="tr grid grid-cols-${data.preview.type == 'shipment' ? '8' : '9'} justify-between w-full px-4 gap-0.5">
-                                        <div class="td text-sm font-semibold truncate">${rowSerial++}.</div>
-                                        <div class="td text-sm font-semibold truncate">${article?.article_no || '-'}</div>
-                                        <div class="td text-sm font-semibold col-span-2 truncate capitalize">${orderedArticle.description}</div>
-                                        ${data.preview.type == 'invoice' ? `<div class="td text-sm font-semibold truncate">${article?.pcs_per_packet}</div>` : ''}
-                                        <div class="td text-sm font-semibold truncate">${article?.pcs_per_packet ? Math.floor(qty / article.pcs_per_packet) : 0}</div>
-                                        <div class="td text-sm font-semibold truncate">${qty}</div>
-                                        <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(salesRate)}</div>
-                                        <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(total)}</div>
-                                        ${data.preview.type == 'order' ? `<div class="td text-sm text-center font-semibold truncate">${orderedArticle.dispatched_pcs > 0 ? orderedArticle.dispatched_pcs : ''}</div>` : ''}
-                                    </div>
-                                </div>
-                            `;
-                        }).join('')}
-                    `;
-                }
-
-                const discountAmount = discount ? (totalAmount * discount) / 100 : 0;
-
-                // Totals sirf last page par
-                invoiceBottom = '';
-                if (pageIndex === articlePages.length - 1) {
-                    invoiceBottom = documentTotalsHtml(data.preview.type, previewData, totalPackets, totalPcs, totalAmount, discount, discountAmount, netAmount);
-                }
-
-                clutter += renderPreviewPage(data, previewData, cartonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, pageIndex, articlePages.length);
-            });
-        }
-
-        // Preview container end
-        clutter += `</div>`;
-    }
-
-    // Helper function - Preview page render karne ke liye
-    function renderPreviewPage(data, previewData, cartonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, pageIndex, totalPages = 1) {
-        const previewCompany = previewData?.branch_branding || companyData;
-        const previewLogoUrl = previewCompany.logo_url || (previewCompany.logo ? `${companyLogoBase}images/${previewCompany.logo}` : '');
-        const isCompactDocument = data.preview.size == "A5" || data.preview.type == "order" || data.preview.type == "invoice" || data.preview.type == "shipment" || data.preview.type == "cargo_list";
-        const pageSizeClass = isCompactDocument ? "w-[148mm] h-[210mm]" : "w-[208mm] h-[302mm]";
-        const pageTextClass = isCompactDocument ? `gos-a5-document ${data.preview.type == "invoice" || data.preview.type == "order" || data.preview.type == "shipment" || data.preview.type == "cargo_list" ? "gos-a5-invoice" : ""}` : "";
-        const documentNo = data.preview.type == 'order'
-            ? previewData.order_no
-            : data.preview.type == 'invoice'
-                ? previewData.invoice_no
-                : data.preview.type == 'shipment'
-                    ? previewData.shipment_no
-                    : data.preview.type == 'cargo_list'
-                        ? previewData.cargo_no
-                        : '';
-        const documentNoLabel = data.preview.type == 'order'
-            ? 'Order No.'
-            : data.preview.type == 'invoice'
-                ? 'Invoice No.'
-                : data.preview.type == 'shipment'
-                    ? 'Shipment No.'
-                    : data.preview.type == 'cargo_list'
-                        ? 'Cargo List No.'
-                        : '';
-        const invoiceSourceNo = previewData.order_no
-            ? `Order No.: ${previewData.order_no}`
-            : previewData.shipment_no
-                ? `Shipment No.: ${previewData.shipment_no}`
-                : '';
-        return `
-            <div id="preview" class="preview ${data.preview.type == 'cargo_list' ? 'cargo-list-preview ' : ''}${pageSizeClass} ${pageTextClass} overflow-hidden flex flex-col">
-                <div class="${data.preview.type == 'cargo_list' ? 'cargo-list-document ' : ''}flex flex-col h-full">
-                    <div id="banner" class="banner w-full flex justify-between items-center px-5">
-                        <div class="left">
-                            <div class="logo flex flex-col">
-                                <!-- Top Row: Image + Logo Text -->
-                                <div class="flex items-center gap-3">
-                                    ${previewLogoUrl ? `
-                                        <div class="h-[3.50rem] w-[13.5rem] flex items-center justify-center gap-2.5">
-                                            <img
-                                                src="${previewLogoUrl}"
-                                                alt="garmentsos-pro"
-                                                class="max-h-full max-w-full object-contain"
-                                            />
-                                            ${previewCompany.logo_text ? `
-                                                <h1 class="text-lg font-bold tracking-wide">
-                                                    ${previewCompany.logo_text}
-                                                </h1>
-                                            ` : ''}
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            </div>
-                        </div>
-                        <div class="right">
-                            <div class="logo text-right py-1">
-                                <h1 class="text-2xl font-medium text-[var(--h-primary-color)]">${data.preview.document}</h1>
-                                ${documentNo ? `<div class="document-number mt-1 text-right">${documentNoLabel}: ${documentNo}</div>` : ''}
-                                ${!['invoice', 'order', 'shipment'].includes(data.preview.type) && previewData.order_no ? '<div class="mt-1 text-right">Order No.: ' + previewData.order_no + '</div>' : ''}
-                                ${data.preview.type == 'form' ? `<div class='mt-1 text-sm'>${previewCompany.phone_number || ''}</div>` : ''}
-                            </div>
-                        </div>
-                    </div>
-                    <hr class="w-full my-3 border-black">
-                    ${data.preview.type != 'form' ? `
-                        <div id="header" class="header w-full flex justify-between px-5">
-                            <div class="left ${data.preview.type == "order" || data.preview.type == "invoice" ? 'grow min-w-0 pr-3' : 'w-50'} space-y-1">
-                                ${data.preview.type == "order" || data.preview.type == "invoice" ? `
-                                    <div class="customer text-lg leading-none capitalize font-medium text-nowrap">M/s: ${previewData.customer.customer_name}</div>
-                                    <div class="person text-md text-lg leading-none">${customerTitlePhoneLine(previewData.customer)}</div>
-                                    <div class="address text-md leading-none">${previewData.customer.address ?? ''}${previewData.customer.city?.title ? ', ' + previewData.customer.city.title : ''}</div>
-                                    <div class="phone deliver-to text-md leading-none">${deliverToLine(previewData)}</div>
-                                ` : data.preview.type == "shipment" ? `
-                                    <div class="address text-md leading-none capitalize">${previewData.city ? 'City: ' + previewData.city : ''}</div>
-                                ` : data.preview.type == "cargo_list" ? `
-                                    <div class="cargo-name capitalize font-semibold text-md leading-none">Cargo Name: ${previewData.cargo_name}</div>
-                                    <div class="date leading-none">Date: ${formatDate(previewData.date)}</div>
-                                ` : `
-                                    <div class="date leading-none">Date: ${formatDate(previewData.date)}</div>
-                                    <div class="number leading-none capitalize">${data.preview.type.replace('_', ' ')} No.: ${data.preview.type == 'shipment' ? previewData.shipment_no : data.preview.type == 'voucher' ? previewData.voucher_no : data.preview.type == 'cargo_list' ? previewData.cargo_no : ''}</div>
-                                `}
-                            </div>
-                            ${(data.preview.type == 'voucher' && previewData.supplier) ? `
-                                <div class="center my-auto">
-                                    <div class="supplier-name capitalize font-semibold text-md">${data.preview.type == 'cargo_list' ? 'Cargo Name' : 'Supplier Name'}: ${previewData.supplier?.supplier_name || previewData.cargo_name}</div>
-                                </div>
-                            ` : ''}
-                            <div class="right ${data.preview.type == "order" || data.preview.type == "invoice" ? 'shrink-0 min-w-[38%]' : 'w-50'} my-auto text-right text-sm text-black space-y-1.5">
-                                ${data.preview.type == "order" || data.preview.type == "invoice" || data.preview.type == "shipment" ? `
-                                    <div class="date leading-none">Date: ${formatDate(previewData.date)}</div>
-                                    ${data.preview.type == 'invoice' && invoiceSourceNo ? `<div class="number leading-none capitalize">${invoiceSourceNo}</div>` : ''}
-                                ` : ''}
-                                ${data.preview.type != 'shipment' ? `<div class="preview-copy leading-none capitalize">${data.preview.type.replace('_', ' ')} Copy: ${(data.preview.type == 'voucher' && !previewData.supplier) ? 'Staff' : (data.preview.type == 'voucher' && previewData.supplier) ? 'Supplier' : data.preview.type == 'cargo_list' ? 'Cargo' : 'Customer'}</div>` : ''}
-                                ${data.preview.type == 'invoice' ? `<div class="number leading-none capitalize">Carton: ${cartonCount || '-'}</div>` : ''}
-                                ${!['invoice', 'order', 'shipment'].includes(data.preview.type) ? `<div class="copy leading-none">Document: ${data.preview.document}</div>` : ''}
-                            </div>
-                        </div>
-                        <hr class="w-full my-3 border-black">
-                        <div class="body w-full px-5 grow mx-auto">
-                            <div class="table w-full">
-                                <div class="table w-full border border-black rounded-lg pb-2 overflow-hidden">
-                                    <div class="thead w-full">
-                                        <div class="tr ${data.preview.type == 'voucher' || data.preview.type == 'cargo_list' ? 'flex justify-between' : 'grid'} ${data.preview.type == 'order' ? 'grid-cols-9' : data.preview.type == 'invoice' ? 'grid-cols-8' : data.preview.type == 'shipment' ? 'grid-cols-8' : 'grid-cols-9'} w-full px-4 py-1.5 bg-[var(--primary-color)] text-white">
-                                            ${invoiceTableHeader}
-                                        </div>
-                                    </div>
-                                    <div id="tbody" class="tbody w-full">
-                                        ${invoiceTableBody}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ` : `
-                        <div class="grow flex flex-col px-5">
-                            <div class="fields grow flex flex-col gap-3 pt-1">
-                                ${data.preview.data.formFields.map(field => `
-                                    <div class="flex gap-3">
-                                        <label>${field.label}:</label>
-                                        <div class="grow border-b border-black capitalize ps-1">${field.text}</div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                            <div class="signatureFields flex gap-6 w-full">
-                                <div class="grow flex gap-3">
-                                    <label>Admin Sig.:</label>
-                                    <div class="grow border-b border-black"></div>
-                                </div>
-                                <div class="grow flex gap-3">
-                                    <label>Emp. Sig.:</label>
-                                    <div class="grow border-b border-black"></div>
-                                </div>
-                            </div>
-                        </div>
-                    `}
-                    ${invoiceBottom != '' ? `<hr class="w-full my-3 border-black">` : ''}
-                    <div class="grid ${(data.preview.type == 'voucher' && previewData.supplier) ? 'grid-cols-3' : data.preview.type == 'voucher' && !previewData.supplier ? 'flex' : 'grid-cols-2'} gap-2 px-5">
-                        ${invoiceBottom}
-                    </div>
-                    <hr class="w-full my-3 border-black">
-                    <div class="footer flex w-full text-sm px-5 justify-between text-black">
-                        <p class="leading-none text-sm">Powered by SparkPair | +92 316 5825495</p>
-                        ${['invoice', 'order', 'shipment', 'cargo_list'].includes(data.preview.type) ? `<p class="leading-none text-sm">${pageIndex + 1} of ${totalPages} | ${printDateTime()}</p>` : ''}
+            clutter += `
+                <div id="preview-container" class="h-auto mx-auto relative flex flex-col">
+                    <div class="preview w-[148mm] h-[210mm] gos-a5-document gos-a5-invoice overflow-hidden flex items-center justify-center bg-white text-black">
+                        Preview renderer not loaded.
                     </div>
                 </div>
-            </div>
-        `;
+            `;
+        }
     }
 
     clutter += `
@@ -1354,6 +809,11 @@ function createMenuModalCard(data) {
     const isEnabled = Boolean(data.switchBtn?.active);
     const actionCount = Array.isArray(data.subMenu) ? data.subMenu.length : 0;
     const description = menuCardDescription(data);
+    const actionText = actionCount > 0 ? 'View Actions' : 'Go to Page';
+    const actionMetaText = actionCount > 0
+        ? `${actionCount} ${actionCount === 1 ? 'action' : 'actions'}`
+        : 'Direct page';
+    const shortcutStatusText = isEnabled ? 'Pinned' : 'Not pinned';
 
     let submenuHtml = '';
     if (Array.isArray(data.subMenu) && data.subMenu.length) {
@@ -1374,7 +834,7 @@ function createMenuModalCard(data) {
 
     return `
         <div id="${data.id}" data-json='${jsonAttr(data)}' oncontextmenu='${htmlAttr(data.oncontextmenu || "")}' role="button" tabindex="0" data-keyboard-action="true"
-            class="item card menu-modal-card no-translate relative overflow-hidden rounded-2xl border border-[var(--glass-border-color)]/25 bg-[var(--secondary-bg-color)] p-4 shadow-sm transition-all duration-200 ease-in-out hover:border-[var(--primary-color)]/40 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]/40"
+            class="item card menu-modal-card no-translate relative flex min-h-[8.65rem] flex-col justify-between overflow-hidden rounded-2xl border border-[var(--glass-border-color)]/25 bg-[var(--secondary-bg-color)] p-4 shadow-sm transition-all duration-200 ease-in-out hover:border-[var(--primary-color)]/40 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]/40"
             onclick='${htmlAttr(data.onclick || "")}'>
             <div class="flex items-start justify-between gap-3">
                 <div class="flex min-w-0 items-start gap-3">
@@ -1384,8 +844,9 @@ function createMenuModalCard(data) {
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
                             <h6 class="truncate text-base font-semibold leading-tight text-[var(--text-color)]">${modalText(data.name || 'Menu')}</h6>
-                            <span class="rounded-full border ${isEnabled ? 'border-[var(--border-success)]/40 bg-[var(--bg-success)] text-[var(--border-success)]' : 'border-[var(--glass-border-color)]/30 bg-[var(--h-bg-color)] text-[var(--secondary-text)]'} px-2.5 py-1 text-[11px] font-semibold">
-                                ${isEnabled ? 'Shortcut' : 'Hidden'}
+                            <span data-menu-shortcut-status="${modalText(data.id || '')}" class="inline-flex h-5 items-center gap-1.5 rounded-lg border ${isEnabled ? 'border-[var(--primary-color)]/25 bg-[var(--primary-color)]/10 text-[var(--primary-color)] shadow-[inset_0_1px_0_rgb(255_255_255_/_0.22)]' : 'border-[var(--glass-border-color)]/35 bg-[var(--h-bg-color)]/70 text-[var(--secondary-text)] shadow-[inset_0_1px_0_rgb(255_255_255_/_0.14)]'} px-2 text-[10px] font-semibold leading-none">
+                                <i class="size-1.5 rounded-full ring-2 ${isEnabled ? 'bg-[var(--primary-color)] ring-[var(--primary-color)]/15' : 'bg-[var(--secondary-text)]/55 ring-[var(--secondary-text)]/10'}"></i>
+                                <span>${shortcutStatusText}</span>
                             </span>
                         </div>
                         ${description ? `<p class="mt-1 text-xs leading-5 text-[var(--secondary-text)]">${description}</p>` : ''}
@@ -1397,11 +858,12 @@ function createMenuModalCard(data) {
                 </div>
             </div>
             <div class="mt-4 flex items-center justify-between border-t border-[var(--glass-border-color)]/15 pt-3">
-                <span class="rounded-full bg-[var(--h-bg-color)] px-2.5 py-1 text-[11px] font-semibold text-[var(--secondary-text)]">
-                    ${actionCount} ${actionCount === 1 ? 'action' : 'actions'}
+                <span class="inline-flex h-7 items-center rounded-lg bg-[var(--h-bg-color)] px-2.5 text-[11px] font-semibold text-[var(--secondary-text)]">
+                    ${actionMetaText}
                 </span>
-                <button type="button" class="rounded-xl border border-[var(--glass-border-color)]/25 bg-[var(--h-bg-color)] px-3 py-1.5 text-xs font-semibold text-[var(--secondary-text)] transition-all duration-200 hover:border-[var(--primary-color)]/40 hover:text-[var(--text-color)]">
-                    Open
+                <button type="button" class="inline-flex h-7 items-center gap-2 rounded-lg border border-[var(--glass-border-color)]/30 bg-[var(--h-bg-color)] px-3 text-xs font-semibold text-[var(--secondary-text)] transition-all duration-200 hover:border-[var(--primary-color)]/40 hover:bg-[var(--secondary-bg-color)] hover:text-[var(--text-color)]">
+                    ${actionText}
+                    <i class="fa-solid ${actionCount > 0 ? 'fa-chevron-down' : 'fa-arrow-right'} text-[10px]"></i>
                 </button>
             </div>
             ${submenuHtml}
@@ -1699,14 +1161,16 @@ document.addEventListener('click', (e) => {
 })
 
 function reRenderInfoInModal(specifier, value) {
-    const container = document.querySelector(specifier);
-    if (!container) return;
+    const containers = document.querySelectorAll(specifier);
+    if (!containers.length) return;
 
-    const mainText = container.querySelector('.main-text');
-    if (mainText) {
-        mainText.innerHTML = value;
-        return;
-    }
+    containers.forEach(container => {
+        const mainText = container.querySelector('.main-text');
+        if (mainText) {
+            mainText.innerHTML = value;
+            return;
+        }
 
-    container.innerHTML = value;
+        container.innerHTML = value;
+    });
 }

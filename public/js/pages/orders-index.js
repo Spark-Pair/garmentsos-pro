@@ -37,111 +37,28 @@
     window.printOrder = function printOrder(elem) {
         closeAllDropdowns();
 
-        if (elem.parentElement.tagName.toLowerCase() === 'li') {
+        const openedFromContextMenu = elem.parentElement.tagName.toLowerCase() === 'li';
+        if (openedFromContextMenu) {
             elem.parentElement.parentElement.querySelector('#show-details').click();
-            document.getElementById('modalForm').parentElement.classList.add('hidden');
+            document.getElementById('modalForm')?.parentElement.classList.add('hidden');
         }
 
         const preview = document.getElementById('preview-container');
         if (!preview) return;
 
-        const oldIframe = document.getElementById('printIframe');
-        if (oldIframe) oldIframe.remove();
-
-        const printIframe = document.createElement('iframe');
-        printIframe.id = 'printIframe';
-        printIframe.style.position = 'absolute';
-        printIframe.style.width = '0px';
-        printIframe.style.height = '0px';
-        printIframe.style.border = 'none';
-        printIframe.style.display = 'none';
-
-        document.body.appendChild(printIframe);
-
-        const printDocument = printIframe.contentDocument || printIframe.contentWindow.document;
-        printDocument.open();
-
-        const headContent = document.head.innerHTML;
-
-        printDocument.write(`
-                <html>
-                    <head>
-                        <title>Print Order</title>
-                        ${headContent}
-                        <style>
-                            @page {
-                                size: A5 portrait;
-                                margin: 3mm;
-                            }
-
-                            @media print {
-                                html,
-                                body {
-                                    margin: 0;
-                                    padding: 0;
-                                    width: auto;
-                                    min-height: 0;
-                                }
-
-                                #preview-container {
-                                    width: auto !important;
-                                    height: auto !important;
-                                    max-height: none !important;
-                                    overflow: visible !important;
-                                }
-
-                                .preview {
-                                    width: 148mm !important;
-                                    height: 210mm !important;
-                                    max-width: 148mm !important;
-                                    max-height: 210mm !important;
-                                    overflow: hidden !important;
-                                    break-after: page;
-                                    page-break-after: always;
-                                    page-break-inside: avoid;
-                                }
-
-                                #preview-container .preview:last-child {
-                                    break-after: auto;
-                                    page-break-after: auto;
-                                }
-
-                                .page-break {
-                                    break-after: page;
-                                    page-break-after: always;
-                                }
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <div id="preview-container" class="preview-container">${preview.innerHTML}</div>
-                    </body>
-                </html>
-            `);
-
-        printDocument.close();
-
-        printIframe.onload = () => {
-            printDocument.querySelectorAll('.preview').forEach(p => p.classList.remove('py-6'));
-            printDocument.querySelectorAll('#banner').forEach(p => p.classList.remove('mt-8'));
-            printDocument.querySelectorAll('.footer').forEach(p => p.classList.remove('mb-4'));
-
-            const orderCopys = printDocument.querySelectorAll('#preview-container .preview-copy');
-            if (orderCopys) {
-                orderCopys.forEach(orderCopy => {
+        window.DocumentPrint.printPreview({
+            title: 'Print Order',
+            preview,
+            delay: 1000,
+            beforePrint: printDocument => {
+                printDocument.querySelectorAll('#preview-container .preview-copy').forEach(orderCopy => {
                     orderCopy.textContent = 'Order Copy: Office';
                 });
-            }
-
-            printIframe.contentWindow.onafterprint = () => {};
-
-            setTimeout(() => {
-                printIframe.contentWindow.focus();
-                printIframe.contentWindow.print();
-            }, 1000);
-
-            document.getElementById('modalForm').parentElement.remove();
-        };
+            },
+            afterPrint: () => {
+                if (openedFromContextMenu) document.getElementById('modalForm')?.parentElement.remove();
+            },
+        });
     };
 
     window.deleteOrder = function deleteOrder(orderId) {
