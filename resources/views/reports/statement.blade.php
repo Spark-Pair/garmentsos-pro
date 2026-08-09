@@ -160,6 +160,8 @@
                         'employee' => $data['totals']['balance'] ?? 0,
                         default => $data['totals']['pending_payment'] ?? 0,
                     };
+                    $statementPartyCity = data_get($data, 'customer.city.title');
+                    $statementPartyAddress = data_get($data, 'customer.address');
                     $datedStatementRows = $statements
                         ->pluck('date')
                         ->filter()
@@ -188,7 +190,7 @@
                                     <div class="flex items-center gap-3">
                                         @if($companyData->logo_url)
                                             <div class="h-[3.50rem] w-[13.5rem] flex items-center justify-center gap-2.5">
-                                                <img 
+                                                <img
                                                     src="{{ $companyData->logo_url }}"
                                                     alt="garmentsos-pro"
                                                     class="max-h-full max-w-full object-contain"
@@ -212,19 +214,46 @@
                                 <hr class="w-full my-3 border-gray-700">
 
                                 {{-- Header Info --}}
-                                <div id="preview-header" class="preview-header w-full flex justify-between px-5">
-                                    <div class="left my-auto pr-3 text-sm text-gray-800 space-y-1.5">
-                                        <div class="date-range leading-none">Date: {{ $statementDateLabel }}</div>
-                                        <div class="branch-scope leading-none">Branches: {{ $data['branch_scope_label'] ?? implode(', ', $selectedBranchLabels) }}</div>
-                                        <div class="total-balance leading-none">{{ $topSummaryLabel }}: {{ \App\Support\Money::format($topSummaryValue) }}</div>
-                                    </div>
-                                    <div class="center my-auto">
-                                        <div class="name capitalize font-semibold text-md">{{ $data['name'] }}</div>
-                                    </div>
-                                    <div class="right my-auto pr-3 text-sm text-gray-800 space-y-1.5">
-                                        <div class="total-bill leading-none">Total Bill: {{ \App\Support\Money::format($data['totals']['bill']) }}</div>
-                                        <div class="total-payment leading-none">Total Payment: {{ \App\Support\Money::format($data['totals']['payment']) }}</div>
-                                        <div class="closing-balance leading-none">Closing Balance: Rs.{{ \App\Support\Money::format($data['closing_balance']) }}</div>
+                                <div id="preview-header" class="preview-header w-full px-5 text-black font-medium">
+                                    <div class="flex h-[3.25rem] items-center justify-between gap-3 overflow-hidden text-[11px] leading-[1.15]">
+                                        <div class="w-[29%] shrink-0 space-y-1 overflow-hidden">
+                                            <div class="flex gap-1 min-w-0">
+                                                <span class="font-semibold shrink-0">Date:</span>
+                                                <span class="truncate">{{ $statementDateLabel }}</span>
+                                            </div>
+                                            <div class="flex gap-1 min-w-0">
+                                                <span class="font-semibold shrink-0">Branches:</span>
+                                                <span class="truncate">{{ $data['branch_scope_label'] ?? implode(', ', $selectedBranchLabels) }}</span>
+                                            </div>
+                                            <div class="flex gap-1 min-w-0">
+                                                <span class="font-semibold shrink-0">{{ $topSummaryLabel }}:</span>
+                                                <span class="truncate">{{ \App\Support\Money::format($topSummaryValue) }}</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="min-w-0 flex-1 text-center overflow-hidden">
+                                            @if (($data['category'] ?? null) === 'customer')
+                                                <div class="name capitalize font-semibold text-[12px] leading-none truncate">{{ $data['name'] }} | {{ $statementPartyCity ?: '-' }}</div>
+                                                <div class="mx-auto mt-1 max-w-full text-[10px] font-semibold leading-[1.05] line-clamp-2" title="{{ $statementPartyAddress ?: '-' }}">{{ $statementPartyAddress ?: '-' }}</div>
+                                            @else
+                                                <div class="name capitalize font-semibold text-[12px] leading-none truncate">{{ $data['name'] }}</div>
+                                            @endif
+                                        </div>
+
+                                        <div class="w-[34%] shrink-0 space-y-1 overflow-hidden pr-1">
+                                            <div class="flex justify-end gap-1.5 min-w-0">
+                                                <span class="font-semibold shrink-0">Total Bill:</span>
+                                                <span class="text-right tabular-nums whitespace-nowrap">{{ \App\Support\Money::format($data['totals']['bill']) }}</span>
+                                            </div>
+                                            <div class="flex justify-end gap-1.5 min-w-0">
+                                                <span class="font-semibold shrink-0">Total Payment:</span>
+                                                <span class="text-right tabular-nums whitespace-nowrap">{{ \App\Support\Money::format($data['totals']['payment']) }}</span>
+                                            </div>
+                                            <div class="flex justify-end gap-1.5 min-w-0">
+                                                <span class="font-semibold shrink-0">Closing Balance:</span>
+                                                <span class="text-right tabular-nums whitespace-nowrap">{{ \App\Support\Money::format($data['closing_balance']) }}</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -233,10 +262,10 @@
                                 {{-- Table --}}
                                 <div id="preview-body" class="preview-body w-[97%] grow mx-auto">
                                     <div class="preview-table w-full">
-                                        <div class="table w-full border border-gray-700 rounded-lg pb-2 overflow-hidden text-xs">
+                                        <div class="table w-full border border-gray-700 rounded-lg p-1 text-xs">
                                             {{-- Table Header --}}
                                             <div class="thead w-full">
-                                                <div class="tr flex justify-between w-full px-1.5 py-1.5 bg-[var(--primary-color)] text-white text-center">
+                                                <div class="tr flex justify-between w-full px-1.5 py-1.5 bg-[var(--primary-color)] text-white text-center rounded-md">
                                                     <div class="th font-medium w-[2.5%]">#</div>
                                                     <div class="th font-medium w-[11.5%]">Date</div>
                                                     @if(in_array($statementType, ['detailed', 'general']))
@@ -251,7 +280,7 @@
                                             </div>
 
                                             {{-- Table Body --}}
-                                            <div id="tbody" class="tbody w-full">
+                                            <div id="tbody" class="tbody w-full mt-1.5 pb-1">
                                                 @foreach ($firstPage as $statement)
                                                     @php
                                                         $isOpeningBalanceRow = ($statement['type'] ?? null) === 'opening_balance';
@@ -266,17 +295,13 @@
                                                             $balance -= $statement['payment'];
                                                         }
 
-                                                        if ($loop->iteration == 1) {
-                                                            $hrClass = 'mb-2';
-                                                        } else {
-                                                            $hrClass = 'my-2';
-                                                        }
-
                                                         $statementSource = $statement['source'] ?? null;
                                                         $isStatementClickable = !empty($statementSource);
                                                     @endphp
                                                     <div>
-                                                        <hr class="w-full {{ $hrClass }} border-gray-700">
+                                                        @unless($loop->first)
+                                                            <hr class="w-full my-2 border-gray-700">
+                                                        @endunless
                                                         <div
                                                             class="tr flex justify-between w-full px-2.5 text-center gap-1 {{ $isStatementClickable ? 'statement-record-trigger cursor-pointer rounded-md transition-colors hover:bg-slate-100/80' : '' }}"
                                                             @if($isStatementClickable)
@@ -326,7 +351,7 @@
                                         <div class="flex items-center gap-3">
                                             @if($companyData->logo_url)
                                                 <div class="h-[3.50rem] w-[13.5rem] flex items-center justify-center gap-2.5">
-                                                    <img 
+                                                    <img
                                                         src="{{ $companyData->logo_url }}"
                                                         alt="garmentsos-pro"
                                                         class="max-h-full max-w-full object-contain"
@@ -343,6 +368,10 @@
                                             <div>
                                                 <h1 class="text-xl font-medium text-[var(--primary-color)] pr-2 leading-none capitalize">{{ $data['category' ]}} Statement</h1>
                                                 <div class='text-xs'>{{ $data['name'] }}</div>
+                                                @if (($data['category'] ?? null) === 'customer')
+                                                    <div class="text-[10px] leading-tight text-gray-800">{{ $statementPartyCity ?: '-' }}</div>
+                                                    <div class="text-[10px] leading-tight text-gray-800 truncate max-w-[12rem]">{{ $statementPartyAddress ?: '-' }}</div>
+                                                @endif
                                             </div>
                                         </div>
                                     </div>
@@ -352,10 +381,10 @@
                                     {{-- Table --}}
                                     <div id="preview-body" class="preview-body w-[97%] grow mx-auto">
                                         <div class="preview-table w-full">
-                                            <div class="table w-full border border-gray-700 rounded-lg pb-2 overflow-hidden text-xs">
+                                            <div class="table w-full border border-gray-700 rounded-lg p-1 text-xs">
                                                 {{-- Table Header --}}
                                                 <div class="thead w-full">
-                                                    <div class="tr flex justify-between w-full px-1.5 py-1.5 bg-[var(--primary-color)] text-white text-center">
+                                                    <div class="tr flex justify-between w-full px-1.5 py-1.5 bg-[var(--primary-color)] text-white text-center rounded-md">
                                                         <div class="th font-medium w-[2.5%]">#</div>
                                                         <div class="th font-medium w-[11.5%]">Date</div>
                                                         @if(in_array($statementType, ['detailed', 'general']))
@@ -370,7 +399,7 @@
                                                 </div>
 
                                                 {{-- Table Body --}}
-                                                <div id="tbody" class="tbody w-full">
+                                                <div id="tbody" class="tbody w-full mt-1 pb-1">
                                                     @foreach ($chunk as $statement)
                                                         @php
                                                             $isOpeningBalanceRow = ($statement['type'] ?? null) === 'opening_balance';
@@ -385,17 +414,13 @@
                                                                 $balance -= $statement['payment'];
                                                             }
 
-                                                            if ($loop->iteration == 1) {
-                                                                $hrClass = 'mb-2';
-                                                            } else {
-                                                                $hrClass = 'my-2';
-                                                            }
-
                                                             $statementSource = $statement['source'] ?? null;
                                                             $isStatementClickable = !empty($statementSource);
                                                         @endphp
                                                         <div>
-                                                            <hr class="w-full {{ $hrClass }} border-gray-700">
+                                                            @unless($loop->first)
+                                                                <hr class="w-full my-2 border-gray-700">
+                                                            @endunless
                                                             <div
                                                                 class="tr flex justify-between w-full px-2.5 gap-1 text-center {{ $isStatementClickable ? 'statement-record-trigger cursor-pointer rounded-md transition-colors hover:bg-slate-100/80' : '' }}"
                                                                 @if($isStatementClickable)

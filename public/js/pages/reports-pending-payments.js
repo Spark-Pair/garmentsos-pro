@@ -43,32 +43,10 @@
 
             clone.querySelectorAll(":scope > hr").forEach((hr) => hr.remove());
 
-            let oldIframe = document.getElementById("printIframe");
-            if (oldIframe) {
-                oldIframe.remove();
-            }
-
-            let printIframe = document.createElement("iframe");
-            printIframe.id = "printIframe";
-            printIframe.style.position = "absolute";
-            printIframe.style.width = "0px";
-            printIframe.style.height = "0px";
-            printIframe.style.border = "none";
-            printIframe.style.display = "none";
-
-            document.body.appendChild(printIframe);
-
-            let printDocument = printIframe.contentDocument || printIframe.contentWindow.document;
-            printDocument.open();
-
-            const headContent = document.head.innerHTML;
-
-            printDocument.write(`
-                <html>
-                <head>
-                    <title>Print Pending Payments</title>
-                    ${headContent}
-                    <style>
+            window.DocumentPrint.printHtml({
+                title: "Print Pending Payments",
+                html: clone.innerHTML,
+                style: `
                     @page {
                         size: A4;
                         margin: 0.19in;
@@ -94,20 +72,8 @@
                             overflow: visible !important;
                         }
                     }
-                    </style>
-                </head>
-                <body>
-                    ${clone.innerHTML}
-                </body>
-                </html>
-            `);
-
-            printDocument.close();
-
-            printIframe.onload = () => {
-                printIframe.contentWindow.focus();
-                printIframe.contentWindow.print();
-            };
+                `,
+            });
         };
 
         window.validateForNextStep = function validateForNextStep() {

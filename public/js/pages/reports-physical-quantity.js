@@ -169,103 +169,72 @@
             }
 
             const clone = preview.cloneNode(true);
-            const oldIframe = document.getElementById("printIframe");
+            window.DocumentPrint.printHtml({
+                title: "Print Physical Quantity Report",
+                html: clone.outerHTML,
+                style: `
+                    @page {
+                        size: A4;
+                        margin: 0;
+                    }
 
-            if (oldIframe) {
-                oldIframe.remove();
-            }
+                    html, body {
+                        width: 210mm;
+                        margin: 0;
+                        padding: 0;
+                        background: #fff;
+                        overflow: visible !important;
+                    }
 
-            const printIframe = document.createElement("iframe");
-            printIframe.id = "printIframe";
-            printIframe.style.position = "absolute";
-            printIframe.style.width = "0";
-            printIframe.style.height = "0";
-            printIframe.style.border = "0";
-            printIframe.style.display = "none";
-            document.body.appendChild(printIframe);
+                    body {
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
 
-            const printDocument = printIframe.contentDocument || printIframe.contentWindow.document;
-            printDocument.open();
+                    #preview-container {
+                        display: block !important;
+                        height: auto !important;
+                        min-height: auto !important;
+                        overflow: visible !important;
+                        position: static !important;
+                    }
 
-            printDocument.write(`
-                <html>
-                <head>
-                    <title>Print Physical Quantity Report</title>
-                    ${document.head.innerHTML}
-                    <style>
-                        @page {
-                            size: A4;
-                            margin: 0;
-                        }
+                    .preview-page {
+                        width: 210mm;
+                        height: 297mm;
+                        min-height: 297mm;
+                        margin: 0 auto;
+                        background: #fff;
+                        page-break-after: always;
+                        break-after: page;
+                        box-shadow: none !important;
+                        overflow: hidden;
+                        position: relative !important;
+                    }
 
-                        html, body {
-                            width: 210mm;
-                            margin: 0;
-                            padding: 0;
-                            background: #fff;
-                            overflow: visible !important;
-                        }
+                    .preview-page:last-child {
+                        page-break-after: auto;
+                        break-after: auto;
+                    }
 
-                        body {
-                            -webkit-print-color-adjust: exact;
-                            print-color-adjust: exact;
-                        }
+                    .preview,
+                    .preview-document {
+                        height: 100% !important;
+                        min-height: 100% !important;
+                        overflow: hidden !important;
+                    }
 
-                        #preview-container {
-                            display: block !important;
-                            height: auto !important;
-                            min-height: auto !important;
-                            overflow: visible !important;
-                            position: static !important;
-                        }
+                    #preview,
+                    #preview-document,
+                    #preview-body {
+                        overflow: visible !important;
+                    }
 
-                        .preview-page {
-                            width: 210mm;
-                            height: 297mm;
-                            min-height: 297mm;
-                            margin: 0 auto;
-                            background: #fff;
-                            page-break-after: always;
-                            break-after: page;
-                            box-shadow: none !important;
-                            overflow: hidden;
-                            position: relative !important;
-                        }
-
-                        .preview-page:last-child {
-                            page-break-after: auto;
-                            break-after: auto;
-                        }
-
-                        .preview,
-                        .preview-document {
-                            height: 100% !important;
-                            min-height: 100% !important;
-                            overflow: hidden !important;
-                        }
-
-                        #preview,
-                        #preview-document,
-                        #preview-body {
-                            overflow: visible !important;
-                        }
-
-                        hr {
-                            box-sizing: border-box;
-                        }
-                    </style>
-                </head>
-                <body>
-                    ${clone.outerHTML}
-                </body>
-                </html>
-            `);
-
-            printDocument.close();
-            printIframe.onload = () => {
-                printIframe.contentWindow.focus();
-                printIframe.contentWindow.print();
-            };
+                    hr {
+                        box-sizing: border-box;
+                    }
+                `,
+            });
         };
 
         window.validateForNextStep = function validateForNextStep() {

@@ -417,7 +417,16 @@ class Customer extends Model
 
         return [
             'date' => $statementDateRange,
-            'name' => "{$this->customer_name} | {$this->city->title}",
+            'name' => $this->customer_name,
+            'customer' => [
+                'name' => $this->customer_name,
+                'address' => $this->address,
+                'city' => [
+                    'id' => $this->city?->id,
+                    'title' => $this->city?->title,
+                    'short_title' => $this->city?->short_title,
+                ],
+            ],
             'opening_balance' => $openingBalance,
             'closing_balance' => $closingBalance,
             'statements' => $statement,

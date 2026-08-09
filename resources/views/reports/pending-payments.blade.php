@@ -39,8 +39,9 @@
                         name="city"
                         id="city"
                         :options="$cities_options ?? []"
-                        :value="$selectedCity ?? ''"
+                        :value="$selectedCities ?? []"
                         showDefault
+                        multiple
                     />
                 </div>
 
@@ -63,7 +64,7 @@
                                 <div id="preview-body" class="preview-body w-[95%] grow mx-auto">
                                     {{-- Multiple Slips --}}
                                     @foreach ($data as $item)
-                                        <div class="slip w-full border border-gray-700 rounded-lg p-1 overflow-hidden text-xs tracking-wide">
+                                        <div class="slip w-full border border-gray-700 rounded-lg p-1 text-xs tracking-wide">
                                             {{-- Header --}}
                                             <div class="head w-full px-4 py-1.5 border border-gray-700 text-center rounded-md mb-1">
                                                 <div class="font-medium">{{ $item['customer'] }}</div>
@@ -84,7 +85,7 @@
                                                 </div>
 
                                                 {{-- Table Body --}}
-                                                <div id="tbody" class="tbody w-full">
+                                                <div id="tbody" class="tbody w-full mt-1.5 pb-1">
                                                     @foreach ($item['payments'] as $payment)
                                                         <div class="w-full px-4 py-1.5 text-center border-b border-gray-700 last:border-0">
                                                             <div class="tr flex items-center">

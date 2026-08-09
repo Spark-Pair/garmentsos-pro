@@ -127,7 +127,7 @@
         function tableHeader(mode) {
             return `
                 <div class="thead w-full">
-                    <div class="tr flex w-full px-2 py-1 bg-[var(--primary-color)] text-white text-[11px]">
+                    <div class="tr flex w-full px-2 py-1.5 bg-[var(--primary-color)] text-white text-[11px] rounded-md">
                         ${columnsForMode(mode).map(([label, width, align]) => `
                             <div class="th font-medium min-w-0 ${width} ${align || "text-left"} px-1">${escapeHtml(label)}</div>
                         `).join("")}
@@ -139,8 +139,8 @@
         function tableRows(rows, mode, offset = 0) {
             return rows.map((row, index) => `
                 <div>
-                    <hr class="w-full border-gray-600">
-                    <div class="tr flex w-full px-2 py-[3px] text-[12px] cursor-pointer hover:bg-gray-100" data-fabric-report-index="${offset + index}">
+                    ${index === 0 ? "" : '<hr class="w-full my-1.5 border-gray-600">'}
+                    <div class="tr flex w-full px-2 text-[12px] cursor-pointer hover:bg-gray-100" data-fabric-report-index="${offset + index}">
                         ${rowCells(row, mode, offset + index + 1).map(([value, width, align]) => `
                             <div class="${cellClass(width, align)}">${escapeHtml(value)}</div>
                         `).join("")}
@@ -233,9 +233,9 @@
 
                     <div class="preview-body w-full grow mx-auto">
                         <div class="preview-table w-[96%] mx-auto">
-                            <div class="table w-full border border-gray-700 rounded-lg pb-1 overflow-hidden text-xs">
+                            <div class="table w-full border border-gray-700 rounded-lg p-1 text-xs">
                                 ${tableHeader(mode)}
-                                <div class="tbody w-full">${tableRows(rows, mode, offset)}</div>
+                                <div class="tbody w-full mt-1.5 pb-1">${tableRows(rows, mode, offset)}</div>
                             </div>
                         </div>
                             </div>
@@ -528,38 +528,14 @@
             const clone = preview.cloneNode(true);
             clone.querySelectorAll(":scope > hr").forEach(hr => hr.remove());
 
-            const oldIframe = document.getElementById("printIframe");
-            if (oldIframe) oldIframe.remove();
-
-            const printIframe = document.createElement("iframe");
-            printIframe.id = "printIframe";
-            printIframe.style.position = "absolute";
-            printIframe.style.width = "0px";
-            printIframe.style.height = "0px";
-            printIframe.style.border = "none";
-            printIframe.style.display = "none";
-            document.body.appendChild(printIframe);
-
-            const printDocument = printIframe.contentDocument || printIframe.contentWindow.document;
-            printDocument.open();
-            printDocument.write(`
-                <html>
-                    <head>
-                        <title>Print Fabric Report</title>
-                        ${document.head.innerHTML}
-                        <style>
-                            @page { size: A4; margin: 0; }
-                            body { margin: 0; padding: 0; background: #fff; }
-                        </style>
-                    </head>
-                    <body>${clone.innerHTML}</body>
-                </html>
-            `);
-            printDocument.close();
-            printIframe.onload = () => {
-                printIframe.contentWindow.focus();
-                printIframe.contentWindow.print();
-            };
+            window.DocumentPrint.printHtml({
+                title: "Print Fabric Report",
+                html: clone.innerHTML,
+                style: `
+                    @page { size: A4; margin: 0; }
+                    body { margin: 0; padding: 0; background: #fff; }
+                `,
+            });
         };
 
         setTimeout(() => {

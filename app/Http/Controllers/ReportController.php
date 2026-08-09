@@ -309,11 +309,25 @@ class ReportController extends Controller
         if ($request->filled('date')) {
             $validated = $request->validate([
                 'date' => 'required|date',
-                'city' => 'nullable|integer|exists:setups,id',
+                'city' => 'nullable',
             ]);
 
             $date = $validated['date'];
-            $selectedCity = $validated['city'] ?? '';
+            $selectedCities = collect(is_array($request->city) ? $request->city : explode(',', (string) $request->city))
+                ->map(fn ($cityId) => trim((string) $cityId))
+                ->filter(fn ($cityId) => ctype_digit($cityId))
+                ->map(fn ($cityId) => (int) $cityId)
+                ->filter(fn ($cityId) => $cityId > 0)
+                ->unique()
+                ->values()
+                ->all();
+
+            if (!empty($selectedCities)) {
+                $validCityCount = Setup::where('type', 'city')->whereIn('id', $selectedCities)->count();
+                if ($validCityCount !== count($selectedCities)) {
+                    return redirect()->back()->with('error', 'Invalid city selected.')->withInput();
+                }
+            }
 
             $payments = CustomerPayment::with([
                     'customer.city',
@@ -329,9 +343,9 @@ class ReportController extends Controller
                         }
                     });
                 })
-                ->when($selectedCity, function ($query) use ($selectedCity) {
-                    $query->whereHas('customer', function ($customerQuery) use ($selectedCity) {
-                        $customerQuery->where('city_id', $selectedCity);
+                ->when(!empty($selectedCities), function ($query) use ($selectedCities) {
+                    $query->whereHas('customer', function ($customerQuery) use ($selectedCities) {
+                        $customerQuery->whereIn('city_id', $selectedCities);
                     });
                 })
                 ->get()
@@ -403,11 +417,11 @@ class ReportController extends Controller
             })
             ->values();
 
-            return view("reports.pending-payments", compact('data', 'cities_options', 'selectedCity', 'reportBranches', 'selectedBranchIds', 'selectedBranchLabels', 'pendingBranding'));
+            return view("reports.pending-payments", compact('data', 'cities_options', 'selectedCities', 'reportBranches', 'selectedBranchIds', 'selectedBranchLabels', 'pendingBranding'));
         }
 
-        $selectedCity = '';
-        return view("reports.pending-payments", compact('cities_options', 'selectedCity', 'reportBranches', 'selectedBranchIds', 'selectedBranchLabels', 'pendingBranding'));
+        $selectedCities = [];
+        return view("reports.pending-payments", compact('cities_options', 'selectedCities', 'reportBranches', 'selectedBranchIds', 'selectedBranchLabels', 'pendingBranding'));
     }
 
     public function article(Request $request)

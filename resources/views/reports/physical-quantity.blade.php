@@ -126,15 +126,15 @@
 
                                     <div id="preview-body" class="preview-body w-[95%] grow mx-auto">
                                         <div class="preview-table w-full">
-                                        <div class="table w-full rounded-lg overflow-hidden text-xs">
+                                        <div class="table w-full rounded-md text-xs">
                                             <div class="flex gap-[6mm] items-start">
                                                 @foreach (['left', 'right'] as $column)
                                                     <div class="w-1/2">
                                                         @if ($page[$column]->isNotEmpty())
                                                             <div class="preview-table w-full">
-                                                            <div class="table w-full border border-gray-700 rounded-lg overflow-hidden text-xs">
+                                                            <div class="table w-full border border-gray-700 rounded-lg p-1 text-xs">
                                                                 <div class="thead w-full">
-                                                                    <div class="tr flex w-full px-2 py-0 bg-[var(--primary-color)] text-white text-center">
+                                                                    <div class="tr flex w-full px-2 py-0 bg-[var(--primary-color)] text-white text-center rounded-md">
                                                                         <div class="th font-medium overflow-hidden w-[8%] text-left">#</div>
                                                                         <div class="th font-medium overflow-hidden w-[30%] text-left">Article/pckt.</div>
                                                                         <div class="th font-medium overflow-hidden grow">Proc. By</div>
@@ -142,10 +142,12 @@
                                                                         <div class="th font-medium overflow-hidden w-[20%]">{{ $secondaryLabel }}</div>
                                                                     </div>
                                                                 </div>
-                                                                <div id="tbody" class="tbody w-full">
+                                                                <div id="tbody" class="tbody w-full mt-1.5 pb-1">
                                                                     @foreach ($page[$column] as $row)
                                                                         <div>
-                                                                            <hr class="w-full border-dotted">
+                                                                            @unless($loop->first)
+                                                                                <hr class="w-full my-1 border-dotted">
+                                                                            @endunless
                                                                             <div class="tr flex  w-full px-2 text-center gap-0.5">
                                                                                 <div class="td font-medium overflow-hidden w-[8%] text-left capitalize truncate">{{ $serial++ }}.</div>
                                                                                 <div class="td font-medium overflow-hidden w-[30%] text-left truncate">{{ $row['article_no'] }}</div>
