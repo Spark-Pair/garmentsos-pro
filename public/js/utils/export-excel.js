@@ -1,19 +1,10 @@
 (function() {
-    function sanitizeFileName(value) {
-        return String(value || 'export')
-            .trim()
-            .replace(/[\\/:*?"<>|]+/g, '-')
-            .replace(/\s+/g, ' ')
-            .slice(0, 120);
-    }
-
-    function getVisibleRows(container) {
-        return Array.from(container.children).filter((row) => {
-            if (!(row instanceof HTMLElement)) return false;
-
-            const style = window.getComputedStyle(row);
-            return style.display !== 'none' && style.visibility !== 'hidden';
+    function columnWidth(header, rows, index, max = 60) {
+        let width = String(header ?? '').length + 2;
+        rows.forEach(row => {
+            width = Math.max(width, String(row[index] ?? '').length + 2);
         });
+        return Math.min(Math.max(width, 10), max);
     }
 
     window.exportPageToExcel = function exportPageToExcel() {
@@ -22,35 +13,66 @@
             return;
         }
 
-        const tableHead = document.querySelector('#table-head');
-        const searchContainer = document.querySelector('.search_container');
+        const tools = window.TableExportTools;
+        const columns = tools?.columns?.() || [];
+        const formattedRows = tools?.formattedRows?.() || [];
+        const rawRows = tools?.rawRows?.() || [];
+        const layoutData = tools?.reportLayoutData?.() || null;
 
-        if (!tableHead || !searchContainer) {
+        if (!columns.length) {
             appAlert('Table data not found for export.');
             return;
         }
 
-        const headers = Array.from(tableHead.children)
-            .map((cell) => cell.textContent.trim())
-            .filter(Boolean);
+        const headers = layoutData?.processedColumns?.length
+            ? layoutData.processedColumns.map(column => column.text).filter(Boolean)
+            : columns.map(column => column.text).filter(Boolean);
 
-        const rows = getVisibleRows(searchContainer)
-            .map((row) => Array.from(row.querySelectorAll('span')).map((cell) => cell.textContent.trim()))
-            .filter((row) => row.some(Boolean));
-
-        if (!headers.length || !rows.length) {
+        if (!headers.length || (!formattedRows.length && !rawRows.length)) {
             appAlert('No table data available for export.');
             return;
         }
 
-        const worksheetData = [headers, ...rows];
-        const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
         const workbook = XLSX.utils.book_new();
         const pageTitle = document.getElementById('page-title')?.textContent?.trim() || 'Export';
-        const fileName = `${sanitizeFileName(pageTitle)}.xlsx`;
-        const sheetName = sanitizeFileName(pageTitle).slice(0, 31) || 'Sheet1';
+        const fileName = `${tools.sanitizeFileName(pageTitle)}.xlsx`;
+        const formattedSheetName = 'Formatted Data';
 
-        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+        if (formattedRows.length || layoutData?.rowRecords?.length) {
+            const bodyRows = layoutData?.rowRecords?.length
+                ? layoutData.rowRecords.map(row => row.cells)
+                : formattedRows.map(row => headers.map((_, index) => row[index] ?? ''));
+            const formattedData = [headers, ...bodyRows];
+
+            if (layoutData?.hasTotals) {
+                formattedData.push(layoutData.totalValues.map((value, index) => value === '' ? (index === 0 ? 'Total' : '') : value));
+            }
+
+            const formattedSheet = XLSX.utils.aoa_to_sheet(formattedData);
+            formattedSheet['!cols'] = headers.map((header, index) => ({
+                wch: columnWidth(header, formattedData.slice(1), index),
+            }));
+            XLSX.utils.book_append_sheet(workbook, formattedSheet, formattedSheetName);
+        }
+
+        if (rawRows.length) {
+            const rawHeaders = Array.from(rawRows.reduce((set, row) => {
+                Object.keys(row).forEach(key => set.add(key));
+                return set;
+            }, new Set()));
+
+            const rawData = [
+                rawHeaders,
+                ...rawRows.map(row => rawHeaders.map(header => row[header] ?? '')),
+            ];
+
+            const rawSheet = XLSX.utils.aoa_to_sheet(rawData);
+            rawSheet['!cols'] = rawHeaders.map((header, index) => ({
+                wch: columnWidth(header, rawData.slice(1), index, 45),
+            }));
+            XLSX.utils.book_append_sheet(workbook, rawSheet, 'Raw Data');
+        }
+
         XLSX.writeFile(workbook, fileName);
     };
 })();
