@@ -187,7 +187,7 @@
 
         let modalData = {
             id: 'menuModal',
-            class: 'h-[82%] w-full',
+            class: 'h-[82%] w-[96vw]',
             menuModal: true,
             cards: { name: 'Menu', count: 3, data: menuData, useMenuCard: true },
             basicSearch: true,
@@ -205,6 +205,7 @@
                 item.switchBtn.active = shortcuts.includes(item.id);
             });
             modalData.cards.data = menuData;
+            modalData.info = `Enabled: ${shortcuts.length}/${typeof maxShortcutsLimit !== 'undefined' ? maxShortcutsLimit : 7}`;
             createModal(modalData);
         };
 

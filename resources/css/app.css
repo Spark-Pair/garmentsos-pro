@@ -1,3 +1,35 @@
 @import "tailwindcss";
 @source "../views";
 @import "@fortawesome/fontawesome-free/css/all.min.css";
+
+#preview-container .preview,
+#preview-container .preview-page,
+#preview-container .preview-document,
+#fabric-preview-container .preview,
+#fabric-preview-container .preview-page,
+#fabric-preview-container .preview-document {
+    color: #000;
+}
+
+#preview-container :is(#header, .header, #preview-header, .preview-header, .total, #calc-bottom, .calc-bottom, .tfooter, .footer),
+#preview-container :is(#header, .header, #preview-header, .preview-header, .total, #calc-bottom, .calc-bottom, .tfooter, .footer) *,
+#fabric-preview-container :is(#header, .header, #preview-header, .preview-header, .total, #calc-bottom, .calc-bottom, .tfooter, .footer),
+#fabric-preview-container :is(#header, .header, #preview-header, .preview-header, .total, #calc-bottom, .calc-bottom, .tfooter, .footer) * {
+    color: #000 !important;
+    opacity: 1 !important;
+}
+
+#preview-container :is(.thead, .head) .tr,
+#preview-container :is(.thead, .head) .tr *,
+#fabric-preview-container :is(.thead, .head) .tr,
+#fabric-preview-container :is(.thead, .head) .tr * {
+    color: #fff !important;
+}
+
+#calc-bottom .final,
+#calc-bottom .final *,
+.calc-bottom .final,
+.calc-bottom .final * {
+    color: var(--text-color) !important;
+    opacity: 1 !important;
+}

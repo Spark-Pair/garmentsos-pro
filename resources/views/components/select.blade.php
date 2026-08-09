@@ -16,16 +16,28 @@
     'disabled' => false,
     'addBtnLink' => '',
     'required' => false,
+    'multiple' => false,
 ])
 
 @php
     $haveOptions = count($options) > 0;
     $resolvedValue = old($name, $value);
+    $selectedValues = collect(is_array($resolvedValue) ? $resolvedValue : explode(',', (string) $resolvedValue))
+        ->map(fn ($item) => trim((string) $item))
+        ->filter(fn ($item) => $item !== '')
+        ->values()
+        ->all();
+    $hiddenValue = $multiple ? implode(',', $selectedValues) : $resolvedValue;
     $isDisabled = !$haveOptions || $disabled;
 
     // Determine selected option
     $selectedText = '';
-    if ($resolvedValue && isset($options[$resolvedValue])) {
+    if ($multiple && count($selectedValues) > 0) {
+        $selectedText = collect($selectedValues)
+            ->map(fn ($selectedValue) => $options[$selectedValue]['text'] ?? null)
+            ->filter()
+            ->implode(', ');
+    } elseif ($resolvedValue && isset($options[$resolvedValue])) {
         $selectedText = $options[$resolvedValue]['text'];
     }
 
@@ -36,11 +48,11 @@
     } elseif (!$haveOptions) {
         $placeholderText = '-- No options available --';
     } elseif ($showDefault === true && !$resolvedValue) {
-        $placeholderText = '-- Select ' . $label . ' --';
+        $placeholderText = $multiple ? '-- Select one or more ' . $label . ' --' : '-- Select ' . $label . ' --';
     }
 
     // Highlight default if not disabled and no selection
-    $showDefaultSelected = !$isDisabled && $resolvedValue === '' && $showDefault;
+    $showDefaultSelected = !$isDisabled && count($selectedValues) === 0 && $showDefault;
 
     $hasServerError = $errors->has($name);
 @endphp
@@ -65,9 +77,36 @@
         translate: 0;
     }
 
+    .selectParent:focus-within > .form-group > .field-control > input:first-child {
+        outline: 1px solid var(--primary-color);
+        outline-offset: 2px;
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 22%, transparent);
+    }
+
+    .form-group.has-field-error > .selectParent:focus-within > .form-group > .field-control > input:first-child {
+        outline-color: var(--border-error) !important;
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--border-error) 12%, transparent) !important;
+    }
+
     .selected {
         background-color: var(--h-bg-color);
+        color: var(--text-color);
     }
+
+    .select-active {
+        background-color: var(--h-bg-color);
+    }
+
+    .optionsDropdown li[data-multiple="true"].selected::after {
+        content: '✓';
+        position: absolute;
+        right: 0.75rem;
+        top: 50%;
+        color: var(--primary-color);
+        font-weight: 700;
+        transform: translateY(-50%);
+    }
+
 </style>
 
 <div class="{{ $class }} form-group">
@@ -77,17 +116,21 @@
                 for="{{ $name }}"
                 class="block font-medium text-[var(--secondary-text)]"
             >
-                {{ $label }}
+                {{ $label }}{{ !$required && !$disabled ? ' (optional)' : '' }}
             </label>
-
-            @if ($addBtnLink !== '')
-                <a
-                    class="text-lg px-2 leading-none"
-                    href="{{ $addBtnLink }}"
-                >
-                    +
-                </a>
-            @endif
+            <span class="flex items-center gap-2">
+                @if ($multiple)
+                    <span class="inline-flex h-5 items-center rounded-lg border border-[var(--primary-color)]/25 bg-[color-mix(in_srgb,var(--primary-color)_10%,transparent)] px-2 text-[10px] font-semibold leading-none text-[var(--primary-color)] shadow-[inset_0_1px_0_rgb(255_255_255_/_0.16)]">Multi</span>
+                @endif
+                @if ($addBtnLink !== '')
+                    <a
+                        class="text-lg px-2 leading-none"
+                        href="{{ $addBtnLink }}"
+                    >
+                        +
+                    </a>
+                @endif
+            </span>
         </span>
     @endif
 
@@ -114,9 +157,12 @@
             class="dbInput"
             data-for="{{ $id }}"
             name="{{ $name }}"
-            value="{{ $isDisabled ? '' : $resolvedValue }}"
+            value="{{ $isDisabled ? '' : $hiddenValue }}"
             {!! $onchange ? 'onchange="' . $onchange . '"' : '' !!}
             {!! $dataFilterPath ? 'data-filter-path="' . $dataFilterPath . '"' : '' !!}
+            @if ($multiple)
+                data-multiple="true"
+            @endif
             @if ($dataClearable)
                 data-clearable
             @endif
@@ -149,7 +195,7 @@
                         onmousedown="selectThisOption(this)"
                         class="py-2 px-3 cursor-pointer rounded-lg transition hover:bg-[var(--h-bg-color)] {{ $showDefaultSelected ? 'selected' : '' }}"
                     >
-                        -- Select {{ $label }} --
+                        {{ $multiple ? '-- Select one or more ' . $label . ' --' : '-- Select ' . $label . ' --' }}
                     </li>
                 @endif
 
@@ -208,13 +254,16 @@
                         data-for="{{ $id }}"
                         data-value="{{ $optionValue }}"
                         onmousedown="selectThisOption(this)"
+                        @if ($multiple)
+                            data-multiple="true"
+                        @endif
                         @if (!is_null($dataOptionAttr))
                             data-option="{{ $dataOptionAttr }}"
                         @endif
                         @if (isset($option['selected']))
                             data-auto-select="true"
                         @endif
-                        class="py-2 px-3 cursor-pointer rounded-lg transition hover:bg-[var(--h-bg-color)] text-nowrap overflow-x-auto scrollbar-hidden {{ !$isDisabled && $optionValue == $resolvedValue ? 'selected' : '' }}"
+                        class="py-2 px-3 cursor-pointer rounded-lg transition hover:bg-[var(--h-bg-color)] text-nowrap overflow-x-auto scrollbar-hidden {{ $multiple ? 'relative pr-8' : '' }} {{ !$isDisabled && in_array((string) $optionValue, $selectedValues, true) ? 'selected' : '' }}"
                     >
                         {{ $option['text'] }}
                     </li>

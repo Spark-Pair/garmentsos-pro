@@ -2,8 +2,15 @@ function getSelectScope(elem) {
     return elem.closest('form') || document;
 }
 
+function formatMultiSelectText(selectedTexts) {
+    if (!selectedTexts.length) return "";
+    if (selectedTexts.length <= 2) return selectedTexts.join(", ");
+    return `${selectedTexts.slice(0, 2).join(", ")} +${selectedTexts.length - 2}`;
+}
+
 function selectThisOption(optionLiElem, options = {}) {
     const shouldValidate = options.validate !== false;
+    const shouldDispatchChange = options.dispatchChange !== false;
     const forId = optionLiElem.dataset.for;
     const scope = getSelectScope(optionLiElem);
     const selectSearch = scope.querySelector(`#${forId}`);
@@ -12,15 +19,46 @@ function selectThisOption(optionLiElem, options = {}) {
 
     if (!selectSearch || !dbInput) return;
 
-    selectSearch.value = optionLiElem.textContent.trim();
-    if (dropdownSearch) {
-        dropdownSearch.value = selectSearch.value;
-    }
-    dbInput.value = optionLiElem.dataset.value;
+    const isMultiple = dbInput.dataset.multiple === "true";
+    const optionValue = String(optionLiElem.dataset.value ?? "");
 
     const allOptions = scope.querySelectorAll(`.optionsDropdown li[data-for="${forId}"]`);
-    allOptions.forEach(li => li.classList.remove('selected'));
-    optionLiElem.classList.add('selected');
+
+    if (isMultiple) {
+        if (optionValue === "") {
+            allOptions.forEach(li => li.classList.remove("selected"));
+        } else {
+            const defaultOption = scope.querySelector(`.optionsDropdown li[data-for="${forId}"][data-value=""]`);
+            defaultOption?.classList.remove("selected");
+            optionLiElem.classList.toggle("selected");
+        }
+
+        const selectedOptions = Array.from(allOptions)
+            .filter(li => li.classList.contains("selected") && String(li.dataset.value ?? "") !== "");
+        const selectedValues = selectedOptions.map(li => String(li.dataset.value ?? ""));
+        const selectedTexts = selectedOptions.map(li => li.textContent.trim());
+
+        dbInput.value = selectedValues.join(",");
+        selectSearch.value = formatMultiSelectText(selectedTexts);
+        if (dropdownSearch) {
+            dropdownSearch.value = "";
+        }
+
+        if (selectedValues.length === 0) {
+            const defaultOption = scope.querySelector(`.optionsDropdown li[data-for="${forId}"][data-value=""]`);
+            defaultOption?.classList.add("selected");
+            selectSearch.value = defaultOption?.textContent.trim() || "";
+        }
+    } else {
+        selectSearch.value = optionLiElem.textContent.trim();
+        if (dropdownSearch) {
+            dropdownSearch.value = selectSearch.value;
+        }
+        dbInput.value = optionValue;
+
+        allOptions.forEach(li => li.classList.remove('selected'));
+        optionLiElem.classList.add('selected');
+    }
 
     const changeEvent = new Event('change', { bubbles: true });
 
@@ -38,7 +76,9 @@ function selectThisOption(optionLiElem, options = {}) {
         setTimeout(() => dispatchChangeWithRetry(retries - 1), 0);
     }
 
-    dispatchChangeWithRetry();
+    if (shouldDispatchChange) {
+        dispatchChangeWithRetry();
+    }
 
     if (!shouldValidate) {
         return;
@@ -59,6 +99,8 @@ function searchSelect(selectSearchInput) {
     const forId = selectSearchInput.dataset.for;
     const scope = getSelectScope(selectSearchInput);
     const allOptions = scope.querySelectorAll(`.optionsDropdown li[data-for="${forId}"]`);
+    const dbInput = scope.querySelector(`.dbInput[data-for="${forId}"]`);
+    const isMultiple = dbInput?.dataset.multiple === "true";
 
     const isDefaultSelection = inputValue.startsWith('-- select');
 
@@ -94,9 +136,13 @@ function searchSelect(selectSearchInput) {
     const visibleOptions = Array.from(allOptions).filter(li => !li.classList.contains('hidden'));
     const bestMatch = findBestSelectSearchMatch(visibleOptions, inputValue);
 
-    allOptions.forEach(li => li.classList.remove('selected'));
+    if (isMultiple) {
+        allOptions.forEach(li => li.classList.remove('select-active'));
+    } else {
+        allOptions.forEach(li => li.classList.remove('selected'));
+    }
     if (bestMatch) {
-        bestMatch.classList.add('selected');
+        bestMatch.classList.add(isMultiple ? 'select-active' : 'selected');
         if (typeof bestMatch.scrollIntoView === 'function') {
             bestMatch.scrollIntoView({ block: 'nearest', inline: 'nearest' });
         }
@@ -142,6 +188,15 @@ function validateSelectInput(selectSearchInput) {
     const forId = selectSearchInput.id;
     const scope = getSelectScope(selectSearchInput);
     const allOptions = scope.querySelectorAll(`.optionsDropdown li[data-for="${forId}"]`);
+    const dbInput = scope.querySelector(`.dbInput[data-for="${forId}"]`);
+
+    if (dbInput?.dataset.multiple === "true") {
+        const selectedTexts = Array.from(allOptions)
+            .filter(li => li.classList.contains("selected") && String(li.dataset.value ?? "") !== "")
+            .map(li => li.textContent.trim());
+        selectSearchInput.value = formatMultiSelectText(selectedTexts);
+        return;
+    }
 
     let isValid = false;
     allOptions.forEach((li) => {
@@ -159,6 +214,20 @@ function validateSelectInput(selectSearchInput) {
 function selectFirstOption(forId, scope = document, options = {}) {
     const dbInput = scope.querySelector(`.dbInput[data-for="${forId}"]`);
     const currentValue = dbInput ? String(dbInput.value || '') : '';
+    const isMultiple = dbInput?.dataset.multiple === "true";
+    if (isMultiple && currentValue) {
+        const values = currentValue.split(",").map(value => value.trim()).filter(Boolean);
+        scope.querySelectorAll(`.optionsDropdown li[data-for="${forId}"]`).forEach(li => {
+            li.classList.toggle("selected", values.includes(String(li.dataset.value ?? "")));
+        });
+        const selectedTexts = Array.from(scope.querySelectorAll(`.optionsDropdown li[data-for="${forId}"].selected`))
+            .map(li => li.textContent.trim());
+        const selectSearch = scope.querySelector(`#${forId}`);
+        if (selectSearch) {
+            selectSearch.value = formatMultiSelectText(selectedTexts);
+        }
+        return;
+    }
     if (currentValue) {
         const matched = scope.querySelector(`.optionsDropdown li[data-for="${forId}"][data-value="${CSS.escape(currentValue)}"]`);
         if (matched) {
@@ -191,6 +260,9 @@ function selectKeyDown(event, input) {
     const dropdown = input.closest(".selectParent").querySelector(".optionsDropdown");
     const allOptions = dropdown.querySelectorAll("li");
     const options = Array.from(allOptions).filter(li => !li.classList.contains("hidden"));
+    const dbInput = getSelectScope(input).querySelector(`.dbInput[data-for="${input.dataset.for || input.id}"]`);
+    const isMultiple = dbInput?.dataset.multiple === "true";
+    const activeClass = isMultiple ? "select-active" : "selected";
 
     function scrollIntoViewIfNeeded(element) {
         if (element && typeof element.scrollIntoView === "function") {
@@ -200,29 +272,34 @@ function selectKeyDown(event, input) {
 
     if (event.key === "ArrowDown") {
         event.preventDefault();
-        const selected = dropdown.querySelector("li.selected:not(.hidden)");
+        const selected = dropdown.querySelector(`li.${activeClass}:not(.hidden)`);
         let next = selected ? options[options.indexOf(selected) + 1] : options[0];
         if (next) {
-            options.forEach(li => li.classList.remove("selected"));
-            next.classList.add("selected");
+            options.forEach(li => li.classList.remove(activeClass));
+            next.classList.add(activeClass);
             input.value = next.textContent.trim();
             scrollIntoViewIfNeeded(next);
         }
     } else if (event.key === "ArrowUp") {
         event.preventDefault();
-        const selected = dropdown.querySelector("li.selected:not(.hidden)");
+        const selected = dropdown.querySelector(`li.${activeClass}:not(.hidden)`);
         let prev = selected ? options[options.indexOf(selected) - 1] : options[options.length - 1];
         if (prev) {
-            options.forEach(li => li.classList.remove("selected"));
-            prev.classList.add("selected");
+            options.forEach(li => li.classList.remove(activeClass));
+            prev.classList.add(activeClass);
             input.value = prev.textContent.trim();
             scrollIntoViewIfNeeded(prev);
         }
     } else if (event.key === "Enter") {
         event.preventDefault();
-        const selected = dropdown.querySelector("li.selected:not(.hidden)");
+        const selected = dropdown.querySelector(`li.${activeClass}:not(.hidden)`);
         if (selected) {
             selectThisOption(selected);
+            if (isMultiple) {
+                input.value = "";
+                searchSelect(input);
+                return;
+            }
             input.blur();
             if (typeof window.focusNextFormField === 'function') {
                 window.focusNextFormField(input);
@@ -235,7 +312,7 @@ function selectKeyDown(event, input) {
 
 function bootSelectDefaults() {
     document.querySelectorAll(".selectParent .dbInput")
-        .forEach(dbInput => selectFirstOption(dbInput.dataset.for, getSelectScope(dbInput), { validate: false }));
+        .forEach(dbInput => selectFirstOption(dbInput.dataset.for, getSelectScope(dbInput), { validate: false, dispatchChange: false }));
 }
 
 if (document.readyState === 'loading') {

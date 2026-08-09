@@ -192,7 +192,9 @@
         }
 
         .my-scrollbar-2 {
-            overflow: auto; /* ensure it's scrollable itself */
+            scrollbar-gutter: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
         }
 
         /* Now target ONLY this element's own scrollbar */
@@ -204,12 +206,12 @@
         }
 
         .my-scrollbar-2::-webkit-scrollbar {
-            width: 10px;
-            height: 10px;
+            width: 0;
+            height: 0;
         }
 
         .my-scrollbar-2::-webkit-scrollbar-track {
-            background: var(--secondary-bg-color);
+            background: transparent;
             border-radius: 8px;
         }
 
@@ -220,11 +222,42 @@
                 var(--h-primary-color)
             );
             border-radius: 8px;
-            border: 2px solid var(--secondary-bg-color);
+            border: 0;
             transition: background 0.3s ease;
         }
 
         .my-scrollbar-2::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(
+                180deg,
+                var(--h-primary-color),
+                var(--primary-color)
+            );
+        }
+
+        .gos-overlay-scrollbar-thumb {
+            position: fixed;
+            z-index: 10050;
+            width: 6px;
+            min-height: 32px;
+            border-radius: 999px;
+            background: linear-gradient(
+                180deg,
+                var(--primary-color),
+                var(--h-primary-color)
+            );
+            box-shadow: 0 0 0 1px var(--glass-border-color);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.18s ease, background 0.18s ease;
+        }
+
+        .gos-overlay-scrollbar-thumb.is-visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .gos-overlay-scrollbar-thumb:hover,
+        .gos-overlay-scrollbar-thumb.is-dragging {
             background: linear-gradient(
                 180deg,
                 var(--h-primary-color),
@@ -492,12 +525,40 @@
         .switchBtn .circle {
             position: relative;
             z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             width: 0.875rem;
             height: 0.875rem;
             border-radius: 9999px;
             background: color-mix(in srgb, white 78%, var(--secondary-text));
             box-shadow: 0 1px 3px rgb(15 23 42 / 0.22);
             transition: transform 180ms ease, background-color 180ms ease;
+        }
+
+        .app-toggle-thumb::before,
+        .app-toggle-thumb::after,
+        .switchBtn .circle::before,
+        .switchBtn .circle::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 0.38rem;
+            height: 0.085rem;
+            border-radius: 999px;
+            background: color-mix(in srgb, var(--secondary-text) 68%, white);
+            transform-origin: center;
+        }
+
+        .app-toggle-thumb::before,
+        .switchBtn .circle::before {
+            transform: translate(-50%, -50%) rotate(45deg);
+        }
+
+        .app-toggle-thumb::after,
+        .switchBtn .circle::after {
+            transform: translate(-50%, -50%) rotate(-45deg);
         }
 
         .app-toggle:not(.is-checked):not(:has(.app-toggle-input:checked)) {
@@ -511,6 +572,12 @@
         .switchBtn.active {
             border-color: color-mix(in srgb, var(--primary-color) 60%, transparent);
             background: var(--primary-color);
+        }
+
+        .app-toggle:has(.app-toggle-input:disabled),
+        .switchBtn.pointer-events-none {
+            cursor: not-allowed;
+            opacity: 0.62;
         }
 
         .app-toggle.is-checked .app-toggle-track,
@@ -529,6 +596,28 @@
         .switchBtn.active .circle {
             transform: translateX(1rem);
             background: white;
+        }
+
+        .app-toggle.is-checked .app-toggle-thumb::before,
+        .app-toggle:has(.app-toggle-input:checked) .app-toggle-thumb::before,
+        .app-toggle-input:checked ~ .app-toggle-thumb::before,
+        .switchBtn.active .circle::before {
+            left: 50%;
+            top: 49%;
+            width: 0.24rem;
+            height: 0.38rem;
+            border: solid var(--primary-color);
+            border-width: 0 0.09rem 0.09rem 0;
+            border-radius: 0;
+            background: transparent;
+            transform: translate(-50%, -50%) rotate(45deg);
+        }
+
+        .app-toggle.is-checked .app-toggle-thumb::after,
+        .app-toggle:has(.app-toggle-input:checked) .app-toggle-thumb::after,
+        .app-toggle-input:checked ~ .app-toggle-thumb::after,
+        .switchBtn.active .circle::after {
+            opacity: 0;
         }
 
         /* Error icon sirf tab dikhe jab field mein error ho */
@@ -663,7 +752,7 @@
         }
 
         .rounded-lg {
-            border-radius: 0.65rem !important;
+            border-radius: 0.75rem !important;
         }
 
         .rounded-xl {
@@ -713,9 +802,12 @@
     @endif
     <script defer src="{{ asset('js/components/select.js') }}"></script>
     <script defer src="{{ asset('js/components/input.js') }}?v={{ @filemtime(public_path('js/components/input.js')) }}"></script>
+    <script defer src="{{ asset('js/components/overlay-scrollbar.js') }}?v={{ @filemtime(public_path('js/components/overlay-scrollbar.js')) }}"></script>
     <script defer src="{{ asset('js/app-init.js') }}"></script>
 
     <script defer src="{{ asset('js/components/card.js') }}"></script>
+    <script defer src="{{ asset('js/components/document-print.js') }}?v={{ @filemtime(public_path('js/components/document-print.js')) }}"></script>
+    <script defer src="{{ asset('js/components/document-preview.js') }}?v={{ @filemtime(public_path('js/components/document-preview.js')) }}"></script>
     <script defer src="{{ asset('js/components/modal.js') }}"></script>
     <script defer src="{{ asset('js/components/context-menu.js') }}"></script>
     <script defer src="{{ asset('js/global-filter-manager.js') }}?v={{ @filemtime(public_path('js/global-filter-manager.js')) }}"></script>

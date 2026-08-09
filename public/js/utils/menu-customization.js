@@ -92,7 +92,8 @@ function updateMenuCustomization(moduleName, newState, switchBtn = null) {
                 if (typeof window.renderMobileMenuShortcuts === 'function') {
                     window.renderMobileMenuShortcuts();
                 }
-                reRenderInfoInModal('.menuModalInfo', `Enabled: ${window.menu_shortcuts.length}/${window.maxShortcutsLimit}`);
+                refreshMenuModalShortcutInfo();
+                refreshMenuModalCardStatus(moduleName, window.menu_shortcuts.includes(moduleName));
                 return;
             }
 
@@ -114,4 +115,35 @@ function updateMenuCustomization(moduleName, newState, switchBtn = null) {
             }
         }
     });
+}
+
+function refreshMenuModalShortcutInfo() {
+    const limit = typeof window.maxShortcutsLimit !== 'undefined' ? window.maxShortcutsLimit : 7;
+    if (typeof reRenderInfoInModal === 'function') {
+        reRenderInfoInModal('.menuModalInfo', `Enabled: ${window.menu_shortcuts.length}/${limit}`);
+    }
+}
+
+function refreshMenuModalCardStatus(moduleName, isEnabled) {
+    const card = document.getElementById(moduleName);
+    if (!card?.classList.contains('menu-modal-card')) return;
+
+    const switchBtn = card.querySelector('.switchBtn');
+    const shortcutStatus = card.querySelector('[data-menu-shortcut-status]');
+
+    switchBtn?.setAttribute('title', isEnabled ? 'Remove from menu' : 'Add to menu');
+    if (!shortcutStatus) return;
+
+    const dot = shortcutStatus.querySelector('i');
+    const text = shortcutStatus.querySelector('span');
+
+    shortcutStatus.className = `inline-flex h-5 items-center gap-1.5 rounded-lg border ${isEnabled ? 'border-[var(--primary-color)]/25 bg-[var(--primary-color)]/10 text-[var(--primary-color)] shadow-[inset_0_1px_0_rgb(255_255_255_/_0.22)]' : 'border-[var(--glass-border-color)]/35 bg-[var(--h-bg-color)]/70 text-[var(--secondary-text)] shadow-[inset_0_1px_0_rgb(255_255_255_/_0.14)]'} px-2 text-[10px] font-semibold leading-none`;
+
+    if (dot) {
+        dot.className = `size-1.5 rounded-full ring-2 ${isEnabled ? 'bg-[var(--primary-color)] ring-[var(--primary-color)]/15' : 'bg-[var(--secondary-text)]/55 ring-[var(--secondary-text)]/10'}`;
+    }
+
+    if (text) {
+        text.textContent = isEnabled ? 'Pinned' : 'Not pinned';
+    }
 }
