@@ -26,6 +26,7 @@
                         'bank_name' => ['text' => 'Bank Name'],
                         'city' => ['text' => 'City'],
                         'fabric' => ['text' => 'Fabric'],
+                        'article_master_unit' => ['text' => 'Article Master Unit'],
                         'staff_type' => ['text' => 'Staff Type'],
                         'utility_bill_type' => ['text' => 'Utility Bill Type'],
                         'utility_bill_location' => ['text' => 'Utility Bill Location'],

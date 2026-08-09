@@ -68,8 +68,9 @@ class ArticleController extends Controller
         }
 
         $articles = $branches->applyScope(Article::select('id', 'article_no'), 'articles')->get();
+        $masterUnitOptions = $this->masterUnitOptions();
 
-        return view('articles.create', compact('lastRecord', 'articles'));
+        return view('articles.create', compact('lastRecord', 'articles', 'masterUnitOptions'));
     }
 
     /**
@@ -90,6 +91,7 @@ class ArticleController extends Controller
             'quantity'      => 'nullable|integer|min:1',
             'extra_pcs'     => 'nullable|integer|min:0',
             'fabric_type'   => 'nullable|string',
+            'pcs_per_packet' => 'nullable|integer|min:1',
             'rates_array'   => 'nullable|json',
             'sales_rate'    => 'required|numeric|min:0',
             'image_upload'  => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
@@ -108,6 +110,7 @@ class ArticleController extends Controller
             'quantity'     => $request->quantity,
             'extra_pcs'    => $request->extra_pcs,
             'fabric_type'  => $request->fabric_type,
+            'pcs_per_packet' => $request->filled('pcs_per_packet') ? (int) $request->pcs_per_packet : 0,
             'rates_array'  => json_decode($request->rates_array),
             'sales_rate'   => $request->sales_rate,
             'branch_id'    => $branchId,
@@ -215,8 +218,9 @@ class ArticleController extends Controller
         $developerImpact = $canArticleOverride
             ? $this->articleDeveloperImpact($article)
             : [];
+        $masterUnitOptions = $this->masterUnitOptions($article->pcs_per_packet);
 
-        return view('articles.edit', compact('article', 'developerImpact', 'canArticleOverride'));
+        return view('articles.edit', compact('article', 'developerImpact', 'canArticleOverride', 'masterUnitOptions'));
     }
 
     /**
@@ -241,6 +245,7 @@ class ArticleController extends Controller
             'quantity' => 'required|integer|min:1',
             'extra_pcs' => 'required|integer|min:0',
             'fabric_type' => 'nullable|string',
+            'pcs_per_packet' => 'nullable|integer|min:1',
             'rates_array' => 'nullable|string',
             "sales_rate" => 'required|numeric|min:0',
             'image_upload' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
@@ -255,6 +260,7 @@ class ArticleController extends Controller
             'quantity' => $request->quantity,
             'extra_pcs' => $request->extra_pcs,
             'fabric_type' => $request->fabric_type,
+            'pcs_per_packet' => $request->filled('pcs_per_packet') ? (int) $request->pcs_per_packet : 0,
             'rates_array' => json_decode($request->rates_array),
             'sales_rate' => $request->sales_rate,
         ];
@@ -349,6 +355,25 @@ class ArticleController extends Controller
         }
 
         return $impact;
+    }
+
+    private function masterUnitOptions($currentValue = null): array
+    {
+        $options = app(ModuleBranchService::class)
+            ->applyRelatedScope(Setup::where('type', 'article_master_unit')->orderBy('title'), 'setups', 'articles')
+            ->get()
+            ->filter(fn (Setup $setup) => (int) $setup->title > 0)
+            ->mapWithKeys(fn (Setup $setup) => [
+                (string) (int) $setup->title => ['text' => (string) (int) $setup->title],
+            ])
+            ->all();
+
+        $currentValue = (int) ($currentValue ?? 0);
+        if ($currentValue > 0 && !isset($options[(string) $currentValue])) {
+            $options[(string) $currentValue] = ['text' => (string) $currentValue];
+        }
+
+        return $options;
     }
 
     public function updateImage(Request $request)

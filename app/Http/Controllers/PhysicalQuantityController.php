@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Article;
 use App\Models\PhysicalQuantity;
+use App\Models\Setup;
 use App\Services\PhysicalQuantityReportService;
 use App\Services\ArticleStockService;
 use App\Services\Branches\ModuleBranchService;
@@ -114,8 +115,9 @@ class PhysicalQuantityController extends Controller
 
         if (!$request->ajax()) {
             $articles = collect();
+            $masterUnitOptions = $this->masterUnitOptions();
 
-            return view('physical-quantities.create', compact('articles'));
+            return view('physical-quantities.create', compact('articles', 'masterUnitOptions'));
         }
 
         $branches = app(ModuleBranchService::class);
@@ -188,7 +190,7 @@ class PhysicalQuantityController extends Controller
             'date' => 'required|date',
             'article_id' => 'required|integer|exists:articles,id',
             'processed_by' => 'required|string',
-            'pcs_per_packet' => 'required|integer|min:1',
+            'pcs_per_packet' => 'nullable|integer|min:1',
             'packets' => 'required|integer|min:1',
             'category' => 'required|string',
         ]);
@@ -200,11 +202,19 @@ class PhysicalQuantityController extends Controller
 
         $data = $validator->validated();
         $data['branch_id'] = app(ModuleBranchService::class)->branchIdForCreate('physical_quantities');
-
-        Article::where('id', $data['article_id'])->update([
-            'pcs_per_packet' => $data['pcs_per_packet'],
+        $article = Article::findOrFail($data['article_id']);
+        $articleUpdate = [
             'processed_by' => $data['processed_by'],
-        ]);
+        ];
+
+        if (!empty($data['pcs_per_packet'])) {
+            $articleUpdate['pcs_per_packet'] = $data['pcs_per_packet'];
+        } elseif ((int) ($article->pcs_per_packet ?? 0) > 0) {
+            $data['pcs_per_packet'] = $article->pcs_per_packet;
+        }
+
+        $article->update($articleUpdate);
+        unset($data['pcs_per_packet'], $data['processed_by']);
 
         PhysicalQuantity::create($data);
 
@@ -231,8 +241,9 @@ class PhysicalQuantityController extends Controller
         }
 
         $physicalQuantity->load('article');
+        $masterUnitOptions = $this->masterUnitOptions($physicalQuantity->article?->pcs_per_packet);
 
-        return view('physical-quantities.edit', compact('physicalQuantity'));
+        return view('physical-quantities.edit', compact('physicalQuantity', 'masterUnitOptions'));
     }
 
     /**
@@ -249,7 +260,7 @@ class PhysicalQuantityController extends Controller
         $validator = Validator::make($request->all(), [
             'date' => 'required|date',
             'processed_by' => 'required|string',
-            'pcs_per_packet' => 'required|integer|min:1',
+            'pcs_per_packet' => 'nullable|integer|min:1',
             'packets' => 'required|integer|min:1',
             'category' => 'required|string',
         ]);
@@ -259,11 +270,15 @@ class PhysicalQuantityController extends Controller
         }
 
         $data = $validator->validated();
-
-        Article::where('id', $physicalQuantity->article_id)->update([
-            'pcs_per_packet' => $data['pcs_per_packet'],
+        $articleUpdate = [
             'processed_by' => $data['processed_by'],
-        ]);
+        ];
+
+        if (!empty($data['pcs_per_packet'])) {
+            $articleUpdate['pcs_per_packet'] = $data['pcs_per_packet'];
+        }
+
+        Article::where('id', $physicalQuantity->article_id)->update($articleUpdate);
 
         $physicalQuantity->update([
             'date' => $data['date'],
@@ -288,5 +303,24 @@ class PhysicalQuantityController extends Controller
         $physicalQuantity->delete();
 
         return redirect()->route('physical-quantities.index')->with('success', 'Physical quantity deleted successfully.');
+    }
+
+    private function masterUnitOptions($currentValue = null): array
+    {
+        $options = app(ModuleBranchService::class)
+            ->applyRelatedScope(Setup::where('type', 'article_master_unit')->orderBy('title'), 'setups', 'physical_quantities')
+            ->get()
+            ->filter(fn (Setup $setup) => (int) $setup->title > 0)
+            ->mapWithKeys(fn (Setup $setup) => [
+                (string) (int) $setup->title => ['text' => (string) (int) $setup->title],
+            ])
+            ->all();
+
+        $currentValue = (int) ($currentValue ?? 0);
+        if ($currentValue > 0 && !isset($options[(string) $currentValue])) {
+            $options[(string) $currentValue] = ['text' => (string) $currentValue];
+        }
+
+        return $options;
     }
 }

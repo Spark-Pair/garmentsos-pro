@@ -106,6 +106,17 @@
                         type="text"
                         placeholder="Enter fabric type"
                     />
+
+                    {{-- master unit --}}
+                    <x-select
+                        label="Master Unit"
+                        name="pcs_per_packet"
+                        id="pcs_per_packet"
+                        :options="$masterUnitOptions"
+                        showDefault
+                        dataClearable
+                        addBtnLink="{{ route('setups.create') }}"
+                    />
                 </div>
             </div>
 
@@ -221,6 +232,11 @@
                         <x-input
                             label="Fabric Type"
                             value="{{ $lastRecord->fabric_type }}"
+                            disabled
+                        />
+                        <x-input
+                            label="Master Unit"
+                            value="{{ $lastRecord->pcs_per_packet ?: '' }}"
                             disabled
                         />
                     </div>

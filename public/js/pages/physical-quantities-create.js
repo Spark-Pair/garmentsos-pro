@@ -10,6 +10,8 @@
         const articleImageShowDOM = document.getElementById("img-article");
 
         const pcsPerPacketDom = document.getElementById("pcs_per_packet");
+        const pcsPerPacketDbDom = document.querySelector('.dbInput[data-for="pcs_per_packet"]');
+        const hasMasterUnitOptions = !!config.hasMasterUnitOptions;
         const processedByDom = document.getElementById("processed_by");
         const packetsDom = document.getElementById("packets");
         const categoryDom = document.getElementById("category");
@@ -44,6 +46,29 @@
 
         function formatPcsAndPackets(quantity, packets = getPacketsFromPcs(quantity)) {
             return `${formatNumber(quantity, 0)} pcs | ${formatNumber(packets)} pkts`;
+        }
+
+        function masterUnitValue() {
+            return Number(pcsPerPacketDbDom?.value || pcsPerPacketDom?.value || 0);
+        }
+
+        function setMasterUnitValue(value) {
+            const normalizedValue = Number(value || 0) > 0 ? String(Number(value)) : "";
+            if (pcsPerPacketDom) {
+                pcsPerPacketDom.value = normalizedValue;
+            }
+            if (pcsPerPacketDbDom) {
+                pcsPerPacketDbDom.value = normalizedValue;
+            }
+        }
+
+        function setMasterUnitLocked(isLocked) {
+            if (!pcsPerPacketDom) return;
+
+            pcsPerPacketDom.readOnly = isLocked;
+            pcsPerPacketDom.classList.toggle("bg-transparent", isLocked);
+            pcsPerPacketDom.classList.toggle("cursor-not-allowed", isLocked);
+            pcsPerPacketDom.classList.toggle("bg-[var(--h-bg-color)]", !isLocked);
         }
 
         window.basicSearch = function basicSearch(searchValue) {
@@ -195,17 +220,11 @@
             const hasProcessedBy = !!(selectedArticle.processed_by && String(selectedArticle.processed_by).trim());
 
             if (hasPcs) {
-                pcsPerPacketDom.readOnly = true;
-                pcsPerPacketDom.classList.remove("bg-[var(--h-bg-color)]");
-                pcsPerPacketDom.classList.add("bg-transparent");
-                pcsPerPacketDom.classList.add("cursor-not-allowed");
-                pcsPerPacketDom.value = selectedArticle.pcs_per_packet;
+                setMasterUnitLocked(true);
+                setMasterUnitValue(selectedArticle.pcs_per_packet);
             } else {
-                pcsPerPacketDom.readOnly = false;
-                pcsPerPacketDom.classList.add("bg-[var(--h-bg-color)]");
-                pcsPerPacketDom.classList.remove("bg-transparent");
-                pcsPerPacketDom.classList.remove("cursor-not-allowed");
-                pcsPerPacketDom.value = "";
+                setMasterUnitLocked(false);
+                setMasterUnitValue("");
             }
 
             if (hasProcessedBy) {
@@ -225,7 +244,12 @@
             updateRemainingQuantity();
         };
 
-        document.getElementById("pcs_per_packet").addEventListener("input", () => {
+        pcsPerPacketDom?.addEventListener("input", () => {
+            calculateTotal();
+            trackArticleQuantity();
+        });
+
+        pcsPerPacketDbDom?.addEventListener("change", () => {
             calculateTotal();
             trackArticleQuantity();
         });
@@ -241,7 +265,7 @@
                 packetsDom.disabled = true;
                 categoryDom.disabled = true;
             } else {
-                pcsPerPacketDom.disabled = false;
+                pcsPerPacketDom.disabled = !hasMasterUnitOptions && Number(selectedArticle.pcs_per_packet || 0) <= 0;
                 packetsDom.disabled = false;
                 categoryDom.disabled = false;
             }
@@ -250,7 +274,7 @@
 
         function calculateTotal() {
             if (selectedArticle) {
-                let pcsPerPacket = pcsPerPacketDom.value;
+                let pcsPerPacket = masterUnitValue();
                 let packets = packetsDom.value;
 
                 totalQuantity = pcsPerPacket * packets;

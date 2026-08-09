@@ -36,7 +36,16 @@
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-3 gap-4">
-                <x-input label="Master Unit" name="pcs_per_packet" id="pcs_per_packet" type="number" value="{{ old('pcs_per_packet', $article?->pcs_per_packet) }}" placeholder="Enter master unit" required dataValidate="max:8|min:1" />
+                <x-select
+                    label="Master Unit"
+                    name="pcs_per_packet"
+                    id="pcs_per_packet"
+                    :options="$masterUnitOptions"
+                    :value="old('pcs_per_packet', $article?->pcs_per_packet ?: '')"
+                    showDefault
+                    dataClearable
+                    addBtnLink="{{ route('setups.create') }}"
+                />
                 <x-input label="Packets" name="packets" id="packets" type="number" value="{{ old('packets', $physicalQuantity->packets) }}" placeholder="Enter packet count" required />
                 <x-select label="Category" name="category" id="category" :options="$category_options" :value="old('category', $physicalQuantity->category)" required />
             </div>

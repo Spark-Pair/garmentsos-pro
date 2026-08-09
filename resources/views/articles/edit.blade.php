@@ -116,6 +116,17 @@
                         placeholder="Enter fabric type"
                         required
                     />
+
+                    <x-select
+                        label="Master Unit"
+                        name="pcs_per_packet"
+                        id="pcs_per_packet"
+                        :options="$masterUnitOptions"
+                        value="{{ $article->pcs_per_packet ?: '' }}"
+                        showDefault
+                        dataClearable
+                        addBtnLink="{{ route('setups.create') }}"
+                    />
                 </div>
 
                 @if ($canArticleOverride)

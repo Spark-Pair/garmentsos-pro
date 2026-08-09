@@ -40,7 +40,15 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-3 gap-4">
                 {{-- pcs_per_packet  --}}
-                <x-input label="Master Unit" name="pcs_per_packet" id="pcs_per_packet" type="number" placeholder="Enter master unit" required dataValidate="max:8|min:1" />
+                <x-select
+                    label="Master Unit"
+                    name="pcs_per_packet"
+                    id="pcs_per_packet"
+                    :options="$masterUnitOptions"
+                    showDefault
+                    dataClearable
+                    addBtnLink="{{ route('setups.create') }}"
+                />
 
                 {{-- packets --}}
                 <x-input label="Packets" name="packets" id="packets" type="number" placeholder="Enter packet count" required />
@@ -102,6 +110,7 @@
         window.__physicalQuantitiesCreate = {
             articles: @json($articles),
             articlesUrl: @json(route('physical-quantities.create')),
+            hasMasterUnitOptions: @json(count($masterUnitOptions) > 0),
         };
     </script>
 @endpush
