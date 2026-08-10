@@ -14,6 +14,7 @@ const GlobalFilterManager = {
     init() {
         if (!document.querySelector('.search_container')) return;
 
+        rootAuthLayout = this.currentLayout();
         this.restoreSavedFilters();
         this.bindFilterEvents();
         this.bindShortcutEvents();
@@ -126,7 +127,9 @@ const GlobalFilterManager = {
     },
 
     async loadInitialData() {
+        rootAuthLayout = this.currentLayout();
         this.showLoading(true);
+        this.emitLoading();
 
         try {
             const url = this.buildUrl({ limit: this.config.initialLoadCount });
@@ -140,6 +143,7 @@ const GlobalFilterManager = {
             console.error('Error loading initial data:', error);
         } finally {
             this.showLoading(false);
+            this.emitRendered();
         }
     },
 
@@ -161,7 +165,9 @@ const GlobalFilterManager = {
             return;
         }
 
+        rootAuthLayout = this.currentLayout();
         this.showLoading(true);
+        this.emitLoading();
 
         try {
             const url = this.buildUrl(filters);
@@ -174,6 +180,7 @@ const GlobalFilterManager = {
             appAlert('Failed to apply filters. Please try again.');
         } finally {
             this.showLoading(false);
+            this.emitRendered();
         }
     },
 
@@ -380,6 +387,8 @@ const GlobalFilterManager = {
         window.visibleData = window.allDataArray;
 
         rootAuthLayout = response.authLayout || window.__authLayout || window.authLayout || rootAuthLayout;
+        window.__authLayout = rootAuthLayout;
+        window.authLayout = rootAuthLayout;
         const calculations = response.calculations || {};
         if (typeof window.renderCalculation === 'function') {
             window.renderCalculation(calculations);
@@ -388,6 +397,7 @@ const GlobalFilterManager = {
         // Use existing page-specific rendering functions
         if (typeof window.createCard === 'function' || typeof window.createRow === 'function') {
             this.renderWithExistingFunctions(items);
+            this.scrollResultsToTop(container);
         } else {
             console.warn('No createCard or createRow function found');
         }
@@ -402,6 +412,37 @@ const GlobalFilterManager = {
         if (noItemsError) {
             noItemsError.style.display = items.length === 0 ? 'block' : 'none';
         }
+    },
+
+    scrollResultsToTop(container) {
+        const scrollParent = container?.closest('.overflow-y-auto, .my-scrollbar-2');
+
+        if (scrollParent) {
+            scrollParent.scrollTop = 0;
+            return;
+        }
+
+        container?.scrollIntoView?.({ block: 'start', behavior: 'instant' });
+    },
+
+    emitLoading() {
+        document.dispatchEvent(new CustomEvent('app:data:loading'));
+    },
+
+    emitRendered() {
+        document.dispatchEvent(new CustomEvent('app:data:rendered', { detail: { items: window.allDataArray || [] } }));
+    },
+
+    currentLayout() {
+        const layoutBtn = document.getElementById('changeLayoutBtn');
+        const layout = window.__pendingAuthLayout
+            || layoutBtn?.dataset?.layout
+            || window.__authLayout
+            || window.authLayout
+            || rootAuthLayout
+            || 'table';
+
+        return layout === 'grid' ? 'grid' : 'table';
     },
 
     renderWithExistingFunctions(items) {
@@ -428,31 +469,126 @@ const GlobalFilterManager = {
     },
 
     showLoading(show) {
-        let loading = document.getElementById('global-loading');
-
-        if (!loading) {
-            const container = document.querySelector('.search_container');
-            if (!container) return;
-
-            loading = document.createElement('div');
-            loading.id = 'global-loading';
-            loading.className = 'text-center py-8 hidden';
-            loading.innerHTML = `
-                <i class="fas fa-spinner fa-spin text-2xl text-[var(--primary-color)]"></i>
-                <p class="text-sm text-[var(--secondary-text)] mt-2">Loading...</p>
-            `;
-            container.parentElement.insertBefore(loading, container);
-        }
-
         const container = document.querySelector('.search_container');
+        const tableHead = document.getElementById('table-head');
+        if (!container) return;
 
         if (show) {
-            loading.classList.remove('hidden');
-            if (container) container.classList.add('opacity-50', 'pointer-events-none');
+            container.dataset.loadingSkeleton = 'true';
+            container.classList.add('pointer-events-none');
+            this.renderSkeleton(container, tableHead);
         } else {
-            loading.classList.add('hidden');
-            if (container) container.classList.remove('opacity-50', 'pointer-events-none');
+            delete container.dataset.loadingSkeleton;
+            container.classList.remove('pointer-events-none');
         }
+    },
+
+    renderSkeleton(container, tableHead) {
+        const isGrid = this.currentLayout() === 'grid';
+        this.ensureSkeletonStyles();
+
+        if (isGrid) {
+            if (tableHead) tableHead.classList.add('hidden');
+            container.className = 'search_container grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 pt-4 px-2 pointer-events-none';
+            container.innerHTML = Array.from({ length: 6 }).map(() => `
+                <div class="gos-skeleton-card rounded-xl border border-[var(--glass-border-color)]/10 bg-[var(--secondary-bg-color)] p-4 shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="gos-skeleton-block size-11 rounded-xl"></div>
+                        <div class="grow space-y-2">
+                            <div class="gos-skeleton-block h-3 rounded" style="width: 42%"></div>
+                            <div class="gos-skeleton-block h-4 rounded" style="width: 64%"></div>
+                        </div>
+                    </div>
+                    <div class="mt-4 grid grid-cols-2 gap-3">
+                        <div class="gos-skeleton-block h-8 rounded-lg"></div>
+                        <div class="gos-skeleton-block h-8 rounded-lg"></div>
+                        <div class="gos-skeleton-block h-8 rounded-lg"></div>
+                        <div class="gos-skeleton-block h-8 rounded-lg"></div>
+                    </div>
+                </div>
+            `).join('');
+            return;
+        }
+
+        if (tableHead) tableHead.classList.remove('hidden');
+        container.className = 'search_container pointer-events-none';
+        const headerCells = tableHead ? Array.from(tableHead.children) : [];
+        const skeletonWidths = ['w-3/4', 'w-1/2', 'w-2/3', 'w-4/5', 'w-1/3'];
+
+        if (headerCells.length) {
+            const rowLayoutClass = tableHead.className
+                .replace(/\bhidden\b/g, '')
+                .replace(/\bbg-\[[^\]]+\]/g, '')
+                .replace(/\brounded-\S+/g, '')
+                .replace(/\bmt-\S+/g, '')
+                .replace(/\bfont-\S+/g, '')
+                .replace(/\bpy-\S+/g, 'py-2')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            container.innerHTML = Array.from({ length: 12 }).map((_, rowIndex) => `
+                <div class="${rowLayoutClass} border-b border-[var(--h-bg-color)] text-xs">
+                    ${headerCells.map((header, columnIndex) => {
+                        const alignClass = header.className.includes('text-right')
+                            ? 'justify-end'
+                            : (header.className.includes('text-center') ? 'justify-center' : 'justify-start');
+                        const widthPercent = [72, 48, 61, 82, 36][(rowIndex + columnIndex) % skeletonWidths.length];
+
+                        return `
+                            <div class="${header.className} flex ${alignClass} px-2 cursor-default">
+                                <span class="gos-skeleton-block block h-3 rounded" style="width: ${widthPercent}%"></span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `).join('');
+            return;
+        }
+
+        container.innerHTML = Array.from({ length: 12 }).map(() => `
+            <div class="flex items-center border-b border-[var(--h-bg-color)] py-2 text-xs">
+                <div class="gos-skeleton-block mx-2 h-3 rounded" style="width: 10%"></div>
+                <div class="gos-skeleton-block mx-2 h-3 rounded" style="width: 16%"></div>
+                <div class="gos-skeleton-block mx-2 h-3 rounded" style="width: 7%"></div>
+                <div class="gos-skeleton-block mx-2 h-3 rounded" style="width: 13%"></div>
+                <div class="gos-skeleton-block mx-2 h-3 rounded" style="width: 9%"></div>
+                <div class="gos-skeleton-block mx-2 h-3 rounded" style="width: 18%"></div>
+                <div class="gos-skeleton-block mx-2 h-3 grow rounded"></div>
+            </div>
+        `).join('');
+    },
+
+    ensureSkeletonStyles() {
+        if (document.getElementById('gos-skeleton-styles')) return;
+
+        const style = document.createElement('style');
+        style.id = 'gos-skeleton-styles';
+        style.textContent = `
+            .gos-skeleton-block {
+                min-width: 1.75rem;
+                background-color: var(--h-bg-color);
+                background-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.34), transparent);
+                background-size: 220% 100%;
+                animation: gos-skeleton-shimmer 1.15s ease-in-out infinite;
+                box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+                opacity: 0.92;
+            }
+
+            .gos-skeleton-card {
+                animation: gos-skeleton-soft 1.25s ease-in-out infinite;
+            }
+
+            @keyframes gos-skeleton-shimmer {
+                0% { background-position: 120% 0; }
+                100% { background-position: -120% 0; }
+            }
+
+            @keyframes gos-skeleton-soft {
+                0%, 100% { opacity: 0.78; }
+                50% { opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
     },
 
     debounce(func, wait) {

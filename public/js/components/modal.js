@@ -1,4 +1,7 @@
 function createModal(data, animate = 'animate') {
+    const appInputBaseClass = 'w-full rounded-lg border border-gray-600 bg-[var(--h-bg-color)] px-3 text-[var(--text-color)] transition-all duration-200 ease-out placeholder:capitalize disabled:bg-transparent disabled:opacity-70 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] focus:border-transparent';
+    const appInputClassFor = (type = 'text') => `${appInputBaseClass} ${type === 'date' ? 'py-[7px]' : 'py-2'}`;
+    const appButtonClass = 'bg-[var(--primary-color)] px-4 rounded-lg hover:bg-[var(--h-primary-color)] transition-all duration-300 ease-in-out cursor-pointer text-nowrap disabled:opacity-50 disabled:cursor-not-allowed';
     const statusColor = {
         active: ['[var(--bg-success)]', '[var(--h-bg-success)]', '[var(--border-success)]'],
         transparent: ['transparent', 'transparent', 'transparent'],
@@ -124,13 +127,13 @@ function createModal(data, animate = 'animate') {
                         type="text"
                         placeholder="Search..."
                         autocomplete="off"
-                        class="w-full rounded-lg bg-[var(--h-bg-color)] border-gray-600 text-[var(--text-color)] px-3 py-2 border focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out disabled:bg-transparent disabled:opacity-70 placeholder:capitalize"
+                        class="${appInputClassFor('text')}"
                         oninput="${data.onBasicSearch}"
                     />
 
                     <button
                         type="button"
-                        class="bg-[var(--primary-color)] px-4 rounded-lg hover:bg-[var(--h-primary-color)] transition-all duration-300 ease-in-out cursor-pointer text-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="${appButtonClass}"
                     >
                         <i class="text-xs fa-solid fa-magnifying-glass"></i>
                     </button>
@@ -199,6 +202,20 @@ function createModal(data, animate = 'animate') {
             if (field.category == 'input') {
                 if (field.type != 'hidden') {
                     let buttonHTML = '';
+                    const fieldName = field.name ?? field.id ?? '';
+                    const isOptional = !field.required && !field.readonly && !field.disabled;
+                    const errorId = `${fieldName}-error`;
+                    const errorIconHTML = fieldName ? `
+                                        <div class="errorIconWrap absolute right-3 top-1/2 z-20 -translate-y-1/2">
+                                            <button type="button" tabindex="-1" aria-label="Validation error"
+                                                class="errorIcon peer flex size-[20px] items-center justify-center rounded-full border border-[var(--border-error)] bg-[color-mix(in_srgb,var(--border-error)_10%,var(--secondary-bg-color))] text-[13px] font-bold leading-none text-[var(--border-error)] opacity-0 pointer-events-none transition-all duration-200">
+                                                !
+                                            </button>
+
+                                            <div id="${errorId}" role="alert"
+                                                class="field-error-msg hidden absolute bottom-[calc(100%+8px)] right-0 z-50 w-max min-w-[9rem] max-w-[230px] rounded-md border border-[color-mix(in_srgb,var(--border-error)_35%,transparent)] bg-[var(--secondary-bg-color)] px-3 py-2 text-xs font-medium leading-4 text-[var(--text-color)] shadow-[0_10px_30px_rgba(15,23,42,0.16)] opacity-0 pointer-events-none translate-y-1 transition-all duration-150 peer-hover:translate-y-0 peer-hover:opacity-100 peer-focus:translate-y-0 peer-focus:opacity-100"></div>
+                                        </div>
+                                    ` : '';
 
                     if (field.btnId) {
                         buttonHTML = `
@@ -209,17 +226,22 @@ function createModal(data, animate = 'animate') {
                     clutter += `
                         <div class="${field.grow ? 'grow' : ''} ${field.full ? 'col-span-full' : ''}">
                             <div class="form-group relative ${field.hidden ? 'hidden' : ''}">
-                                <label for="${field.name ?? ''}" class="block font-medium text-[var(--secondary-text)] mb-2 ${!field.label ? 'hidden' : ''}">${field.label}</label>
+                                ${field.label ? `
+                                    <span class="mb-2 flex items-center justify-between">
+                                        <label for="${field.id || field.name || ''}" class="block font-medium text-[var(--secondary-text)]">
+                                            ${field.label}${isOptional ? ' (optional)' : ''}
+                                        </label>
+                                    </span>
+                                ` : ''}
 
-                                <div class="relative flex gap-3">
+                                <div class="field-control relative flex gap-4">
                                     <input onkeydown="${field.enterToSubmitListener ? 'enterToSubmit(event)' : ''}" id="${field.id ?? ''}" type="${field.type ?? 'text'}" name="${field.name ?? ''}" value="${field.value ?? ''}" min="${field.min}" max="${field.max}" placeholder="${field.placeholder ?? ''}" data-validate="${field.data_validate ?? ''}" ${field.required ? 'required' : ''} ${field.disabled ? 'disabled' : ''} ${field.readonly ? 'readonly' : ''}
                                     ${field.data_validate ? `oninput="validateInput(this); ${field.oninput ?? ''}"` : (field.oninput ? `oninput="${field.oninput}"` : '')}
-                                    onchange="${field.onchange ?? ''}" class="w-full rounded-lg bg-[var(--h-bg-color)] border-gray-600 text-[var(--text-color)] px-3 ${field.type == 'date' ? 'py-[7px]' : 'py-2'} border focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out disabled:bg-transparent placeholder:capitalize">
+                                    onchange="${field.onchange ?? ''}" class="${appInputClassFor(field.type ?? 'text')}" ${fieldName ? `aria-describedby="${errorId}"` : ''}>
                                     ${buttonHTML}
+                                    ${errorIconHTML}
                                 </div>
                             </div>
-
-                            <div id="${field.name}-error" class="text-[var(--border-error)] text-xs mt-1.5 hidden transition-all duration-300 ease-in-out leading-none"></div>
                         </div>
                     `;
 
@@ -268,7 +290,7 @@ function createModal(data, animate = 'animate') {
                         <label for="${field.name ?? ''}" class="block font-medium text-[var(--secondary-text)] mb-2">${field.label} *</label>
 
                         <div class="selectParent relative flex gap-3">
-                            <select id="${field.id ?? ''}" name="${field.name ?? ''}" onchange="${field.onchange}" value="${field.value || ''}" class="w-full rounded-lg bg-[var(--h-bg-color)] border-gray-600 text-[var(--text-color)] px-3 py-2 border appearance-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out disabled:bg-transparent" ${field.required ? 'required' : ''} ${field.disabled ? 'disabled' : ''} ${field.readonly ? 'readonly' : ''}>
+                            <select id="${field.id ?? ''}" name="${field.name ?? ''}" onchange="${field.onchange}" value="${field.value || ''}" class="${appInputClassFor('text')} appearance-none" ${field.required ? 'required' : ''} ${field.disabled ? 'disabled' : ''} ${field.readonly ? 'readonly' : ''}>
                                 ${optionsHTML}
                             </select>
                             ${buttonHTML}
@@ -341,7 +363,7 @@ function createModal(data, animate = 'animate') {
                                         type="text"
                                         placeholder="Search menu..."
                                         autocomplete="off"
-                                        class="w-full rounded-lg bg-[var(--h-bg-color)] border border-[var(--glass-border-color)]/30 text-[var(--text-color)] px-3 py-2 focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out disabled:bg-transparent disabled:opacity-70"
+                                        class="${appInputClassFor('text')}"
                                         oninput="${data.onBasicSearch}"
                                     />
 
@@ -379,7 +401,7 @@ function createModal(data, animate = 'animate') {
                                 type="text"
                                 placeholder="🔍 Search..."
                                 autocomplete="off"
-                                class="w-full rounded-lg bg-[var(--h-bg-color)] border-gray-600 text-[var(--text-color)] px-3 py-2 border focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out disabled:bg-transparent disabled:opacity-70 placeholder:capitalize"
+                                class="${appInputClassFor('text')}"
                                 oninput="${data.onBasicSearch}"
                             />
 
@@ -744,7 +766,7 @@ function renderTableBody(tableBody, rowPaddingClass = 'px-4') {
 
                 if (item.input) {
                     inputHTML = `
-                        <input class="${item.input.class || ''} w-[70%] border border-gray-600 bg-[var(--h-bg-color)] py-0.5 px-2 rounded-md text-xs focus:outline-none opacity-0 pointer-events-none" type="${item.input.type || 'text'}" name="${item.input.name || ''}" value="${item.input.value || ''}" min="${item.input.min || ''}" oninput="${item.input.oninput || ''}" onclick="${item.input.onclick || ''}" />
+                        <input class="${item.input.class || ''} w-[70%] rounded-lg border border-gray-600 bg-[var(--h-bg-color)] px-3 py-2 text-xs text-[var(--text-color)] transition-all duration-200 ease-out placeholder:capitalize disabled:bg-transparent disabled:opacity-70 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] focus:border-transparent opacity-0 pointer-events-none" type="${item.input.type || 'text'}" name="${item.input.name || ''}" value="${item.input.value || ''}" min="${item.input.min || ''}" oninput="${item.input.oninput || ''}" onclick="${item.input.onclick || ''}" />
                     `;
                 }
 

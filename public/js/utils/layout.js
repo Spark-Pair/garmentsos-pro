@@ -30,6 +30,10 @@ function changeLayout() {
                 }
                 window.__authLayout = nextLayout;
                 window.authLayout = nextLayout;
+                window.__pendingAuthLayout = nextLayout;
+                if (window.GlobalFilterManager?.showLoading) {
+                    window.GlobalFilterManager.showLoading(true);
+                }
                 location.reload();
             }
         },

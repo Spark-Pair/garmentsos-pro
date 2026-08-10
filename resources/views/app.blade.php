@@ -780,9 +780,9 @@
     <script defer src="{{ asset('js/utils/ui.js') }}"></script>
     <script defer src="{{ asset('js/utils/activity.js') }}"></script>
     <script defer src="{{ asset('js/utils/notifications.js') }}"></script>
-    <script defer src="{{ asset('js/utils/loader.js') }}"></script>
+    <script defer src="{{ asset('js/utils/loader.js') }}?v={{ $assetVersion }}.loader-3"></script>
     <script defer src="{{ asset('js/utils/table.js') }}"></script>
-    <script defer src="{{ asset('js/utils/layout.js') }}"></script>
+    <script defer src="{{ asset('js/utils/layout.js') }}?v={{ $assetVersion }}.skeleton-1"></script>
     <script defer src="{{ asset('js/utils/print-columns.js') }}"></script>
     <script defer src="{{ asset('js/utils/export-excel.js') }}"></script>
     <script defer src="{{ asset('js/utils/backup.js') }}"></script>
@@ -803,9 +803,9 @@
     <script defer src="{{ asset('js/components/card.js') }}"></script>
     <script defer src="{{ asset('js/components/document-print.js') }}?v={{ $assetVersion }}"></script>
     <script defer src="{{ asset('js/components/document-preview.js') }}?v={{ $assetVersion }}"></script>
-    <script defer src="{{ asset('js/components/modal.js') }}"></script>
+    <script defer src="{{ asset('js/components/modal.js') }}?v={{ $assetVersion }}.inputs-3"></script>
     <script defer src="{{ asset('js/components/context-menu.js') }}"></script>
-    <script defer src="{{ asset('js/global-filter-manager.js') }}?v={{ $assetVersion }}"></script>
+    <script defer src="{{ asset('js/global-filter-manager.js') }}?v={{ $assetVersion }}.skeleton-5"></script>
 </head>
 
 <body class="bg-[var(--secondary-bg-color)] text-[var(--text-color)] text-sm min-h-screen flex flex-col md:flex-row items-stretch justify-start fade-in" cz-shortcut-listen="true" data-app-config='@json($appConfig)'>
@@ -816,8 +816,16 @@
     @endif
 
     <!-- Loader -->
-    <div id="page-loader" class="fixed inset-0 z-[9999] bg-[var(--overlay-color)] bg-opacity-80 flex items-center justify-center hidden">
-        <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+    <div id="page-loader" class="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--overlay-color)]/60 px-4 hidden">
+        <div class="flex w-full max-w-xs items-center gap-4 rounded-xl border border-[var(--glass-border-color)]/20 bg-[var(--secondary-bg-color)] px-5 py-4 text-[var(--text-color)] shadow-xl">
+            <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[var(--h-bg-color)]">
+                <div class="size-6 rounded-full border-3 border-[var(--primary-color)] border-t-transparent animate-spin"></div>
+            </div>
+            <div class="min-w-0">
+                <p class="font-semibold leading-none">Loading</p>
+                <p class="mt-1 text-xs text-[var(--secondary-text)]">Please wait...</p>
+            </div>
+        </div>
     </div>
     <div class="wrapper flex-1 min-w-0 min-h-screen md:h-screen flex flex-col relative w-full overflow-hidden">
         {{-- main content --}}
