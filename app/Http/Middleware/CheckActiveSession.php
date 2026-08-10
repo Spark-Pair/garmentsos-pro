@@ -15,6 +15,12 @@ class CheckActiveSession
         if (Auth::check()) {
             // Get the current user's session token (Laravel session ID)
             $sessionToken = session()->getId();
+            $cacheKey = 'active_session_checked:' . $sessionToken;
+            $lastCheckedAt = (int) session($cacheKey, 0);
+
+            if ($lastCheckedAt > 0 && time() - $lastCheckedAt < 20) {
+                return $next($request);
+            }
 
             // Check if the session is active within the last 60 minutes
             $userSession = UserSession::where('user_id', Auth::id())
@@ -35,6 +41,8 @@ class CheckActiveSession
                 Auth::logout();
                 return redirect(route('login'))->with('error', 'Your session ended because it expired or a newer login replaced it.');
             }
+
+            session([$cacheKey => time()]);
         }
 
         return $next($request);

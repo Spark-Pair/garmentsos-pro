@@ -199,8 +199,9 @@ class BrandingSettingsService
     protected function refreshSharedValues(): void
     {
         $this->cache->forget();
+        app()->forgetInstance('branding.effective_values');
         app()->forgetInstance('client_company');
         View::share('client_company', $this->clientCompany());
-        View::share('branding', $this->effectiveValues());
+        View::share('branding', app('branding.effective_values'));
     }
 }

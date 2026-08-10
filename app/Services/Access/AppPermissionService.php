@@ -5,12 +5,17 @@ namespace App\Services\Access;
 use App\Models\AppPermissionRule;
 use App\Models\User;
 use App\Services\Branches\BranchModuleRegistryService;
+use Illuminate\Support\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 
 class AppPermissionService
 {
+    protected ?bool $permissionTableReady = null;
+
+    protected array $applicableRuleCache = [];
+
     public function can(?User $user, ?string $moduleKey, string $action = 'view'): bool
     {
         if (!$user || !$moduleKey) {
@@ -21,31 +26,17 @@ class AppPermissionService
             return true;
         }
 
-        if (!Schema::hasTable('app_permission_rules')) {
+        if (!$this->tableReady()) {
             return true;
         }
 
         $moduleKey = app(BranchModuleRegistryService::class)->canonicalKey($moduleKey);
         $field = $this->fieldForAction($action);
-        $base = AppPermissionRule::query()
-            ->where(function ($query) use ($moduleKey) {
-                $query->whereNull('module_key')->orWhere('module_key', $moduleKey);
-            });
+        $rule = $this->bestRuleFor($user, $moduleKey);
 
-        $query = (clone $base)->where(function ($query) use ($user) {
-            $query->where('user_id', $user->id)
-                ->orWhere(function ($roleQuery) use ($user) {
-                    $roleQuery->whereNull('user_id')->where('role', $user->role);
-                });
-        });
-
-        if (!$query->exists()) {
+        if (!$rule) {
             return $field === 'can_override' ? false : true;
         }
-
-        $rule = (clone $query)
-            ->orderByRaw('case when user_id = ? and module_key is not null then 0 when user_id = ? and module_key is null then 1 when user_id is null and module_key is not null then 2 else 3 end', [$user->id, $user->id])
-            ->first();
 
         if (
             $field !== 'can_override'
@@ -65,23 +56,13 @@ class AppPermissionService
 
     public function hasRule(?User $user, ?string $moduleKey): bool
     {
-        if (!$user || !$moduleKey || !Schema::hasTable('app_permission_rules')) {
+        if (!$user || !$moduleKey || !$this->tableReady()) {
             return false;
         }
 
         $moduleKey = app(BranchModuleRegistryService::class)->canonicalKey($moduleKey);
 
-        return AppPermissionRule::query()
-            ->where(function ($query) use ($moduleKey) {
-                $query->whereNull('module_key')->orWhere('module_key', $moduleKey);
-            })
-            ->where(function ($query) use ($user) {
-                $query->where('user_id', $user->id)
-                    ->orWhere(function ($roleQuery) use ($user) {
-                        $roleQuery->whereNull('user_id')->where('role', $user->role);
-                    });
-            })
-            ->exists();
+        return $this->bestRuleFor($user, $moduleKey) !== null;
     }
 
     public function hasCurrentRule(?string $moduleKey): bool
@@ -123,5 +104,49 @@ class AppPermissionService
             'override', 'developer' => 'can_override',
             default => 'can_view',
         };
+    }
+
+    protected function bestRuleFor(User $user, string $moduleKey): ?AppPermissionRule
+    {
+        return $this->applicableRules($user)
+            ->filter(fn (AppPermissionRule $rule) => $rule->module_key === null || $rule->module_key === $moduleKey)
+            ->sortBy(fn (AppPermissionRule $rule) => match (true) {
+                (int) $rule->user_id === (int) $user->id && $rule->module_key !== null => 0,
+                (int) $rule->user_id === (int) $user->id && $rule->module_key === null => 1,
+                $rule->user_id === null && $rule->module_key !== null => 2,
+                default => 3,
+            })
+            ->first();
+    }
+
+    protected function applicableRules(User $user): Collection
+    {
+        $cacheKey = $user->id . ':' . $user->role;
+
+        if (array_key_exists($cacheKey, $this->applicableRuleCache)) {
+            return $this->applicableRuleCache[$cacheKey];
+        }
+
+        return $this->applicableRuleCache[$cacheKey] = AppPermissionRule::query()
+            ->where(function ($query) use ($user) {
+                $query->where('user_id', $user->id)
+                    ->orWhere(function ($roleQuery) use ($user) {
+                        $roleQuery->whereNull('user_id')->where('role', $user->role);
+                    });
+            })
+            ->get();
+    }
+
+    protected function tableReady(): bool
+    {
+        if ($this->permissionTableReady !== null) {
+            return $this->permissionTableReady;
+        }
+
+        try {
+            return $this->permissionTableReady = Schema::hasTable('app_permission_rules');
+        } catch (\Throwable) {
+            return $this->permissionTableReady = false;
+        }
     }
 }

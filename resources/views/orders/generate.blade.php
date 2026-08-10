@@ -94,7 +94,7 @@
 
 
 @push('page-scripts')
-<script defer src="{{ asset('js/pages/orders-generate.js') }}?v={{ @filemtime(public_path('js/pages/orders-generate.js')) }}"></script>
+<script defer src="{{ asset('js/pages/orders-generate.js') }}?v={{ config('app.version', 'local') }}"></script>
 <script>
         window.__ordersGenerate = {
             lastOrder: @json($last_order),

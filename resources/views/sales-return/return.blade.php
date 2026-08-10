@@ -89,7 +89,7 @@
 @endsection
 
 @push('page-scripts')
-<script defer src="{{ asset('js/pages/sales-return-return.js') }}?v={{ @filemtime(public_path('js/pages/sales-return-return.js')) }}"></script>
+<script defer src="{{ asset('js/pages/sales-return-return.js') }}?v={{ config('app.version', 'local') }}"></script>
 <script>
         window.__salesReturnReturn = {
             detailsUrl: @json(route('sales-returns.get-details')),

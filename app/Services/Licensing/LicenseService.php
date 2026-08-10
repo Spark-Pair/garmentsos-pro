@@ -8,6 +8,7 @@ use App\Services\AuditLogService;
 use App\Services\Updater\InstalledVersionService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 
@@ -50,7 +51,7 @@ class LicenseService
             return LicenseStatus::notEnforced();
         }
 
-        return $this->statusForDeviceLicense();
+        return $this->statusForDeviceLicense(false);
 
         $installation = $this->identity->current();
         $license = License::query()
@@ -187,10 +188,10 @@ class LicenseService
 
     public function verifyNow(): LicenseStatus
     {
-        return $this->statusForDeviceLicense();
+        return $this->statusForDeviceLicense(true);
     }
 
-    protected function statusForDeviceLicense(): LicenseStatus
+    protected function statusForDeviceLicense(bool $forceOnlineCheck = false): LicenseStatus
     {
         $installId = $this->identity->existingInstallId();
         if ($installId === null) {
@@ -200,6 +201,13 @@ class LicenseService
                 'License activation is required. Request a demo/trial or register this device with SparkPair.',
                 ['source' => 'missing_install_id'],
             );
+        }
+
+        if (!$forceOnlineCheck) {
+            $cachedStatus = Cache::get($this->licenseStatusCacheKey($installId));
+            if ($cachedStatus instanceof LicenseStatus) {
+                return $cachedStatus;
+            }
         }
 
         $machineHash = $this->machine->machineHash();
@@ -230,7 +238,7 @@ class LicenseService
 
         if (($result['ok'] ?? false) && is_array($result['body'] ?? null)) {
             $body = $result['body'];
-            return $this->statusFromVerifyResponse($body, 'server_verify');
+            return $this->rememberLicenseStatus($installId, $this->statusFromVerifyResponse($body, 'server_verify'));
         }
 
         if ($this->isUpdateCausedIdentityMismatch($result) && $this->hasApprovedLocalStateForInstall($installId)) {
@@ -242,16 +250,32 @@ class LicenseService
                 'server_status' => $result['status'] ?? null,
             ]);
 
-            return $this->statusFromApprovedStableMigration(
+            return $this->rememberLicenseStatus($installId, $this->statusFromApprovedStableMigration(
                 'This approved installation is being rebound from the old Docker fingerprint to the stable install identity. Refresh approval from SparkPair when internet is available.',
                 $result['message'] ?? $result['error'] ?? null,
-            );
+            ));
         }
 
-        return $this->statusFromVerifyCache(
+        return $this->rememberLicenseStatus($installId, $this->statusFromVerifyCache(
             $result['message'] ?? 'License server is not reachable.',
             $result['error'] ?? null,
-        );
+        ));
+    }
+
+    protected function licenseStatusCacheKey(string $installId): string
+    {
+        return 'licensing.current_status.' . sha1($installId . '|' . $this->machine->machineHash());
+    }
+
+    protected function rememberLicenseStatus(string $installId, LicenseStatus $status): LicenseStatus
+    {
+        $seconds = max(0, (int) config('licensing.status_cache_seconds', 900));
+
+        if ($seconds > 0) {
+            Cache::put($this->licenseStatusCacheKey($installId), $status, $seconds);
+        }
+
+        return $status;
     }
 
     protected function statusFromVerifyResponse(array $body, string $source): LicenseStatus

@@ -32,7 +32,7 @@
 @endsection
 
 @push('page-scripts')
-<script defer src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script defer src="{{ asset('vendor/xlsx/xlsx.full.min.js') }}"></script>
 <script defer src="{{ asset('js/pages/attendances-record.js') }}"></script>
 <script>
         window.__attendancesRecord = {

@@ -1,4 +1,27 @@
 (function() {
+    function loadXlsx() {
+        if (typeof XLSX !== 'undefined') {
+            return Promise.resolve();
+        }
+
+        if (window.__xlsxLoading) {
+            return window.__xlsxLoading;
+        }
+
+        window.__xlsxLoading = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = '/vendor/xlsx/xlsx.full.min.js';
+            script.async = true;
+            script.onload = () => typeof XLSX !== 'undefined'
+                ? resolve()
+                : reject(new Error('Excel export library unavailable.'));
+            script.onerror = () => reject(new Error('Excel export library could not be loaded.'));
+            document.head.appendChild(script);
+        });
+
+        return window.__xlsxLoading;
+    }
+
     function columnWidth(header, rows, index, max = 60) {
         let width = String(header ?? '').length + 2;
         rows.forEach(row => {
@@ -7,9 +30,11 @@
         return Math.min(Math.max(width, 10), max);
     }
 
-    window.exportPageToExcel = function exportPageToExcel() {
-        if (typeof XLSX === 'undefined') {
-            appAlert('Excel export library failed to load.');
+    window.exportPageToExcel = async function exportPageToExcel() {
+        try {
+            await loadXlsx();
+        } catch (error) {
+            appAlert(error.message || 'Excel export library failed to load.');
             return;
         }
 

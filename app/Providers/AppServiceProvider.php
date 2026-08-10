@@ -19,6 +19,10 @@ class AppServiceProvider extends ServiceProvider
             return app(BrandingSettingsService::class)->clientCompany();
         });
 
+        app()->singleton('branding.effective_values', function () {
+            return app(BrandingSettingsService::class)->effectiveValues();
+        });
+
         // Singleton for Pusher flag
         app()->singleton('pusher.enabled', function () {
             return (bool) config('client_company.pusher_enabled')
@@ -125,7 +129,7 @@ class AppServiceProvider extends ServiceProvider
 
         // Share client company with all views
         View::share('client_company', app('client_company'));
-        View::share('branding', app(BrandingSettingsService::class)->effectiveValues());
+        View::share('branding', app('branding.effective_values'));
 
         // Share Pusher enabled flag
         View::share('pusherEnabled', app('pusher.enabled'));

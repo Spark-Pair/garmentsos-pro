@@ -44,7 +44,8 @@ return [
                 'useTLS' => env('PUSHER_SCHEME', 'https') === 'https',
             ],
             'client_options' => [
-                // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
+                'connect_timeout' => (float) env('PUSHER_CONNECT_TIMEOUT', 1.5),
+                'timeout' => (float) env('PUSHER_REQUEST_TIMEOUT', 2),
             ],
         ],
 

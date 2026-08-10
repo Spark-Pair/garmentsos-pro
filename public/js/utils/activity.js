@@ -20,6 +20,6 @@ function updateLastActivity() {
 }
 
 function initActivityPing() {
-    updateLastActivity();
+    setTimeout(updateLastActivity, 60 * 1000);
     setInterval(updateLastActivity, 60 * 60 * 1000);
 }

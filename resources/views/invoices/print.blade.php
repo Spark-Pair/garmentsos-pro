@@ -51,7 +51,7 @@
 @endpush
 
 @push('page-scripts')
-<script defer src="{{ asset('js/pages/invoices-print.js') }}?v={{ @filemtime(public_path('js/pages/invoices-print.js')) }}"></script>
+<script defer src="{{ asset('js/pages/invoices-print.js') }}?v={{ config('app.version', 'local') }}"></script>
 <script>
         document.addEventListener('DOMContentLoaded', function () {
             document.body.classList.add('print-only');

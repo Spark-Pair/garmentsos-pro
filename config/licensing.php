@@ -66,7 +66,9 @@ return [
 
     'install_id_path' => storage_path('app/install-id.txt'),
 
-    'request_timeout_seconds' => 10,
+    'request_timeout_seconds' => (int) env('LICENSE_REQUEST_TIMEOUT_SECONDS', 3),
+
+    'status_cache_seconds' => (int) env('LICENSE_STATUS_CACHE_SECONDS', 900),
 
     'default_enforcement_mode' => 'readonly',
 ];

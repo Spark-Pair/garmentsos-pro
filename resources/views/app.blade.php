@@ -54,7 +54,7 @@
     $canRunUpdateActions = false;
     $updateActionDeniedMessage = '';
     $canManageUpdates = Auth::check() && in_array(Auth::user()->role, ['developer', 'admin'], true);
-    if (Auth::check() && !request()->is('login') && !request()->is('setup')) {
+    if ($canManageUpdates && !request()->is('login') && !request()->is('setup')) {
         try {
             $updateActionAccess = app(\App\Services\Updater\UpdateActionAccessService::class);
             $canRunUpdateActions = $updateActionAccess->canRunFrom(request());
@@ -97,6 +97,7 @@
 
     $appConfig['currentModuleKey'] = $currentBranchModuleKey;
     $appConfig['developerModeModules'] = $developerModeModules;
+    $assetVersion = config('app.version', config('updater.current_version', '1'));
 @endphp
 <!DOCTYPE html>
 <html lang="en" data-theme="{{ $preferredTheme }}">
@@ -544,7 +545,7 @@
             position: absolute;
             left: 50%;
             top: 50%;
-            width: 0.38rem;
+            width: 0.42rem;
             height: 0.085rem;
             border-radius: 999px;
             background: color-mix(in srgb, var(--secondary-text) 68%, white);
@@ -603,14 +604,14 @@
         .app-toggle-input:checked ~ .app-toggle-thumb::before,
         .switchBtn.active .circle::before {
             left: 50%;
-            top: 49%;
+            top: 50%;
             width: 0.24rem;
             height: 0.38rem;
             border: solid var(--primary-color);
             border-width: 0 0.09rem 0.09rem 0;
             border-radius: 0;
             background: transparent;
-            transform: translate(-50%, -50%) rotate(45deg);
+            transform: translate(-50%, -58%) rotate(45deg);
         }
 
         .app-toggle.is-checked .app-toggle-thumb::after,
@@ -756,15 +757,15 @@
         }
 
         .rounded-xl {
-            border-radius: 0.95rem !important;
+            border-radius: 1.05rem !important;
         }
 
         .rounded-2xl {
-            border-radius: 1.15rem !important;
+            border-radius: 1.25rem !important;
         }
 
         .rounded-3xl {
-            border-radius: 1.35rem !important;
+            border-radius: 1.45rem !important;
         }
     </style>
 
@@ -773,9 +774,6 @@
     @vite('resources/css/app.css')
     @stack('page-styles')
 
-    @if($pusherEnabled)
-        <script defer src="https://js.pusher.com/8.4.0/pusher.min.js"></script>
-    @endif
     <script defer src="{{ asset('jquery.js') }}"></script>
     <script defer src="{{ asset('js/validate-inputs.js') }}"></script>
     <script defer src="{{ asset('js/utils/format.js') }}"></script>
@@ -785,7 +783,6 @@
     <script defer src="{{ asset('js/utils/loader.js') }}"></script>
     <script defer src="{{ asset('js/utils/table.js') }}"></script>
     <script defer src="{{ asset('js/utils/layout.js') }}"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <script defer src="{{ asset('js/utils/print-columns.js') }}"></script>
     <script defer src="{{ asset('js/utils/export-excel.js') }}"></script>
     <script defer src="{{ asset('js/utils/backup.js') }}"></script>
@@ -797,20 +794,18 @@
     <script defer src="{{ asset('js/utils/navigation.js') }}"></script>
     <script defer src="{{ asset('js/utils/readonly.js') }}"></script>
     <script defer src="{{ asset('js/utils/amounts.js') }}"></script>
-    @if($pusherEnabled)
-        <script defer src="{{ asset('js/utils/pusher-notifications.js') }}"></script>
-    @endif
+    <script defer src="{{ asset('js/utils/pusher-notifications.js') }}"></script>
     <script defer src="{{ asset('js/components/select.js') }}"></script>
-    <script defer src="{{ asset('js/components/input.js') }}?v={{ @filemtime(public_path('js/components/input.js')) }}"></script>
-    <script defer src="{{ asset('js/components/overlay-scrollbar.js') }}?v={{ @filemtime(public_path('js/components/overlay-scrollbar.js')) }}"></script>
+    <script defer src="{{ asset('js/components/input.js') }}?v={{ $assetVersion }}"></script>
+    <script defer src="{{ asset('js/components/overlay-scrollbar.js') }}?v={{ $assetVersion }}"></script>
     <script defer src="{{ asset('js/app-init.js') }}"></script>
 
     <script defer src="{{ asset('js/components/card.js') }}"></script>
-    <script defer src="{{ asset('js/components/document-print.js') }}?v={{ @filemtime(public_path('js/components/document-print.js')) }}"></script>
-    <script defer src="{{ asset('js/components/document-preview.js') }}?v={{ @filemtime(public_path('js/components/document-preview.js')) }}"></script>
+    <script defer src="{{ asset('js/components/document-print.js') }}?v={{ $assetVersion }}"></script>
+    <script defer src="{{ asset('js/components/document-preview.js') }}?v={{ $assetVersion }}"></script>
     <script defer src="{{ asset('js/components/modal.js') }}"></script>
     <script defer src="{{ asset('js/components/context-menu.js') }}"></script>
-    <script defer src="{{ asset('js/global-filter-manager.js') }}?v={{ @filemtime(public_path('js/global-filter-manager.js')) }}"></script>
+    <script defer src="{{ asset('js/global-filter-manager.js') }}?v={{ $assetVersion }}"></script>
 </head>
 
 <body class="bg-[var(--secondary-bg-color)] text-[var(--text-color)] text-sm min-h-screen flex flex-col md:flex-row items-stretch justify-start fade-in" cz-shortcut-listen="true" data-app-config='@json($appConfig)'>

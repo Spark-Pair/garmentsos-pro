@@ -141,7 +141,7 @@
 
 
 @push('page-scripts')
-<script defer src="{{ asset('js/pages/customer-payments-create.js') }}?v={{ @filemtime(public_path('js/pages/customer-payments-create.js')) }}"></script>
+<script defer src="{{ asset('js/pages/customer-payments-create.js') }}?v={{ config('app.version', 'local') }}"></script>
 <script>
         window.__customerPaymentsCreate = {
             banksOptions: @json($banks_options),

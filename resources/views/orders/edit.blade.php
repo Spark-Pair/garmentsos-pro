@@ -129,7 +129,7 @@
 
 
 @push('page-scripts')
-<script defer src="{{ asset('js/pages/orders-edit.js') }}?v={{ @filemtime(public_path('js/pages/orders-edit.js')) }}"></script>
+<script defer src="{{ asset('js/pages/orders-edit.js') }}?v={{ config('app.version', 'local') }}"></script>
 <script>
         window.__ordersEdit = {
             order: @json($orderPayload),
