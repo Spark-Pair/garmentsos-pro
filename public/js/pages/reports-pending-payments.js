@@ -49,7 +49,7 @@
                 style: `
                     @page {
                         size: A4;
-                        margin: 0.19in;
+                        margin: 3mm;
                     }
 
                     body {

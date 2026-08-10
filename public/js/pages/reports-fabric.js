@@ -532,7 +532,7 @@
                 title: "Print Fabric Report",
                 html: clone.innerHTML,
                 style: `
-                    @page { size: A4; margin: 0; }
+                    @page { size: A4; margin: 3mm; }
                     body { margin: 0; padding: 0; background: #fff; }
                 `,
             });

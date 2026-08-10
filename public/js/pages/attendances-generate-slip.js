@@ -134,7 +134,7 @@
                 style: `
                     @page {
                         size: A4 landscape;
-                        margin: 0;
+                        margin: 3mm;
                     }
 
                     body {

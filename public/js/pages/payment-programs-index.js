@@ -141,7 +141,7 @@ function initPaymentProgramsIndex() {
                 <head>
                     <title>${escapePaymentText(printData.title)}</title>
                     <style>
-                        @page { size: A4; margin: 0.19in; }
+                        @page { size: A4; margin: 3mm; }
                         * { box-sizing: border-box; }
                         body {
                             margin: 0;
