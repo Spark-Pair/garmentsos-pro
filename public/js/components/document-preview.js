@@ -61,15 +61,15 @@
             const note = documentNote(previewData);
             return `
                 ${note ? `
-                    <div class="total col-span-2 flex justify-center items-center border border-black rounded-lg py-1.5 px-4 w-full text-center font-semibold">
+                    <div class="total col-span-2 flex justify-center items-center border border-black rounded-lg py-1.5 px-2.5 w-full text-center font-semibold">
                         ${previewText(note)}
                     </div>
                 ` : ''}
-                <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-4 w-full">
+                <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-2.5 w-full">
                     <div class="text-nowrap">Total Quantity</div>
                     <div class="w-1/4 text-right grow">${formatNumbersDigitLess(totalPackets)} | ${formatNumbersDigitLess(totalPcs)}</div>
                 </div>
-                <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-4 w-full">
+                <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-2.5 w-full">
                     <div class="text-nowrap font-semibold">Net Amount</div>
                     <div class="w-1/4 text-right grow font-semibold">${formatNumbersWithDigits(totalAmount, 1, 1)}</div>
                 </div>
@@ -77,19 +77,19 @@
         }
 
         return `
-            <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-4 w-full">
+            <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-2.5 w-full">
                 <div class="text-nowrap">Total Quantity</div>
                 <div class="w-1/4 text-right grow">${formatNumbersDigitLess(totalPackets)} | ${formatNumbersDigitLess(totalPcs)}</div>
             </div>
-            <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-4 w-full">
+            <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-2.5 w-full">
                 <div class="text-nowrap">Gross Amount</div>
                 <div class="w-1/4 text-right grow">${formatNumbersWithDigits(totalAmount, 1, 1)}</div>
             </div>
-            <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-4 w-full">
+            <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-2.5 w-full">
                 <div class="text-nowrap">Discount ${discount}%</div>
                 <div class="w-1/4 text-right grow">${formatNumbersWithDigits(discountAmount, 1, 1)}</div>
             </div>
-            <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-4 w-full">
+            <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-2.5 w-full">
                 <div class="text-nowrap">Net Amount</div>
                 <div class="w-1/4 text-right grow">${formatNumbersWithDigits(netAmount, 1, 1)}</div>
             </div>

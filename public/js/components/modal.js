@@ -534,10 +534,6 @@ function createModal(data, animate = 'animate') {
         <div id="modal-action"
             class="bg-[var(--secondary-bg-color)] rounded-2xl shadow-lg max-w-3xl w-auto p-3 relative text-sm">
             <div class="flex gap-3">
-                <button onclick="closeModal('${data.id}')" type="button"
-                    class="px-4 py-2 bg-[var(--secondary-bg-color)] border border-gray-600 text-[var(--secondary-text)] rounded-lg hover:bg-[var(--h-bg-color)] transition-all duration-300 ease-in-out cursor-pointer hover:scale-[0.95]">
-                    Close
-                </button>
     `;
 
     if (data.bottomActions) {
@@ -586,6 +582,10 @@ function createModal(data, animate = 'animate') {
     }
 
     clutter += `
+                    <button onclick="closeModal('${data.id}')" type="button"
+                        class="px-4 py-2 bg-[var(--secondary-bg-color)] border border-gray-600 text-[var(--secondary-text)] rounded-lg hover:bg-[var(--h-bg-color)] transition-all duration-300 ease-in-out cursor-pointer hover:scale-[0.95]">
+                        Close
+                    </button>
                 </div>
             </div>
         `;
@@ -819,7 +819,7 @@ function createMenuModalCard(data) {
     if (Array.isArray(data.subMenu) && data.subMenu.length) {
         submenuHtml = `
             <div class="subMenu text-sm fixed border border-[var(--glass-border-color)]/30 w-56 bg-[var(--h-secondary-bg-color)] text-[var(--text-color)] shadow-xl rounded-2xl transform scale-95 transition-all duration-300 ease-in-out z-50 opacity-100 scale-in hidden" style="top: 0; left: 0;">
-                <ul class="p-2">
+                <ul class="p-1.5">
                     ${data.subMenu.map(subMenuAction => `
                         <li>
                             <a href="${subMenuAction.href}" class="block px-4 py-2 hover:bg-[var(--h-bg-color)] rounded-xl transition-all duration-200 ease-in-out text-nowrap">
@@ -838,7 +838,7 @@ function createMenuModalCard(data) {
             onclick='${htmlAttr(data.onclick || "")}'>
             <div class="flex items-start justify-between gap-3">
                 <div class="flex min-w-0 items-start gap-3">
-                    <div class="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--glass-border-color)]/25 bg-[var(--h-bg-color)] text-[var(--text-color)]">
+                    <div class="flex size-11 shrink-0 items-center justify-center rounded-xl border border-[var(--glass-border-color)]/25 bg-[var(--h-bg-color)] text-[var(--text-color)]">
                         ${data.svgIcon || `<span class="text-sm font-bold">${modalText(String(data.name || 'M').slice(0, 2).toUpperCase())}</span>`}
                     </div>
                     <div class="min-w-0">

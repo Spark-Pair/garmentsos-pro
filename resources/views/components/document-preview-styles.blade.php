@@ -205,11 +205,9 @@
     }
 
     .gos-a5-document .total {
-        min-height: 25px;
-        border-radius: 8px !important;
+        border-radius: 10px !important;
         font-size: 11px !important;
         line-height: 1.2 !important;
-        padding: 5px 8px !important;
     }
 
     .gos-a5-document .total > div:first-child {
@@ -594,9 +592,7 @@
     }
 
     .gos-a5-invoice .total {
-        min-height: 24px;
         font-size: 12px !important;
-        padding: 5px 8px !important;
     }
 
     .gos-a5-invoice .total > div:last-child {
