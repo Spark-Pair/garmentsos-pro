@@ -32,6 +32,7 @@
                         'utility_bill_location' => ['text' => 'Utility Bill Location'],
                         'daily_ledger_method' => ['text' => 'Daily Ledger Method'],
                         'daily_ledger_case' => ['text' => 'Daily Ledger Case'],
+                        'worker_type' => ['text' => 'Worker Type'],
                     ]"
                     showDefault
                 />
@@ -59,7 +60,7 @@
                     maxlength="20"
                     data-setup-short-title
                 />
-                
+
                 <!-- login Button -->
                 <button type="submit"
                     class="w-full bg-[var(--primary-color)] text-[var(--text-color)] px-4 py-2 mt-2 rounded-lg hover:bg-[var(--h-primary-color)] transition-all duration-300 ease-in-out font-medium uppercase cursor-pointer">

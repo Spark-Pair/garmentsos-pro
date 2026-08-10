@@ -835,6 +835,8 @@
 
             window.validateForNextStep = function validateForNextStep() {
                 generateInvoice();
+                console.log(JSON.stringify(selectedCustomersArray));
+
                 document.getElementById("customers_array").value = JSON.stringify(selectedCustomersArray);
                 return true;
             };

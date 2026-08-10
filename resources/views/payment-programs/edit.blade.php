@@ -63,11 +63,9 @@
                 <input type="hidden" name="sub_category" value="{{ $paymentProgram->sub_category_id }}">
             @endif
 
-            <x-input label="Remarks" name="remarks" id="remarks" value="{{ old('remarks', $paymentProgram->remarks) }}" placeholder="Enter Remarks" />
+            <x-input label="Amount" type="amount" name="amount" id="amount" value="{{ old('amount', \App\Support\Money::format($paymentProgram->amount)) }}" placeholder='Enter Amount' required dataValidate="required|amount" />
 
-            <div class="col-span-full">
-                <x-input label="Amount" type="amount" name="amount" id="amount" value="{{ old('amount', \App\Support\Money::format($paymentProgram->amount)) }}" placeholder='Enter Amount' required dataValidate="required|amount" />
-            </div>
+            <x-input label="Remarks" name="remarks" id="remarks" value="{{ old('remarks', $paymentProgram->remarks) }}" placeholder="Enter Remarks" />
         </div>
         <div class="w-full flex justify-end mt-4">
             <button type="submit"

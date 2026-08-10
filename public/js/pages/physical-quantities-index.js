@@ -9,7 +9,7 @@
                 class="item row relative group flex border-b border-[var(--h-bg-color)] items-center py-2 cursor-pointer hover:bg-[var(--h-secondary-bg-color)] transition-all fade-in ease-in-out text-xs"
                 data-json='${jsonAttr(data)}'>
 
-                <div class="w-[7%]">${data.article_no}</div>
+                <div class="w-[7%]">${data.article_no} | ${data.size}</div>
                 <div class="w-[7%] capitalize">${data.processed_by}</div>
                 <div class="w-[4%]">${data.unit}</div>
                 <div class="w-[8%]">${data.orderable_quantity}</div>

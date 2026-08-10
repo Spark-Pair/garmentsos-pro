@@ -272,41 +272,154 @@ class InvoiceController extends Controller
     //     return redirect()->route('invoices.create')->with('success', 'Invoice generated successfully.');
     // }
 
+    // public function store(Request $request)
+    // {
+    //     if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant'])) {
+    //         return $resp;
+    //     }
+
+    //     if ($request->has('order_no')) {
+    //         $validator = Validator::make($request->all(), [
+    //             "invoice_no" => "required|string",
+    //             "order_no" => "required|string",
+    //             "date" => "required|date",
+    //             "netAmount" => "required|string",
+    //             "articles_in_invoice" => "required|string",
+    //         ]);
+
+    //         if ($validator->fails()) {
+    //             return redirect()->back()->withErrors($validator)->withInput()->with('error', $validator->errors()->first());
+    //         }
+
+    //         $invoice = null;
+    //         $invoiceCustomerId = null;
+    //         $data = [
+    //             'invoice_no' => app(ModuleBranchService::class)->shouldFilterRecords('invoices')
+    //                 ? app(BranchSerialService::class)->next('invoices', Invoice::class, 'invoice_no', 'INV')
+    //                 : $request->invoice_no,
+    //             'order_no' => $request->order_no,
+    //             'date' => $request->date,
+    //             'netAmount' => $request->netAmount,
+    //             'articles_in_invoice' => json_decode($request->articles_in_invoice, true),
+    //         ];
+
+    //         DB::transaction(function () use ($data, &$invoice, &$invoiceCustomerId) {
+    //             $branches = app(ModuleBranchService::class);
+    //             $orderQuery = $branches->applyRelatedScope(Order::with('articles.article'), 'orders', 'invoices');
+    //             $orderDb = $this->applyDocumentNumberLookup($orderQuery, 'order_no', $data["order_no"])->lockForUpdate()->first();
+    //             if (!$orderDb) {
+    //                 throw ValidationException::withMessages([
+    //                     'order_no' => 'Order not found for the selected branch.',
+    //                 ]);
+    //             }
+
+    //             $sync = app(OrderInvoiceSyncService::class);
+    //             $lines = $sync->normalizeInvoiceLines($data['articles_in_invoice']);
+    //             $sync->validateInvoiceAgainstOrder($orderDb, $lines);
+    //             $this->validateInvoiceStock($lines->groupBy('article_id')->map(fn ($group) => $group->sum('invoice_pcs')), $orderDb->id);
+
+    //             $invoice = Invoice::create([
+    //                 'invoice_no' => $data['invoice_no'],
+    //                 'order_no' => $orderDb->order_no,
+    //                 'shipment_no' => null,
+    //                 'date' => $data['date'],
+    //                 'netAmount' => (int) str_replace(',', '', $data['netAmount']),
+    //                 'customer_id' => $orderDb->customer_id,
+    //                 'branch_id' => $orderDb->branch_id ?: $branches->branchIdForCreate('invoices'),
+    //             ]);
+    //             $invoiceCustomerId = (int) $orderDb->customer_id;
+
+    //             $sync->replaceInvoiceArticles($invoice, $lines);
+    //             $sync->recalculateOrderDispatch($orderDb);
+    //         });
+
+    //         if ($invoice && $invoiceCustomerId) {
+    //             $this->notifyCustomerAboutInvoice($invoiceCustomerId, $invoice->invoice_no);
+    //         }
+    //     } else {
+    //         return redirect()->back()->withInput()->with('error', 'Invoice must be created against an order.');
+    //     }
+
+    //     return redirect()->route('invoices.create')->with('success', 'Invoice generated successfully.');
+    // }
+
     public function store(Request $request)
     {
-        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant'])) {
+        if ($resp = $this->denyIfNoRole([
+            'developer',
+            'owner',
+            'admin',
+            'accountant',
+        ])) {
             return $resp;
         }
 
-        if ($request->has('order_no')) {
+        /*
+        |--------------------------------------------------------------------------
+        | ORDER INVOICE
+        |--------------------------------------------------------------------------
+        */
+        if ($request->filled('order_no')) {
+
             $validator = Validator::make($request->all(), [
-                "invoice_no" => "required|string",
-                "order_no" => "required|string",
-                "date" => "required|date",
-                "netAmount" => "required|string",
-                "articles_in_invoice" => "required|string",
+                'invoice_no' => 'required|string',
+                'order_no' => 'required|string',
+                'date' => 'required|date',
+                'netAmount' => 'required|string',
+                'articles_in_invoice' => 'required|string',
             ]);
 
             if ($validator->fails()) {
-                return redirect()->back()->withErrors($validator)->withInput()->with('error', $validator->errors()->first());
+                return redirect()
+                    ->back()
+                    ->withErrors($validator)
+                    ->withInput()
+                    ->with('error', $validator->errors()->first());
             }
 
             $invoice = null;
             $invoiceCustomerId = null;
+
             $data = [
                 'invoice_no' => app(ModuleBranchService::class)->shouldFilterRecords('invoices')
-                    ? app(BranchSerialService::class)->next('invoices', Invoice::class, 'invoice_no', 'INV')
+                    ? app(BranchSerialService::class)->next(
+                        'invoices',
+                        Invoice::class,
+                        'invoice_no',
+                        'INV'
+                    )
                     : $request->invoice_no,
+
                 'order_no' => $request->order_no,
                 'date' => $request->date,
                 'netAmount' => $request->netAmount,
-                'articles_in_invoice' => json_decode($request->articles_in_invoice, true),
+                'articles_in_invoice' => json_decode(
+                    $request->articles_in_invoice,
+                    true
+                ),
             ];
 
-            DB::transaction(function () use ($data, &$invoice, &$invoiceCustomerId) {
+            DB::transaction(function () use (
+                $data,
+                &$invoice,
+                &$invoiceCustomerId
+            ) {
                 $branches = app(ModuleBranchService::class);
-                $orderQuery = $branches->applyRelatedScope(Order::with('articles.article'), 'orders', 'invoices');
-                $orderDb = $this->applyDocumentNumberLookup($orderQuery, 'order_no', $data["order_no"])->lockForUpdate()->first();
+
+                $orderQuery = $branches->applyRelatedScope(
+                    Order::with('articles.article'),
+                    'orders',
+                    'invoices'
+                );
+
+                $orderDb = $this->applyDocumentNumberLookup(
+                    $orderQuery,
+                    'order_no',
+                    $data['order_no']
+                )
+                    ->lockForUpdate()
+                    ->first();
+
                 if (!$orderDb) {
                     throw ValidationException::withMessages([
                         'order_no' => 'Order not found for the selected branch.',
@@ -314,33 +427,367 @@ class InvoiceController extends Controller
                 }
 
                 $sync = app(OrderInvoiceSyncService::class);
-                $lines = $sync->normalizeInvoiceLines($data['articles_in_invoice']);
-                $sync->validateInvoiceAgainstOrder($orderDb, $lines);
-                $this->validateInvoiceStock($lines->groupBy('article_id')->map(fn ($group) => $group->sum('invoice_pcs')), $orderDb->id);
+
+                $lines = $sync->normalizeInvoiceLines(
+                    $data['articles_in_invoice']
+                );
+
+                $sync->validateInvoiceAgainstOrder(
+                    $orderDb,
+                    $lines
+                );
+
+                $this->validateInvoiceStock(
+                    $lines
+                        ->groupBy('article_id')
+                        ->map(
+                            fn ($group) => $group->sum('invoice_pcs')
+                        ),
+                    $orderDb->id
+                );
 
                 $invoice = Invoice::create([
                     'invoice_no' => $data['invoice_no'],
                     'order_no' => $orderDb->order_no,
                     'shipment_no' => null,
                     'date' => $data['date'],
-                    'netAmount' => (int) str_replace(',', '', $data['netAmount']),
+                    'netAmount' => (int) str_replace(
+                        ',',
+                        '',
+                        $data['netAmount']
+                    ),
                     'customer_id' => $orderDb->customer_id,
-                    'branch_id' => $orderDb->branch_id ?: $branches->branchIdForCreate('invoices'),
+                    'branch_id' => $orderDb->branch_id
+                        ?: $branches->branchIdForCreate('invoices'),
                 ]);
+
                 $invoiceCustomerId = (int) $orderDb->customer_id;
 
-                $sync->replaceInvoiceArticles($invoice, $lines);
-                $sync->recalculateOrderDispatch($orderDb);
+                $sync->replaceInvoiceArticles(
+                    $invoice,
+                    $lines
+                );
+
+                $sync->recalculateOrderDispatch(
+                    $orderDb
+                );
             });
 
             if ($invoice && $invoiceCustomerId) {
-                $this->notifyCustomerAboutInvoice($invoiceCustomerId, $invoice->invoice_no);
+                $this->notifyCustomerAboutInvoice(
+                    $invoiceCustomerId,
+                    $invoice->invoice_no
+                );
             }
-        } else {
-            return redirect()->back()->withInput()->with('error', 'Invoice must be created against an order.');
+
+            return redirect()
+                ->route('invoices.create')
+                ->with(
+                    'success',
+                    'Invoice generated successfully.'
+                );
         }
 
-        return redirect()->route('invoices.create')->with('success', 'Invoice generated successfully.');
+        /*
+        |--------------------------------------------------------------------------
+        | SHIPMENT INVOICE
+        |--------------------------------------------------------------------------
+        */
+        if ($request->filled('shipment_no')) {
+
+            $validator = Validator::make($request->all(), [
+                'shipment_no' => 'required|string',
+                'date' => 'required|date',
+                'customers_array' => 'required|string',
+            ]);
+
+            if ($validator->fails()) {
+                return redirect()
+                    ->back()
+                    ->withErrors($validator)
+                    ->withInput()
+                    ->with('error', $validator->errors()->first());
+            }
+
+            $customers = json_decode(
+                $request->customers_array,
+                true
+            );
+
+            if (!is_array($customers) || empty($customers)) {
+                return redirect()
+                    ->back()
+                    ->withInput()
+                    ->with(
+                        'error',
+                        'Please select at least one customer.'
+                    );
+            }
+
+            /*
+            * Validate selected customers.
+            */
+            foreach ($customers as $customer) {
+                if (
+                    !isset($customer['id']) ||
+                    !isset($customer['carton_count'])
+                ) {
+                    return redirect()
+                        ->back()
+                        ->withInput()
+                        ->with(
+                            'error',
+                            'Invalid customer selection data.'
+                        );
+                }
+
+                if ((int) $customer['carton_count'] < 1) {
+                    return redirect()
+                        ->back()
+                        ->withInput()
+                        ->with(
+                            'error',
+                            'Carton count must be at least 1.'
+                        );
+                }
+            }
+
+            $createdInvoices = [];
+            $customerIds = [];
+
+            DB::transaction(function () use (
+                $request,
+                $customers,
+                &$createdInvoices,
+                &$customerIds
+            ) {
+
+                $branches = app(ModuleBranchService::class);
+
+                /*
+                * Get shipment with its articles.
+                *
+                * This follows the same relationship style already used
+                * in your existing order invoice code:
+                *
+                * Order::with('articles.article')
+                *
+                * If your Shipment relationship has another name,
+                * change 'articles' here.
+                */
+                $shipmentQuery = $branches->applyRelatedScope(
+                    Shipment::with('articles.article'),
+                    'shipments',
+                    'invoices'
+                );
+
+                $shipment = $this->applyDocumentNumberLookup(
+                    $shipmentQuery,
+                    'shipment_no',
+                    $request->shipment_no
+                )
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$shipment) {
+                    throw ValidationException::withMessages([
+                        'shipment_no' =>
+                            'Shipment not found for the selected branch.',
+                    ]);
+                }
+
+                /*
+                * Shipment must have articles.
+                */
+                if (
+                    !$shipment->articles ||
+                    $shipment->articles->isEmpty()
+                ) {
+                    throw ValidationException::withMessages([
+                        'shipment_no' =>
+                            'The selected shipment has no articles.',
+                    ]);
+                }
+
+                /*
+                * Make sure selected customers exist.
+                */
+                $selectedCustomerIds = collect($customers)
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()
+                    ->values();
+
+                $customerModels = Customer::whereIn(
+                    'id',
+                    $selectedCustomerIds
+                )
+                    ->get()
+                    ->keyBy('id');
+
+                if (
+                    $customerModels->count() !==
+                    $selectedCustomerIds->count()
+                ) {
+                    throw ValidationException::withMessages([
+                        'customers_array' =>
+                            'One or more selected customers were not found.',
+                    ]);
+                }
+
+                /*
+                * Calculate total cartons.
+                */
+                $totalCartons = collect($customers)->sum(
+                    fn ($customer) => (int) $customer['carton_count']
+                );
+
+                if ($totalCartons <= 0) {
+                    throw ValidationException::withMessages([
+                        'customers_array' =>
+                            'Invalid carton count.',
+                    ]);
+                }
+
+                /*
+                * Create one invoice per selected customer.
+                */
+                foreach ($customers as $customerData) {
+
+                    $customerId = (int) $customerData['id'];
+                    $cartonCount = (int) $customerData['carton_count'];
+
+                    $customer = $customerModels->get($customerId);
+
+                    if (!$customer) {
+                        continue;
+                    }
+
+                    /*
+                    * Generate invoice number.
+                    */
+                    $invoiceNo = $branches->shouldFilterRecords('invoices')
+                        ? app(BranchSerialService::class)->next(
+                            'invoices',
+                            Invoice::class,
+                            'invoice_no',
+                            'INV'
+                        )
+                        : $request->invoice_no;
+
+                    /*
+                    * Calculate invoice amount.
+                    *
+                    * shipment_pcs is multiplied by customer's carton count.
+                    */
+                    $netAmount = 0;
+
+                    foreach ($shipment->articles as $shipmentArticle) {
+
+                        $shipmentPcs = (int) (
+                            $shipmentArticle->shipment_pcs
+                            ?? $shipmentArticle->quantity
+                            ?? 0
+                        );
+
+                        $salesRate = (float) (
+                            $shipmentArticle->article->sales_rate
+                            ?? 0
+                        );
+
+                        $invoicePcs =
+                            $shipmentPcs * $cartonCount;
+
+                        $netAmount +=
+                            $salesRate * $invoicePcs;
+                    }
+
+                    /*
+                    * Create invoice.
+                    */
+                    $invoice = Invoice::create([
+                        'invoice_no' => $invoiceNo,
+                        'order_no' => null,
+                        'shipment_no' => $shipment->shipment_no,
+                        'date' => $request->date,
+                        'netAmount' => (int) round($netAmount),
+                        'customer_id' => $customerId,
+                        'branch_id' => $shipment->branch_id
+                            ?: $branches->branchIdForCreate('invoices'),
+                        'carton_count' => $cartonCount,
+                    ]);
+
+                    /*
+                    * Create invoice article rows.
+                    */
+                    foreach ($shipment->articles as $shipmentArticle) {
+
+                        $articleId = $shipmentArticle->article_id
+                            ?? $shipmentArticle->article?->id;
+
+                        if (!$articleId) {
+                            continue;
+                        }
+
+                        $shipmentPcs = (int) (
+                            $shipmentArticle->shipment_pcs
+                            ?? $shipmentArticle->quantity
+                            ?? 0
+                        );
+
+                        $invoicePcs =
+                            $shipmentPcs * $cartonCount;
+
+                        InvoiceArticles::create([
+                            'invoice_id' => $invoice->id,
+                            'article_id' => $articleId,
+                            'description' =>
+                                $shipmentArticle->description ?? '',
+                            'invoice_pcs' => $invoicePcs,
+                        ]);
+                    }
+
+                    $createdInvoices[] = $invoice;
+                    $customerIds[] = $customerId;
+                }
+            });
+
+            /*
+            * Notify customers after successful transaction.
+            */
+            foreach ($createdInvoices as $index => $invoice) {
+
+                $customerId = $customerIds[$index] ?? null;
+
+                if ($customerId) {
+                    $this->notifyCustomerAboutInvoice(
+                        $customerId,
+                        $invoice->invoice_no
+                    );
+                }
+            }
+
+            return redirect()
+                ->route('invoices.create')
+                ->with(
+                    'success',
+                    count($createdInvoices) .
+                    ' shipment invoice(s) generated successfully.'
+                );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | INVALID REQUEST
+        |--------------------------------------------------------------------------
+        */
+        return redirect()
+            ->back()
+            ->withInput()
+            ->with(
+                'error',
+                'Invoice must be created against an order or shipment.'
+            );
     }
 
     /**

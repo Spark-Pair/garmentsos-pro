@@ -272,6 +272,7 @@ class PhysicalQuantityReportService
                     'id' => $model->id,
                     'article_id' => $model->article_id,
                     'article_no' => $article->article_no,
+                    'size' => $article->size,
                     'processed_by' => $article->processed_by,
                     'unit' => $article->pcs_per_packet,
                     'total_quantity' => floor($totalPcs / 12) . ' Dz. | ' . $totalPackets,

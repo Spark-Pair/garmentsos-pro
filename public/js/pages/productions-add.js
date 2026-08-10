@@ -880,33 +880,10 @@
                     (templates.issue?.rateEditable || "") +
                     (templates.issue?.amountOptional || "");
 
-                if (
-                    work == "Singer" ||
-                    work == "Stitching" ||
-                    work == "CMT" ||
-                    work == "Kaj Button" ||
-                    work == "Cropping" ||
-                    work == "Packing"
-                ) {
+                if (work !== null && work !== undefined && work !== "") {
                     secondStepHTML =
                         articleHtml +
                         (templates.issue?.materials || "") +
-                        quantityHtml +
-                        rateHtml +
-                        (partsHtml || "") +
-                        issueHandoverHtml +
-                        (templates.issue?.issueDate || "");
-                } else if (
-                    work == "Print" ||
-                    work == "Embroidery" ||
-                    work == "Dhaap" ||
-                    work == "Wash" ||
-                    work == "O/F Look" ||
-                    work == "Bartake" ||
-                    work == "Press"
-                ) {
-                    secondStepHTML =
-                        articleHtml +
                         quantityHtml +
                         rateHtml +
                         (partsHtml || "") +
@@ -1251,7 +1228,7 @@
             };
 
             window.generateQuantityModal = function generateQuantityModal(item) {
-                
+
                 let quantityModalData = {
                     id: "quantityModalForm",
                     name: "Enter Quantity",
@@ -1446,7 +1423,7 @@
             window.trackTicketState = function trackTicketState(elem) {
                 if (elem.value != "") {
                     let selectedTicket = JSON.parse(elem.parentElement.querySelector("li.selected").dataset.option);
-                    
+
                     selectThisArticle(selectedTicket.article);
                     selectThisOption(document.querySelector(`li[data-value="${selectedTicket.work_id}"]`));
                     selectThisOption(document.querySelector(`li[data-value="${selectedTicket.worker_id}"]`));

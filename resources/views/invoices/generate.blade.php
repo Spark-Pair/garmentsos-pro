@@ -136,6 +136,7 @@
                     </div>
                 </div>
 
+                <input type="hidden" id="customers_array" name="customers_array">
                 <input type="hidden" name="articles_in_invoice" id="articles_in_invoice" value="">
 
                 <div class="flex w-full grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-nowrap">
