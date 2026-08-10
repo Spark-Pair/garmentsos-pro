@@ -84,10 +84,10 @@
     window.__paymentProgramsCreate = {
         csrfToken: "{{ csrf_token() }}",
     };
-    window.__paymentProgramsEdit = @json([
+    window.__paymentProgramsEdit = {{ Illuminate\Support\Js::from([
         'customer_id' => old('customer_id', $paymentProgram->customer_id),
         'category' => old('category', $paymentProgram->category),
         'sub_category' => old('sub_category', $paymentProgram->sub_category_id),
-    ]);
+    ]) }};
 </script>
 @endpush

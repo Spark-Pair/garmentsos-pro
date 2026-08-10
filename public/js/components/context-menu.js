@@ -37,22 +37,51 @@ function createContextMenu(data) {
         `;
     }
 
+    const validRecordId = (value) => value !== null
+        && typeof value !== 'undefined'
+        && String(value).trim() !== ''
+        && String(value) !== 'undefined';
+    const usableLink = (link) => typeof link === 'string'
+        && link.trim() !== ''
+        && !/\/(?:undefined|null|NaN)(?:\/|$)/.test(link);
+
+    const editActionHref = (action) => {
+        const recordId = action.dataId ?? data.data?.id ?? data.item?.id;
+        if (!validRecordId(recordId)) return null;
+
+        const basePath = window.location.pathname.replace(/\/+$/, '');
+        return `${basePath}/${encodeURIComponent(recordId)}/edit`;
+    };
+
     if (Array.isArray(data.actions)) {
         data.actions.forEach(action => {
-            if (action.id.includes('edit')) {
-                const basePath = window.location.pathname.replace(/\/+$/, '');
+            if (action.link) {
+                if (!usableLink(action.link)) return;
+
                 clutter += `
                     <li>
-                        <a id="${action.id}-in-context" href="${basePath}/${data.item.id}/edit"
+                        <a id="${action.id}-in-context" href="${action.link}"
                             class="flex items-center w-full px-4 py-2 text-left hover:bg-[var(--h-bg-color)] rounded-md transition-all duration-300 ease-in-out cursor-pointer">
                             ${action.text}
                         </a>
                     </li>
                 `;
-            } else if (action.link) {
+            } else if (action.onclick) {
                 clutter += `
                     <li>
-                        <a id="${action.id}-in-context" href="${action.link}"
+                        <button id="${action.id}-in-context" type="button" onclick='${htmlAttr(action.onclick)}'
+                            class="flex items-center w-full px-4 py-2 text-left hover:bg-[var(--h-bg-color)] rounded-md transition-all duration-300 ease-in-out cursor-pointer">
+                            ${action.text}
+                        </button>
+                    </li>
+                `;
+            } else if (action.id.includes('edit')) {
+                const href = editActionHref(action);
+                if (!href) return;
+
+                clutter += `
+                    <li>
+                        <a id="${action.id}-in-context" href="${href}"
                             class="flex items-center w-full px-4 py-2 text-left hover:bg-[var(--h-bg-color)] rounded-md transition-all duration-300 ease-in-out cursor-pointer">
                             ${action.text}
                         </a>

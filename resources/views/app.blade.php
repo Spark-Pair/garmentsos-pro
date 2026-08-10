@@ -98,6 +98,7 @@
     $appConfig['currentModuleKey'] = $currentBranchModuleKey;
     $appConfig['developerModeModules'] = $developerModeModules;
     $assetVersion = config('app.version', config('updater.current_version', '1'));
+    $suppressPageFlashMessages = request()->route()?->getActionMethod() === 'edit';
 @endphp
 <!DOCTYPE html>
 <html lang="en" data-theme="{{ $preferredTheme }}">
@@ -804,7 +805,7 @@
     <script defer src="{{ asset('js/components/document-print.js') }}?v={{ $assetVersion }}"></script>
     <script defer src="{{ asset('js/components/document-preview.js') }}?v={{ $assetVersion }}"></script>
     <script defer src="{{ asset('js/components/modal.js') }}?v={{ $assetVersion }}.inputs-3"></script>
-    <script defer src="{{ asset('js/components/context-menu.js') }}"></script>
+    <script defer src="{{ asset('js/components/context-menu.js') }}?v={{ $assetVersion }}"></script>
     <script defer src="{{ asset('js/global-filter-manager.js') }}?v={{ $assetVersion }}.skeleton-5"></script>
 </head>
 
@@ -832,21 +833,23 @@
         <main class="flex-1 min-h-0 px-4 py-6 md:p-8 overflow-y-hidden my-scrollbar-2 flex items-center justify-center bg-[var(--bg-color)] rounded-3xl mx-2.5 md:mr-2.5 {{ request()->is('login') ? 'mt-2.5 md:ml-2.5' : 'mt-0 md:ml-0' }} md:mt-2.5 relative">
             {{-- alert --}}
             <div id="messageBox" class="absolute top-5 mx-auto flex items-center flex-col space-y-3 z-[100] text-sm w-full select-none pointer-events-none">
-                @if (session('info'))
-                    <x-alert type="info" :messages="session('info')" />
-                @endif
+                @unless ($suppressPageFlashMessages)
+                    @if (session('info'))
+                        <x-alert type="info" :messages="session('info')" />
+                    @endif
 
-                @if (session('success'))
-                    <x-alert type="success" :messages="session('success')" />
-                @endif
+                    @if (session('success'))
+                        <x-alert type="success" :messages="session('success')" />
+                    @endif
 
-                @if (session('warning'))
-                    <x-alert type="warning" :messages="session('warning')" />
-                @endif
+                    @if (session('warning'))
+                        <x-alert type="warning" :messages="session('warning')" />
+                    @endif
 
-                @if (session('error'))
-                    <x-alert type="error" :messages="session('error')" />
-                @endif
+                    @if (session('error'))
+                        <x-alert type="error" :messages="session('error')" />
+                    @endif
+                @endunless
                 @if (!request()->is('login') && !request()->is('setup') && session('license_readonly'))
                     <x-alert type="warning" :messages="'Read-only mode is enabled. You can view data but cannot make changes.'"/>
                 @endif

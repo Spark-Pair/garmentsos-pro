@@ -43,6 +43,13 @@
             `;
         }
 
+        function hasRecordId(data) {
+            return data?.id !== null
+                && typeof data?.id !== "undefined"
+                && String(data.id).trim() !== ""
+                && String(data.id) !== "undefined";
+        }
+
         window.createRow = function createRow(data) {
             return `
             <div id="${data.id}" oncontextmenu='${htmlAttr(data.oncontextmenu || "")}' onclick='${htmlAttr(data.onclick || "")}'
@@ -81,11 +88,13 @@
                     text: "Edit",
                     onclick: `generateEditProductionModal(${JSON.stringify(data)})`,
                 });
-                actions.push({
-                    id: "delete-production",
-                    text: "Delete",
-                    onclick: `submitResourceDelete('/productions/${data.id}')`,
-                });
+                if (hasRecordId(data)) {
+                    actions.push({
+                        id: "delete-production",
+                        text: "Delete",
+                        onclick: `submitResourceDelete('/productions/${data.id}')`,
+                    });
+                }
             }
 
             createContextMenu({
@@ -140,11 +149,13 @@
                     text: "Edit",
                     onclick: `generateEditProductionModal(${JSON.stringify(data)})`,
                 });
-                bottomActions.push({
-                    id: "delete-production",
-                    text: "Delete",
-                    onclick: `submitResourceDelete('/productions/${data.id}')`,
-                });
+                if (hasRecordId(data)) {
+                    bottomActions.push({
+                        id: "delete-production",
+                        text: "Delete",
+                        onclick: `submitResourceDelete('/productions/${data.id}')`,
+                    });
+                }
             }
 
             createModal({
@@ -165,6 +176,11 @@
         };
 
         window.generateEditProductionModal = function generateEditProductionModal(data) {
+            if (!hasRecordId(data)) {
+                appAlert("Production record ID is missing. Please refresh and try again.", "error");
+                return;
+            }
+
             const isIssue = Boolean(data.issue_date);
             const dateLabel = isIssue ? "Issue Date" : "Receive Date";
             const dateName = isIssue ? "issue_date" : "receive_date";

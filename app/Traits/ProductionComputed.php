@@ -77,7 +77,14 @@ trait ProductionComputed
         if (Schema::hasTable('production_flows')) {
             $this->loadMissing('productionFlows');
             if ($this->productionFlows->isNotEmpty()) {
-                return $this->productionFlows
+                $movementType = $this->issue_date ? 'issue' : 'receive';
+                $flows = $this->productionFlows->where('movement_type', $movementType);
+
+                if ($flows->isEmpty()) {
+                    $flows = $this->productionFlows;
+                }
+
+                return $flows
                     ->groupBy('part')
                     ->map(fn ($flows, $part) => [
                         'part' => (string) $part,
@@ -108,6 +115,10 @@ trait ProductionComputed
         }
 
         $this->loadMissing('productionFlows');
+
+        if ($this->issue_date) {
+            return null;
+        }
 
         return $this->productionFlows
             ->pluck('parent_ticket')
@@ -183,10 +194,41 @@ trait ProductionComputed
 
             case 'worker_name':
                 $workerIds = $this->searchFilterMatchingIds(\App\Models\Employee::class, 'employee_name', $value);
+                $workIds = $this->searchFilterMatchingIds(\App\Models\Setup::class, 'title', $value);
 
-                return $workerIds->isEmpty()
-                    ? $query->whereRaw('1 = 0')
-                    : $query->whereIn('worker_id', $workerIds->all());
+                if ($workerIds->isEmpty() && $workIds->isEmpty()) {
+                    return $query->whereRaw('1 = 0');
+                }
+
+                return $query->where(function ($q) use ($workerIds, $workIds) {
+                    if ($workerIds->isNotEmpty()) {
+                        $q->whereIn('worker_id', $workerIds->all());
+                    }
+
+                    if ($workIds->isNotEmpty()) {
+                        $method = $workerIds->isNotEmpty() ? 'orWhereIn' : 'whereIn';
+                        $q->{$method}('work_id', $workIds->all());
+                    }
+                });
+
+            case 'part':
+            case 'parts':
+                $tokens = $this->searchFilterTokens($value);
+                if ($tokens->isEmpty()) {
+                    return $query;
+                }
+
+                return $query->where(function ($partQuery) use ($tokens) {
+                    $partQuery->whereHas('productionFlows', function ($flowQuery) use ($tokens) {
+                        foreach ($tokens as $token) {
+                            $flowQuery->orWhere('part', 'like', "%{$token}%");
+                        }
+                    });
+
+                    foreach ($tokens as $token) {
+                        $partQuery->orWhere('parts', 'like', "%{$token}%");
+                    }
+                });
 
             case 'ticket':
                 return $this->searchFilterWhereLikeAny($query, 'ticket', $value);

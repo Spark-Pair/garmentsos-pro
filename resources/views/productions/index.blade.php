@@ -12,8 +12,14 @@
             "Worker Name" => [
                 "id" => "worker_name",
                 "type" => "text",
-                "placeholder" => "Enter worker name",
+                "placeholder" => "Enter worker / work",
                                 "dataFilterPath" => "worker_name",
+            ],
+            "Part" => [
+                "id" => "part",
+                "type" => "text",
+                "placeholder" => "Enter part",
+                                "dataFilterPath" => "part_quantities",
             ],
             "Ticket" => [
                 "id" => "ticket",
@@ -66,8 +72,8 @@
 
 
 @push('page-scripts')
-<script defer src="{{ asset('js/pages/production-ticket-print.js') }}"></script>
-<script defer src="{{ asset('js/pages/productions-index.js') }}"></script>
+<script defer src="{{ asset('js/pages/production-ticket-print.js') }}?v={{ config('app.version', 'local') }}"></script>
+<script defer src="{{ asset('js/pages/productions-index.js') }}?v={{ config('app.version', 'local') }}"></script>
 <script>
         window.__productionTicketPrint = {
             company: @json(app(\App\Services\Branches\ModuleBranchService::class)->documentBranding('productions')),

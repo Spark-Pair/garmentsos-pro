@@ -558,18 +558,46 @@ function createModal(data, animate = 'animate') {
             <div class="flex gap-3">
     `;
 
+    const validRecordId = (value) => value !== null
+        && typeof value !== 'undefined'
+        && String(value).trim() !== ''
+        && String(value) !== 'undefined';
+    const usableLink = (link) => typeof link === 'string'
+        && link.trim() !== ''
+        && !/\/(?:undefined|null|NaN)(?:\/|$)/.test(link);
+
+    const editActionHref = (action) => {
+        const recordId = action.dataId ?? data.id;
+        if (!validRecordId(recordId)) return null;
+
+        const basePath = window.location.pathname.replace(/\/+$/, '');
+        return `${basePath}/${encodeURIComponent(recordId)}/edit`;
+    };
+
     if (data.bottomActions) {
         data.bottomActions.forEach(action => {
             if (action.link) {
+                if (!usableLink(action.link)) return;
+
                 clutter += `
                     <a id="${action.id}-in-modal" href="${action.link}"
                         class="px-4 py-2 bg-[var(--secondary-bg-color)] border border-gray-600 text-[var(--secondary-text)] rounded-lg hover:bg-[var(--h-bg-color)] transition-all duration-300 ease-in-out cursor-pointer hover:scale-[0.95]">
                         ${action.text}
                     </a>
                 `;
-            } else if (action.id.includes('edit')) {
+            } else if (action.onclick) {
                 clutter += `
-                    <a id="${action.id}-in-modal" href="${window.location.pathname}/${action.dataId}/edit"
+                    <button id="${action.id}-in-modal" type="${action.type ?? 'button'}" onclick='${htmlAttr(action.onclick)}'
+                        class="px-4 py-2 bg-${(action.id.includes('add') || action.id.includes('done'))? '[var(--bg-success)]' : '[var(--secondary-bg-color)]'} border hover:border-${(action.id.includes('add') || action.id.includes('done'))? '[var(--border-success)] border-[var(--bg-success)]' : 'gray-600 border-gray-600'} text-${(action.id.includes('add') || action.id.includes('done'))? '[var(--border-success)]' : '[var(--secondary-text)]'} rounded-lg hover:bg-${(action.id.includes('add') || action.id.includes('done'))? '[var(--h-bg-success)]' : '[var(--h-bg-color)]'} transition-all duration-300 ease-in-out cursor-pointer hover:scale-[0.95]">
+                        ${action.text}
+                    </button>
+                `;
+            } else if (action.id.includes('edit')) {
+                const href = editActionHref(action);
+                if (!href) return;
+
+                clutter += `
+                    <a id="${action.id}-in-modal" href="${href}"
                         class="px-4 py-2 bg-[var(--secondary-bg-color)] border border-gray-600 text-[var(--secondary-text)] rounded-lg hover:bg-[var(--h-bg-color)] transition-all duration-300 ease-in-out cursor-pointer hover:scale-[0.95]">
                         ${action.text}
                     </a>

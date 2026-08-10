@@ -112,8 +112,12 @@ class ProductionController extends Controller
             $productionsQuery = $branches
                 ->applyScope(Production::with($relations)->orderByDesc('id'), 'productions');
             if (app(ProductionFlowService::class)->ready()) {
-                $productionsQuery->whereDoesntHave('productionFlows', function ($query) {
-                    $query->whereNotNull('parent_ticket');
+                $productionsQuery->where(function ($query) {
+                    $query
+                        ->whereNotNull('issue_date')
+                        ->orWhereDoesntHave('productionFlows', function ($flowQuery) {
+                            $flowQuery->whereNotNull('parent_ticket');
+                        });
                 });
             }
 
@@ -701,6 +705,17 @@ class ProductionController extends Controller
     public function edit(Production $production)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($production, 'productions');
+
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'manager', 'admin', 'accountant', 'store_keeper'])) {
+            return $resp;
+        }
+
+        $production->loadMissing(['article', 'work', 'worker', 'productionFlows']);
+
+        return view('productions.edit', [
+            'production' => $production,
+            'branchBranding' => app(ModuleBranchService::class)->documentBranding('productions', $production),
+        ]);
     }
 
     /**
