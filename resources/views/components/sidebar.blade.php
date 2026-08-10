@@ -10,40 +10,39 @@
 
 <!-- Logout Modal -->
 <div id="logoutModal"
-    class="hidden fixed inset-0 z-[99] flex items-center justify-center bg-[var(--overlay-color)] text-xs md:text-sm fade-in">
-    <!-- Modal Content -->
-    <div class="bg-[var(--secondary-bg-color)] rounded-xl shadow-lg w-80 md:w-full md:max-w-lg p-6 relative">
-        <!-- Close Button -->
+    class="hidden fixed inset-0 z-[99] flex items-center justify-center bg-[var(--overlay-color)] px-4 text-xs md:text-sm fade-in">
+    <div class="w-80 rounded-xl border border-[var(--glass-border-color)]/20 bg-[var(--secondary-bg-color)] p-5 shadow-lg relative md:w-full md:max-w-md">
         <button type="button" onclick="closeLogoutModal()"
-            class="absolute top-3 right-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-all duration-300 ease-in-out cursor-pointer">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
-                class="w-6 h-6">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            class="absolute right-4 top-4 flex size-8 items-center justify-center rounded-lg text-[var(--secondary-text)] transition-all duration-300 ease-in-out hover:bg-[var(--h-bg-color)] hover:text-[var(--text-color)] cursor-pointer">
+            <i class="fas fa-xmark"></i>
         </button>
 
-        <!-- Modal Body -->
-        <div class="modal_body flex items-start">
-            <div class="w-1/3 h-1/3 md:w-1/5 md:h-1/5">
-                <img src="{{ asset('images/error_icon.png') }}" alt="" class="w-full h-full object-cover">
+        <div class="mb-5 flex items-start gap-3 pr-8">
+            <div class="flex size-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border-error)]/25 bg-[var(--bg-error)]/25 text-[var(--text-error)]">
+                <i class="fas fa-right-from-bracket text-sm"></i>
             </div>
-            <div class="content ml-5">
-                <h2 class="text-lg md:text-xl font-semibold text-[var(--text-color)]">Logout Account</h2>
-                <p class="text-[var(--secondary-text)] mt-1 mb-4 md:mt-2 md:mb-6">Are you sure you want to logout? All of your data will be permanently removed. This action cannot be undone.</p>
+            <div class="min-w-0">
+                <h2 class="text-lg font-semibold leading-6 text-[var(--text-color)]">Logout Account</h2>
+                <p class="mt-1 text-sm text-[var(--secondary-text)]">End your current session?</p>
             </div>
         </div>
 
-        <!-- Modal Footer -->
-        <div class="flex justify-end space-x-3">
-            <!-- Cancel Button -->
-            <button type="button" onclick="closeLogoutModal()"
-                class="px-4 py-2 bg-[var(--secondary-bg-color)] border text-[var(--secondary-text)] rounded-md hover:bg-[var(--bg-color)] transition-all duration-300 ease-in-out cursor-pointer">Cancel</button>
+        <div class="mb-5 rounded-lg border border-[var(--glass-border-color)]/10 bg-[var(--h-bg-color)]/60 px-4 py-3">
+            <p class="truncate text-sm font-semibold capitalize text-[var(--text-color)]">{{ Auth::user()->name }}</p>
+            <p class="mt-1 truncate text-xs text-[var(--secondary-text)]">username: {{ Auth::user()->username }}</p>
+        </div>
 
-            <!-- Logout Form -->
+        <div class="flex justify-end gap-3">
+            <button type="button" onclick="closeLogoutModal()"
+                class="rounded-lg border border-gray-600 bg-[var(--h-bg-color)] px-4 py-2 font-semibold text-[var(--secondary-text)] transition-all duration-300 ease-in-out hover:bg-[var(--secondary-bg-color)] hover:text-[var(--text-color)] cursor-pointer">Cancel</button>
+
             <form id="logoutForm" method="POST" action="{{ route('logout') }}" data-readonly-allow>
                 @csrf
                 <button type="submit"
-                    class="px-4 py-2 bg-[var(--danger-color)] text-white rounded-md hover:bg-[var(--h-danger-color)] transition-all duration-300 ease-in-out cursor-pointer">Logout</button>
+                    class="flex items-center gap-2 rounded-lg bg-[var(--danger-color)] px-4 py-2 font-semibold text-white transition-all duration-300 ease-in-out hover:bg-[var(--h-danger-color)] cursor-pointer">
+                    <i class="fas fa-right-from-bracket text-xs"></i>
+                    Logout
+                </button>
             </form>
         </div>
     </div>
