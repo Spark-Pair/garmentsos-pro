@@ -98,6 +98,19 @@ class ArticleStockService
             ->groupBy('article_id')
             ->pluck('quantity', 'article_id');
 
+        $shipmentInvoicedPcs = InvoiceArticles::query()
+            ->whereIn('article_id', $missingArticleIds)
+            ->whereHas('invoice', fn ($invoiceQuery) => $invoiceQuery->whereNotNull('shipment_no'))
+            ->when(!empty($branchIds) && Schema::hasColumn('invoices', 'branch_id'), fn ($query) => $query->whereHas('invoice', fn ($invoiceQuery) => $invoiceQuery->where(function ($scope) use ($branchIds, $includeNullBranchRecords) {
+                $scope->whereIn('branch_id', $branchIds);
+                if ($includeNullBranchRecords) {
+                    $scope->orWhereNull('branch_id');
+                }
+            })))
+            ->selectRaw('article_id, SUM(invoice_pcs) as quantity')
+            ->groupBy('article_id')
+            ->pluck('quantity', 'article_id');
+
         $returnRows = SalesReturn::query()
             ->whereIn('article_id', $missingArticleIds)
             ->when(!empty($branchIds) && Schema::hasColumn('sales_returns', 'branch_id'), fn ($query) => $query->where(function ($scope) use ($branchIds, $includeNullBranchRecords) {
@@ -116,6 +129,7 @@ class ArticleStockService
             $physicalRows,
             $orderedPcs,
             $invoicedPcs,
+            $shipmentInvoicedPcs,
             $returnRows
         ) {
             $article = $articles->get($articleId);
@@ -136,7 +150,7 @@ class ArticleStockService
             $receivedPcs = $unit > 0 ? (int) round($receivedPackets * $unit) : 0;
             $totalOrderedPcs = (int) ($orderedPcs->get($articleId) ?? 0);
             $totalInvoicedPcs = (int) ($invoicedPcs->get($articleId) ?? 0);
-            $totalShipmentInvoicedPcs = (int) ($invoicedPcs->whereNotNull('shipment_id')->get($articleId) ?? 0);
+            $totalShipmentInvoicedPcs = (int) ($shipmentInvoicedPcs->get($articleId) ?? 0);
             $totalReturnPcs = (int) ($returns->firstWhere('type', 'return')?->quantity ?? 0);
             $totalAdjustmentPcs = (int) ($returns->firstWhere('type', 'adjustment')?->quantity ?? 0);
             $currentStockPcs = max(0, $receivedPcs - $totalInvoicedPcs + $totalReturnPcs + $totalAdjustmentPcs);
