@@ -257,28 +257,40 @@ class PhysicalQuantityController extends Controller
             return $resp;
         }
 
-        $validator = Validator::make($request->all(), [
+        $canEditArticleMeta = Auth::user()?->role === 'developer' || app_can('physical_quantities', 'override');
+        $rules = [
             'date' => 'required|date',
-            'processed_by' => 'required|string',
-            'pcs_per_packet' => 'nullable|integer|min:1',
             'packets' => 'required|integer|min:1',
             'category' => 'required|string',
-        ]);
+        ];
+
+        if ($canEditArticleMeta) {
+            $rules['processed_by'] = 'required|string';
+            $rules['pcs_per_packet'] = 'nullable|integer|min:1';
+        }
+
+        $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
         $data = $validator->validated();
-        $articleUpdate = [
-            'processed_by' => $data['processed_by'],
-        ];
+        $articleUpdate = [];
 
-        if (!empty($data['pcs_per_packet'])) {
-            $articleUpdate['pcs_per_packet'] = $data['pcs_per_packet'];
+        if ($canEditArticleMeta) {
+            $articleUpdate = [
+                'processed_by' => $data['processed_by'],
+            ];
+
+            if (!empty($data['pcs_per_packet'])) {
+                $articleUpdate['pcs_per_packet'] = $data['pcs_per_packet'];
+            }
         }
 
-        Article::where('id', $physicalQuantity->article_id)->update($articleUpdate);
+        if (!empty($articleUpdate)) {
+            Article::where('id', $physicalQuantity->article_id)->update($articleUpdate);
+        }
 
         $physicalQuantity->update([
             'date' => $data['date'],

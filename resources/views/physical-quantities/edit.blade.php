@@ -9,6 +9,7 @@
     ];
     $article = $physicalQuantity->article;
     $articleText = trim(($article?->article_no ?? '-') . ' | ' . ($article?->description ?? ''));
+    $canEditArticleMeta = Auth::user()?->role === 'developer' || app_can('physical_quantities', 'override');
 @endphp
     <div class="max-w-5xl mx-auto">
         <x-search-header heading="Edit Physical Quantity" link linkText="Show Physical Quantities" linkHref="{{ route('physical-quantities.index') }}"/>
@@ -31,7 +32,7 @@
                 </div>
 
                 <div class="w-1/4">
-                    <x-input label="Processed By" name="processed_by" id="processed_by" value="{{ old('processed_by', $article?->processed_by) }}" placeholder="Enter processed by" required />
+                    <x-input label="Processed By" name="processed_by" id="processed_by" value="{{ old('processed_by', $article?->processed_by) }}" placeholder="Enter processed by" :disabled="!$canEditArticleMeta" :required="$canEditArticleMeta" />
                 </div>
             </div>
 
@@ -43,8 +44,9 @@
                     :options="$masterUnitOptions"
                     :value="old('pcs_per_packet', $article?->pcs_per_packet ?: '')"
                     showDefault
-                    dataClearable
-                    addBtnLink="{{ route('setups.create') }}"
+                    :dataClearable="$canEditArticleMeta"
+                    :disabled="!$canEditArticleMeta"
+                    addBtnLink="{{ $canEditArticleMeta ? route('setups.create') : '' }}"
                 />
                 <x-input label="Packets" name="packets" id="packets" type="number" value="{{ old('packets', $physicalQuantity->packets) }}" placeholder="Enter packet count" required />
                 <x-select label="Category" name="category" id="category" :options="$category_options" :value="old('category', $physicalQuantity->category)" required />

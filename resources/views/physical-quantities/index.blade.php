@@ -80,7 +80,7 @@
 
 
 @push('page-scripts')
-<script defer src="{{ asset('js/pages/physical-quantities-index.js') }}"></script>
+<script defer src="{{ asset('js/pages/physical-quantities-index.js') }}?v={{ config('app.version', 'local') }}.partial-modal-1"></script>
 <script>
         window.__physicalQuantitiesIndex = {
             authLayout: @json($authLayout),

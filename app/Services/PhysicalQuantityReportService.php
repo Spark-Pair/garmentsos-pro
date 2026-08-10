@@ -248,8 +248,28 @@ class PhysicalQuantityReportService
                 $currentStockPackets = (float) ($stock['current_stock_packets'] ?? 0);
                 $remainingPackets = (float) ($stock['remaining_quantity_packets'] ?? 0);
                 $shipment = $this->resolveShipment($shipmentCitiesMap->get($model->article_id, collect()));
+                $partialRecords = $items
+                    ->sortByDesc('id')
+                    ->map(function (PhysicalQuantity $item) {
+                        $category = str_replace('_', ' ', (string) $item->category);
+                        $date = $item->date
+                            ? date('d-M-Y', strtotime((string) $item->date))
+                            : '-';
+
+                        return [
+                            'id' => $item->id,
+                            'date' => $date,
+                            'category' => ucwords($category),
+                            'packets' => $this->formatPacketQuantity((float) $item->packets),
+                            'source' => $this->isSalesReturnQuantity($item) ? 'Sales Return' : 'Physical Quantity',
+                            'created_by' => $item->creator?->name ?? '-',
+                        ];
+                    })
+                    ->values()
+                    ->all();
 
                 return [
+                    'id' => $model->id,
                     'article_id' => $model->article_id,
                     'article_no' => $article->article_no,
                     'processed_by' => $article->processed_by,
@@ -275,6 +295,7 @@ class PhysicalQuantityReportService
                     'adjustment_packets_numeric' => $adjustmentPackets,
                     'current_stock_packets_numeric' => $currentStockPackets,
                     'remaining_packets_numeric' => $remainingPackets,
+                    'partial_records' => $partialRecords,
                     'onclick' => 'generateModal(this)',
                     'oncontextmenu' => 'generateContextMenu(event)',
                 ];
