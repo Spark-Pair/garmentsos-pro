@@ -799,6 +799,7 @@
                         shipment_no: selectedShipmentNo(),
                         carton_count: cartonCount,
                         discount: discount || 0,
+                        netAmount: netAmount || null,
                         branch_branding: companyData,
                         invoice_articles: sortArticleRows(shipmentArticles).map((article) => ({
                             article: article.article,
@@ -808,6 +809,9 @@
                             invoice_pcs: article.shipment_pcs * cartonCount,
                         })),
                     };
+
+                    console.log(previewData);
+                    
 
                     previewDom.className = "h-auto mx-auto relative flex flex-col";
                     previewDom.innerHTML = [
@@ -835,7 +839,6 @@
 
             window.validateForNextStep = function validateForNextStep() {
                 generateInvoice();
-                console.log(JSON.stringify(selectedCustomersArray));
 
                 document.getElementById("customers_array").value = JSON.stringify(selectedCustomersArray);
                 return true;
@@ -847,24 +850,47 @@
 
                 printBtn.addEventListener("click", (e) => {
                     e.preventDefault();
+
                     closeAllDropdowns();
+
                     generateInvoice();
 
                     const form = document.getElementById("form");
-                    const preview = document.getElementById("preview-container") || document.getElementById("preview");
-                    if (!form || !preview) return;
+                    if (!form) return;
 
-                    window.DocumentPrint.printPreview({
-                        title: 'Print Invoice',
-                        preview,
-                        delay: 1000,
-                        beforePrint: printDocument => {
-                            compactInvoicePrintHeaders(printDocument);
-                            const invoiceCopy = printDocument.querySelector("#preview-container .preview-copy, #preview-container .invoice-copy");
-                            if (invoiceCopy) invoiceCopy.textContent = "Invoice Copy: Office";
-                        },
-                        afterPrint: () => form.submit(),
-                    });
+                    // Tell Laravel that this is Save & Print
+                    let printAfterSaveInput = form.querySelector(
+                        'input[name="printAfterSave"]'
+                    );
+
+                    if (!printAfterSaveInput) {
+                        printAfterSaveInput = document.createElement("input");
+                        printAfterSaveInput.type = "hidden";
+                        printAfterSaveInput.name = "printAfterSave";
+                        form.appendChild(printAfterSaveInput);
+                    }
+
+                    printAfterSaveInput.value = "1";
+
+                    // Shipment customers
+                    if (invoiceType === "shipment") {
+                        const customersInput = document.getElementById("customers_array");
+
+                        if (customersInput) {
+                            customersInput.value = JSON.stringify(selectedCustomersArray);
+                        }
+                    }
+
+                    // Order articles
+                    if (invoiceType === "order") {
+                        updateInputArticlesInInvoice();
+                    }
+
+                    // IMPORTANT:
+                    // Do NOT open print window here.
+                    // Submit first so Laravel saves the invoice.
+                    printAfterSave = 1
+                    form.submit();
                 });
             }
 
@@ -1197,24 +1223,47 @@
 
                 printBtn.addEventListener("click", (e) => {
                     e.preventDefault();
+
                     closeAllDropdowns();
+
                     generateInvoice();
 
                     const form = document.getElementById("form");
-                    const preview = document.getElementById("preview-container") || document.getElementById("preview");
-                    if (!form || !preview) return;
+                    if (!form) return;
 
-                    window.DocumentPrint.printPreview({
-                        title: 'Print Invoice',
-                        preview,
-                        delay: 1000,
-                        beforePrint: printDocument => {
-                            compactInvoicePrintHeaders(printDocument);
-                            const invoiceCopy = printDocument.querySelector("#preview-container .preview-copy, #preview-container .invoice-copy");
-                            if (invoiceCopy) invoiceCopy.textContent = "Invoice Copy: Office";
-                        },
-                        afterPrint: () => form.submit(),
-                    });
+                    // Tell Laravel that this is Save & Print
+                    let printAfterSaveInput = form.querySelector(
+                        'input[name="printAfterSave"]'
+                    );
+
+                    if (!printAfterSaveInput) {
+                        printAfterSaveInput = document.createElement("input");
+                        printAfterSaveInput.type = "hidden";
+                        printAfterSaveInput.name = "printAfterSave";
+                        form.appendChild(printAfterSaveInput);
+                    }
+
+                    printAfterSaveInput.value = "1";
+
+                    // Shipment customers
+                    if (invoiceType === "shipment") {
+                        const customersInput = document.getElementById("customers_array");
+
+                        if (customersInput) {
+                            customersInput.value = JSON.stringify(selectedCustomersArray);
+                        }
+                    }
+
+                    // Order articles
+                    if (invoiceType === "order") {
+                        updateInputArticlesInInvoice();
+                    }
+
+                    // IMPORTANT:
+                    // Do NOT open print window here.
+                    // Submit first so Laravel saves the invoice.
+                    printAfterSave = 1
+                    form.submit();
                 });
             }
 

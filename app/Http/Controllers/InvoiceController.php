@@ -354,6 +354,8 @@ class InvoiceController extends Controller
             return $resp;
         }
 
+        $invoiceNumbers = [];
+
         /*
         |--------------------------------------------------------------------------
         | ORDER INVOICE
@@ -480,6 +482,12 @@ class InvoiceController extends Controller
                 );
             }
 
+            if ($request->boolean('printAfterSave')) {
+                session()->put('invoiceNumbers', [$invoice->invoice_no]);
+
+                return redirect()->route('invoices.print');
+            }
+
             return redirect()
                 ->route('invoices.create')
                 ->with(
@@ -498,6 +506,7 @@ class InvoiceController extends Controller
             $validator = Validator::make($request->all(), [
                 'shipment_no' => 'required|string',
                 'date' => 'required|date',
+                'netAmount' => 'required|string',
                 'customers_array' => 'required|string',
             ]);
 
@@ -559,7 +568,8 @@ class InvoiceController extends Controller
                 $request,
                 $customers,
                 &$createdInvoices,
-                &$customerIds
+                &$customerIds,
+                &$invoiceNumbers
             ) {
 
                 $branches = app(ModuleBranchService::class);
@@ -680,7 +690,6 @@ class InvoiceController extends Controller
                     *
                     * shipment_pcs is multiplied by customer's carton count.
                     */
-                    $netAmount = 0;
 
                     foreach ($shipment->articles as $shipmentArticle) {
 
@@ -694,12 +703,6 @@ class InvoiceController extends Controller
                             $shipmentArticle->article->sales_rate
                             ?? 0
                         );
-
-                        $invoicePcs =
-                            $shipmentPcs * $cartonCount;
-
-                        $netAmount +=
-                            $salesRate * $invoicePcs;
                     }
 
                     /*
@@ -710,12 +713,18 @@ class InvoiceController extends Controller
                         'order_no' => null,
                         'shipment_no' => $shipment->shipment_no,
                         'date' => $request->date,
-                        'netAmount' => (int) round($netAmount),
+                        'netAmount' => (int) str_replace(
+                            ',',
+                            '',
+                            $request->netAmount
+                        ) * $cartonCount,
                         'customer_id' => $customerId,
                         'branch_id' => $shipment->branch_id
                             ?: $branches->branchIdForCreate('invoices'),
                         'carton_count' => $cartonCount,
                     ]);
+
+                    $invoiceNumbers[] = $invoice->invoice_no;
 
                     /*
                     * Create invoice article rows.
@@ -756,7 +765,6 @@ class InvoiceController extends Controller
             * Notify customers after successful transaction.
             */
             foreach ($createdInvoices as $index => $invoice) {
-
                 $customerId = $customerIds[$index] ?? null;
 
                 if ($customerId) {
@@ -765,6 +773,12 @@ class InvoiceController extends Controller
                         $invoice->invoice_no
                     );
                 }
+            }
+
+            if ($request->boolean('printAfterSave')) {
+                session()->put('invoiceNumbers', $invoiceNumbers);
+
+                return redirect()->route('invoices.print');
             }
 
             return redirect()
@@ -984,17 +998,99 @@ class InvoiceController extends Controller
 
     public function print()
     {
-        $invoiceNumbers = session('invoiceNumbers');
+        /*
+        |--------------------------------------------------------------------------
+        | Get invoice numbers saved by store()
+        |--------------------------------------------------------------------------
+        */
+        $invoiceNumbers = session()->get('invoiceNumbers', []);
 
-        if (!$invoiceNumbers) {
-            return redirect()->route('invoices.create')->with('error', 'No invoices to print.');
+        if (!is_array($invoiceNumbers)) {
+            $invoiceNumbers = [$invoiceNumbers];
         }
 
-        $invoices = Invoice::with(["customer.city", 'invoiceArticles.article', 'shipment', 'order', 'branch'])->whereIn('invoice_no', $invoiceNumbers)->get();
+        $invoiceNumbers = collect($invoiceNumbers)
+            ->filter(fn ($number) => filled($number))
+            ->map(fn ($number) => trim((string) $number))
+            ->unique()
+            ->values()
+            ->all();
 
-        $invoicePayloads = $invoices->map(fn (Invoice $invoice) => $invoice->toFormattedArray()['data'])->values();
+        /*
+        |--------------------------------------------------------------------------
+        | No invoice numbers
+        |--------------------------------------------------------------------------
+        */
+        if (empty($invoiceNumbers)) {
+            return redirect()
+                ->route('invoices.create')
+                ->with('error', 'No invoices to print.');
+        }
 
-        return view("invoices.print", compact("invoices", "invoicePayloads"));
+        /*
+        |--------------------------------------------------------------------------
+        | Load invoices
+        |--------------------------------------------------------------------------
+        */
+        $invoices = Invoice::query()
+            ->with([
+                'customer.city',
+                'invoiceArticles.article',
+                'shipment',
+                'order',
+                'branch',
+            ])
+            ->whereIn('invoice_no', $invoiceNumbers)
+            ->orderBy('id')
+            ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Invoice numbers exist but records were not found
+        |--------------------------------------------------------------------------
+        */
+        if ($invoices->isEmpty()) {
+            // Clear invalid print session
+            session()->forget('invoiceNumbers');
+
+            return redirect()
+                ->route('invoices.create')
+                ->with(
+                    'error',
+                    'Invoices not found: ' . implode(', ', $invoiceNumbers)
+                );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Prepare invoice payloads
+        |--------------------------------------------------------------------------
+        */
+        $invoicePayloads = $invoices
+            ->map(function (Invoice $invoice) {
+                $formatted = $invoice->toFormattedArray();
+
+                return $formatted['data'] ?? $formatted;
+            })
+            ->values();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Remove print queue after successfully loading invoices
+        |--------------------------------------------------------------------------
+        */
+        session()->forget('invoiceNumbers');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Print view
+        |--------------------------------------------------------------------------
+        */
+        return view('invoices.print', [
+            'invoices' => $invoices,
+            'invoicePayloads' => $invoicePayloads,
+            'client_company' => app('client_company'),
+        ]);
     }
 
     private function validateInvoiceStock($invoiceQuantities, ?int $excludeOrderId = null): void
