@@ -9,7 +9,12 @@
         const companyLogoBase = config.companyLogoBase || "";
         const searchFieldsHtml = config.searchFieldsHtml || "";
         const errorAlertTemplate = config.errorAlertTemplate || "";
+        const discountDisabled = Boolean(config.discountDisabled);
         let invoicePreviewOffset = 0;
+
+        function invoiceDiscountDisabled() {
+            return discountDisabled;
+        }
 
         function safeDocumentNumberPreview(value, fallback = "Will be generated on save") {
             const text = String(value ?? "").trim();

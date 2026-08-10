@@ -82,13 +82,17 @@ class InvoiceController extends Controller
             return $resp;
         }
 
+        $user = Auth::user();
         $orderNumber = session('orderNumber');
 
         if ($orderNumber) {
-            $user = Auth::user();
             $user->invoice_type = 'order';
             $user->save();
         }
+
+        $invoiceType = in_array($user?->invoice_type, ['order', 'shipment'], true)
+            ? $user->invoice_type
+            : 'order';
 
         $last_Invoice = Invoice::orderBy('id', 'desc')->first();
 
@@ -115,9 +119,15 @@ class InvoiceController extends Controller
             ->map(fn ($orderNo) => ['text' => $orderNo])
             ->toArray();
 
+        $shipmentsOptions = $branches->applyRelatedScope(Shipment::query(), 'shipments', 'invoices')
+            ->orderByDesc('id')
+            ->pluck('shipment_no', 'shipment_no')
+            ->map(fn ($shipmentNo) => ['text' => $shipmentNo])
+            ->toArray();
+
         $branchBranding = app(ModuleBranchService::class)->documentBranding('invoices');
 
-        return view("invoices.generate", compact("last_Invoice", 'customers', 'orderNumber', 'branchBranding', 'nextInvoiceNo', 'ordersOptions'));
+        return view("invoices.generate", compact("last_Invoice", 'customers', 'orderNumber', 'branchBranding', 'nextInvoiceNo', 'ordersOptions', 'shipmentsOptions', 'invoiceType'));
     }
 
     /**

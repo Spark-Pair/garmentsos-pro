@@ -6,10 +6,6 @@
     @endphp
 
     @php
-        $invoiceType = 'order';
-    @endphp
-
-    @php
         $searchFields = [
             "Customer Name" => [
                 "id" => "customer_name",
@@ -68,7 +64,7 @@
         $errorAlertTemplate = view('components.alert', ['type' => 'error', 'messages' => '__MESSAGE__'])->render();
     @endphp
 
-    <div class="switch-btn-container hidden absolute top-3 md:top-17 left-3 md:left-5 z-[100]">
+    <div class="switch-btn-container absolute top-3 md:top-17 left-3 md:left-5 z-[100]">
         <div class="switch-btn relative flex border-3 border-[var(--secondary-bg-color)] bg-[var(--secondary-bg-color)] rounded-2xl overflow-hidden">
             <!-- Highlight rectangle -->
             <div id="highlight" class="absolute h-full rounded-xl bg-[var(--bg-color)] transition-all duration-300 ease-in-out z-0"></div>
@@ -82,6 +78,15 @@
             >
                 <div class="hidden md:block">Order</div>
                 <div class="block md:hidden"><i class="fas fa-cart-shopping text-xs"></i></div>
+            </button>
+            <button
+                id="shipmentBtn"
+                type="button"
+                class="relative z-10 px-3.5 md:px-5 py-1.5 md:py-2 cursor-pointer rounded-xl transition-colors duration-300"
+                onclick="setInvoiceType(this, 'shipment')"
+            >
+                <div class="hidden md:block">Shipment</div>
+                <div class="block md:hidden"><i class="fas fa-truck text-xs"></i></div>
             </button>
         </div>
     </div>
@@ -103,10 +108,15 @@
             <div class="step1 space-y-4 ">
                 <div class="flex justify-between gap-4">
                     <input type="hidden" name="date" value='{{ now()->toDateString() }}'>
-                    {{-- order_no --}}
-                    <div class="grow">
-                        <x-select label="Order Number" name="order_no" id="order_no" :options="$ordersOptions" :value="$orderNumber ?? ''" required showDefault withButton btnId="generateInvoiceBtn" btnText="Generate Invoice" />
-                    </div>
+                    @if ($invoiceType === 'shipment')
+                        <div class="grow">
+                            <x-select label="Shipment Number" name="shipment_no" id="shipment_no" :options="$shipmentsOptions" required showDefault withButton btnId="selectCustomersBtn" btnText="Select Customers" />
+                        </div>
+                    @else
+                        <div class="grow">
+                            <x-select label="Order Number" name="order_no" id="order_no" :options="$ordersOptions" :value="$orderNumber ?? ''" required showDefault withButton btnId="generateInvoiceBtn" btnText="Generate Invoice" />
+                        </div>
+                    @endif
                 </div>
                 {{-- rate showing --}}
                 <div id="article-table" class="w-full text-left text-sm">
@@ -163,7 +173,7 @@
 
 
 @push('page-scripts')
-<script defer src="{{ asset('js/pages/invoices-generate.js') }}?v={{ @filemtime(public_path('js/pages/invoices-generate.js')) }}"></script>
+<script defer src="{{ asset('js/pages/invoices-generate.js') }}?v={{ config('app.version', 'local') }}.invoice-fix-1"></script>
 <script>
         window.__invoicesGenerate = {
             invoiceType: @json($invoiceType),
@@ -175,6 +185,7 @@
             companyLogoBase: @json(asset('images')),
             searchFieldsHtml: @json($searchFieldsHtml),
             errorAlertTemplate: @json($errorAlertTemplate),
+            discountDisabled: @json($hideDocumentDiscount),
         };
     </script>
 @endpush
