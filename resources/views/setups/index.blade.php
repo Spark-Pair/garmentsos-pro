@@ -71,6 +71,8 @@
 <script>
         window.__setupsIndex = {
             authLayout: @json($authLayout),
+            canUpdate: @json($canUpdate),
+            canDelete: @json($canDelete),
         };
     </script>
 @endpush
