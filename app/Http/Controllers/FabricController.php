@@ -106,7 +106,10 @@ class FabricController extends Controller
 
         // return $fabrics_options;
 
-        return view('fabrics.index', compact('fabrics_options', 'authLayout'));
+        $canUpdate = app_menu_can('fabrics', ['developer', 'owner', 'admin', 'accountant', 'store_keeper'], 'update');
+        $canDelete = app_menu_can('fabrics', ['developer', 'owner', 'admin', 'accountant', 'store_keeper'], 'delete');
+
+        return view('fabrics.index', compact('fabrics_options', 'authLayout', 'canUpdate', 'canDelete'));
     }
 
     private function fabricIndexCollectionMatchesFilters(array $item, Request $request): bool
@@ -272,7 +275,7 @@ class FabricController extends Controller
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($fabric, 'fabrics');
 
-        if ($resp = $this->denyIfNoRole(['developer'])) {
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant', 'store_keeper'])) {
             return $resp;
         }
 
@@ -318,7 +321,7 @@ class FabricController extends Controller
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($fabric, 'fabrics');
 
-        if ($resp = $this->denyIfNoRole(['developer'])) {
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant', 'store_keeper'])) {
             return $resp;
         }
 
@@ -375,7 +378,7 @@ class FabricController extends Controller
      */
     public function destroy(Fabric $fabric)
     {
-        if ($resp = $this->denyIfNoRole(['developer'])) {
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant', 'store_keeper'])) {
             return $resp;
         }
 
@@ -470,7 +473,7 @@ class FabricController extends Controller
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($issuedFabric, 'fabrics');
 
-        if ($resp = $this->denyIfNoRole(['developer'])) {
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant', 'store_keeper'])) {
             return $resp;
         }
 
@@ -484,7 +487,7 @@ class FabricController extends Controller
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($issuedFabric, 'fabrics');
 
-        if ($resp = $this->denyIfNoRole(['developer'])) {
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant', 'store_keeper'])) {
             return $resp;
         }
 
@@ -524,7 +527,7 @@ class FabricController extends Controller
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($issuedFabric, 'fabrics');
 
-        if ($resp = $this->denyIfNoRole(['developer'])) {
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant', 'store_keeper'])) {
             return $resp;
         }
 
@@ -717,7 +720,7 @@ class FabricController extends Controller
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($returnFabric, 'fabrics');
 
-        if ($resp = $this->denyIfNoRole(['developer'])) {
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant', 'store_keeper'])) {
             return $resp;
         }
 
@@ -731,7 +734,7 @@ class FabricController extends Controller
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($returnFabric, 'fabrics');
 
-        if ($resp = $this->denyIfNoRole(['developer'])) {
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant', 'store_keeper'])) {
             return $resp;
         }
 
@@ -771,7 +774,7 @@ class FabricController extends Controller
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($returnFabric, 'fabrics');
 
-        if ($resp = $this->denyIfNoRole(['developer'])) {
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant', 'store_keeper'])) {
             return $resp;
         }
 

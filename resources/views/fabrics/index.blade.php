@@ -102,6 +102,8 @@
         window.__fabricsIndex = {
             currentUserRole: '{{ Auth::user()->role }}',
             authLayout: @json($authLayout),
+            canUpdate: @json($canUpdate),
+            canDelete: @json($canDelete),
         };
     </script>
 @endpush

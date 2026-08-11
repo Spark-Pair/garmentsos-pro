@@ -1,4 +1,8 @@
 (function () {
+    const config = window.__fabricsIndex || {};
+    const canUpdate = Boolean(config.canUpdate);
+    const canDelete = Boolean(config.canDelete);
+
     window.createRow = function createRow(data) {
         return `
             <div id="${data.id}" oncontextmenu='${htmlAttr(data.oncontextmenu || "")}' onclick='${htmlAttr(data.onclick || "")}'
@@ -25,12 +29,15 @@
 
         const actions = [];
         const resource = fabricResourceFor(data);
-        if (isDeveloperUser() && resource) {
+        if (canUpdate && resource) {
             actions.push({
                 id: 'edit-fabric',
                 text: 'Edit',
                 link: resource.edit,
             });
+        }
+
+        if (canDelete && resource) {
             actions.push({
                 id: 'delete-fabric',
                 text: 'Delete',
@@ -69,12 +76,15 @@
         };
 
         const resource = fabricResourceFor(data);
-        if (isDeveloperUser() && resource) {
+        if (canUpdate && resource) {
             modalData.bottomActions.push({
                 id: 'edit-fabric',
                 text: 'Edit',
                 link: resource.edit,
             });
+        }
+
+        if (canDelete && resource) {
             modalData.bottomActions.push({
                 id: 'delete-fabric',
                 text: 'Delete',
