@@ -60,7 +60,7 @@ class DailyLedgerController extends Controller
             // Get filtered deposits
             $filteredDeposits = $branches->applyScope(DailyLedgerDeposit::orderByDesc('date'), 'daily_ledger')
                 ->orderByDesc('created_at')
-                ->applyFilters($request, false)
+                ->applyFilters($request, false, true)
                 ->get()
                 ->map(function($item) {
                     return $item->toFormattedArray();
@@ -69,7 +69,7 @@ class DailyLedgerController extends Controller
             // Get filtered uses
             $filteredUses = $branches->applyScope(DailyLedgerUse::orderByDesc('date'), 'daily_ledger')
                 ->orderByDesc('created_at')
-                ->applyFilters($request, false)
+                ->applyFilters($request, false, true)
                 ->get()
                 ->map(function($item) {
                     return $item->toFormattedArray();
@@ -89,13 +89,31 @@ class DailyLedgerController extends Controller
 
             $openingBalance = 0;
             if ($filteredLedgers->isNotEmpty()) {
-                $firstVisibleDate = $filteredLedgers
-                    ->pluck('date_raw')
-                    ->filter()
-                    ->sort()
+                $firstVisible = $filteredLedgers
+                    ->sortBy([
+                        ['date_raw', 'asc'],
+                        ['created_at', 'asc'],
+                    ])
                     ->first();
 
-                if ($firstVisibleDate) {
+                $firstVisibleDate = $firstVisible['date_raw'] ?? null;
+                $firstVisibleCreatedAt = $firstVisible['created_at'] ?? null;
+
+                if ($firstVisibleDate && $firstVisibleCreatedAt) {
+                    $beforeEntryScope = function ($query) use ($firstVisibleDate, $firstVisibleCreatedAt) {
+                        return $query->where(function ($before) use ($firstVisibleDate, $firstVisibleCreatedAt) {
+                            $before->whereDate('date', '<', $firstVisibleDate)
+                                ->orWhere(function ($sameDay) use ($firstVisibleDate, $firstVisibleCreatedAt) {
+                                    $sameDay->whereDate('date', $firstVisibleDate)
+                                        ->where('created_at', '<', $firstVisibleCreatedAt);
+                                });
+                        });
+                    };
+
+                    $beforeDeposits = $beforeEntryScope($scopedDeposits())->sum('amount');
+                    $beforeUses = $beforeEntryScope($scopedUses())->sum('amount');
+                    $openingBalance = $beforeDeposits - $beforeUses;
+                } elseif ($firstVisibleDate) {
                     $beforeDeposits = $scopedDeposits()->whereDate('date', '<', $firstVisibleDate)->sum('amount');
                     $beforeUses = $scopedUses()->whereDate('date', '<', $firstVisibleDate)->sum('amount');
                     $openingBalance = $beforeDeposits - $beforeUses;
