@@ -231,7 +231,7 @@
 
         const quantity = data.quantity || article.quantity || "-";
         const amount = money(data.amount);
-        const rate = money(data.rate);
+        const rate = formatNumbersWithDigits(data.rate, 2, 2);
         const balance = money(worker.balance);
         const issuedByName = data.issued_by_name || "-";
         const receivedByName = data.received_by_name || "-";
