@@ -124,7 +124,7 @@
                 @endif
                 @if ($addBtnLink !== '')
                     <a
-                        class="text-lg px-2 leading-none"
+                        class="select-add-btn text-lg px-2 leading-none"
                         href="{{ $addBtnLink }}"
                     >
                         +

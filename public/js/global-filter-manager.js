@@ -77,6 +77,7 @@ const GlobalFilterManager = {
                     field.dataset.listInputValues = '';
                 }
             });
+            closeAllDropdowns();
             if (typeof window.refreshListInput === 'function') {
                 window.refreshListInput();
             }
@@ -150,6 +151,7 @@ const GlobalFilterManager = {
     async applyFilters(options = {}) {
         const shouldPersist = options.persist !== false;
         const filters = this.collectFilters();
+        closeAllDropdowns();
 
         if (shouldPersist) {
             if (Object.keys(filters).length > 0) {

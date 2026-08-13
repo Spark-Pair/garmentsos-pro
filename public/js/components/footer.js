@@ -56,6 +56,14 @@
 
                 currentStep = step + 1;
                 updateButtons();
+
+                document.dispatchEvent(
+                    new CustomEvent('wizard:step-changed', {
+                        detail: {
+                            step: currentStep
+                        }
+                    })
+                );
             }
 
             function prevStep(step) {
@@ -88,6 +96,14 @@
                 document.getElementById('progress-bar').style.width = `${(step - 1) * (100 / noOfSteps)}%`;
                 currentStep = step - 1;
                 updateButtons();
+
+                document.dispatchEvent(
+                    new CustomEvent('wizard:step-changed', {
+                        detail: {
+                            step: currentStep
+                        }
+                    })
+                );
             }
 
             window.gotoStep = function gotoStep(step) {

@@ -1,3 +1,4 @@
+let keyboardFieldNavigation = false;
 function getSelectScope(elem) {
     return elem.closest('form') || document;
 }
@@ -9,6 +10,10 @@ function formatMultiSelectText(selectedTexts) {
 }
 
 function selectThisOption(optionLiElem, options = {}) {
+    if (keyboardFieldNavigation) {
+        return;
+    }
+
     const shouldValidate = options.validate !== false;
     const shouldDispatchChange = options.dispatchChange !== false;
     const forId = optionLiElem.dataset.for;
@@ -243,26 +248,98 @@ function selectFirstOption(forId, scope = document, options = {}) {
 }
 
 function selectClicked(input) {
-    const searchInput = input.closest('.selectParent').querySelector('.dropDownParent input');
+    const selectParent = input.closest('.selectParent');
+    const searchInput = selectParent.querySelector('.dropDownParent input');
+    const dropdown = selectParent.querySelector('.optionsDropdown');
+    const dropdownParent = selectParent.querySelector('.dropDownParent');
+
+    const dbInput = getSelectScope(input).querySelector(
+        `.dbInput[data-for="${input.dataset.for || input.id}"]`
+    );
+
+    const isMultiple = dbInput?.dataset.multiple === "true";
+
+    // Current selected options save
+    const selectedOptions = Array.from(
+        dropdown.querySelectorAll('li.selected')
+    );
+
     searchInput.focus();
     searchInput.value = '';
+
     searchSelect(searchInput);
 
-    const inputRect = input.getBoundingClientRect();
-    const dropdown = input.closest(".selectParent").querySelector(".dropDownParent");
+    // ===============================
+    // Restore actual selected state
+    // ===============================
+    if (!isMultiple) {
+        dropdown.querySelectorAll('li.selected').forEach(li => {
+            li.classList.remove('selected');
+        });
 
-    dropdown.style.width = inputRect.width + "px";
-    dropdown.style.top = (inputRect.top + inputRect.height) + "px";
-    dropdown.style.left = inputRect.left + "px";
+        const selectedOption = selectedOptions[0];
+
+        if (selectedOption) {
+            selectedOption.classList.add('selected');
+        }
+    }
+
+    const inputRect = input.getBoundingClientRect();
+
+    dropdownParent.style.width = inputRect.width + "px";
+    dropdownParent.style.top = `${inputRect.top + inputRect.height}px`;
+    dropdownParent.style.left = `${inputRect.left}px`;
+
+    // ===============================
+    // Scroll to selected option
+    // ===============================
+    if (selectedOptions.length) {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                const selectedOption = selectedOptions[0];
+
+                if (!selectedOption || selectedOption.classList.contains('hidden')) {
+                    return;
+                }
+
+                selectedOption.scrollIntoView({
+                    block: 'nearest',
+                    inline: 'nearest'
+                });
+            });
+        });
+    }
 }
 
 function selectKeyDown(event, input) {
+    if (event.key === "Enter" && event.shiftKey) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        if (typeof window.focusPreviousFormField === "function") {
+            window.focusPreviousFormField(input);
+        }
+
+        return;
+    }
     const dropdown = input.closest(".selectParent").querySelector(".optionsDropdown");
     const allOptions = dropdown.querySelectorAll("li");
     const options = Array.from(allOptions).filter(li => !li.classList.contains("hidden"));
     const dbInput = getSelectScope(input).querySelector(`.dbInput[data-for="${input.dataset.for || input.id}"]`);
     const isMultiple = dbInput?.dataset.multiple === "true";
     const activeClass = isMultiple ? "select-active" : "selected";
+
+    // ✅ Shift + Enter = Previous form field
+    if (event.key === "Enter" && event.shiftKey) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        if (typeof window.focusPreviousFormField === "function") {
+            window.focusPreviousFormField(input);
+        }
+
+        return;
+    }
 
     function scrollIntoViewIfNeeded(element) {
         if (element && typeof element.scrollIntoView === "function") {

@@ -102,6 +102,11 @@ class Supplier extends Model
         return $this->belongsTo(Employee::class, 'worker_id');
     }
 
+    public function inventoryTransactions()
+    {
+        return $this->hasMany(InventoryTransaction::class, 'supplier_id');
+    }
+
     public function getBalanceAttribute()
     {
         return $this->calculateBalance();
@@ -110,6 +115,10 @@ class Supplier extends Model
     public function calculateBalance($fromDate = null, $toDate = null, $formatted = false, $includeGivenDate = true, ?array $branchIds = null, bool $includeNullBranchRecords = false)
     {
         $expenseQuery = $this->expenses();
+
+        $inventoryExpenseQuery = $this->inventoryTransactions()
+            ->where('direction', 'in');
+
         $paymentsQuery = $this->payments()
             ->whereRaw('LOWER(method) IN (?, ?, ?, ?, ?, ?, ?, ?)', [
                 'cheque',
@@ -121,6 +130,7 @@ class Supplier extends Model
                 'p. return',
                 'adjustment',
             ]);
+
         $adjustmentsQuery = $this->statementAdjustments();
 
         $productionQuery = null;
@@ -153,25 +163,39 @@ class Supplier extends Model
         };
 
         $applyBranchScope($expenseQuery, 'expenses');
+        $applyBranchScope($inventoryExpenseQuery, 'inventory_transactions');
         $applyBranchScope($paymentsQuery, 'supplier_payments');
         $applyBranchScope($adjustmentsQuery, 'statement_adjustments');
+
         if ($productionQuery) {
             $applyBranchScope($productionQuery, 'productions');
         }
 
         DateRange::apply($expenseQuery, 'date', $fromDate, $toDate, $includeGivenDate);
+        DateRange::apply($inventoryExpenseQuery, 'date', $fromDate, $toDate, $includeGivenDate);
         DateRange::apply($paymentsQuery, 'date', $fromDate, $toDate, $includeGivenDate);
         DateRange::apply($adjustmentsQuery, 'date', $fromDate, $toDate, $includeGivenDate);
+
         if ($productionQuery) {
             DateRange::apply($productionQuery, 'receive_date', $fromDate, $toDate, $includeGivenDate);
         }
 
         $totalExpense = $expenseQuery->sum('amount') ?? 0;
-        $totalPayments = $paymentsQuery->sum('amount') ?? 0;
-        $totalProduction = $productionQuery ? $productionQuery->sum('amount') : 0;
-        $adjustmentsNet = (float) $adjustmentsQuery->get()->sum(fn($adjustment) => (float) $adjustment->net_amount);
 
-        $balance = (($totalExpense + $totalProduction) - $totalPayments) + $adjustmentsNet;
+        $totalInventoryExpense = $inventoryExpenseQuery->sum('amount') ?? 0;
+
+        $totalPayments = $paymentsQuery->sum('amount') ?? 0;
+
+        $totalProduction = $productionQuery ? $productionQuery->sum('amount') : 0;
+
+        $adjustmentsNet = (float) $adjustmentsQuery
+            ->get()
+            ->sum(fn ($adjustment) => (float) $adjustment->net_amount);
+
+        $balance = (
+            ($totalExpense + $totalInventoryExpense + $totalProduction)
+            - $totalPayments
+        ) + $adjustmentsNet;
 
         return $formatted ? \App\Support\Money::format($balance) : $balance;
     }
@@ -204,6 +228,16 @@ class Supplier extends Model
         $expenseQuery = $this->expenses()
             ->whereBetween(\Illuminate\Support\Facades\DB::raw('DATE(date)'), [$start, $end])
             ->when($hasBranchScope && Schema::hasColumn('expenses', 'branch_id'), $branchScope);
+        $inventoryExpenseQuery = $this->inventoryTransactions()
+            ->where('direction', 'in')
+            ->whereBetween(
+                \Illuminate\Support\Facades\DB::raw('DATE(date)'),
+                [$start, $end]
+            )
+            ->when(
+                $hasBranchScope && Schema::hasColumn('inventory_transactions', 'branch_id'),
+                $branchScope
+            );
         $paymentQuery = $this->payments()
             ->whereBetween(\Illuminate\Support\Facades\DB::raw('DATE(date)'), [$start, $end])
             ->when($hasBranchScope && Schema::hasColumn('supplier_payments', 'branch_id'), $branchScope)
@@ -333,6 +367,14 @@ class Supplier extends Model
                 'created_at' => $i->created_at,
             ]);
 
+            $inventoryExpenses = $mapQuery($inventoryExpenseQuery, fn($i) => [
+                'type' => 'invoice',
+                'date' => $rawDate($i, 'date')?->toDateString(),
+                'bill' => (float) ($i->amount ?? 0),
+                'payment' => 0,
+                'created_at' => $i->created_at,
+            ]);
+
             $payments = $mapQuery($paymentQuery, fn($p) => [
                 'type' => 'payment',
                 'date' => $rawDate($p, 'date')?->toDateString(),
@@ -357,6 +399,7 @@ class Supplier extends Model
             ]);
 
             $statement = $expenses
+                ->merge($inventoryExpenses)
                 ->merge($productions)
                 ->merge($adjustments)
                 ->merge($payments)
@@ -396,12 +439,28 @@ class Supplier extends Model
                 'date' => $rawDate($i, 'date'),
                 'reff_no' => $i->reff_no,
                 'type' => 'invoice',
+                'method' => 'Expense',
                 'bill' => (float) ($i->amount ?? 0),
                 'payment' => 0,
                 'description' => $i->remarks ?? '-',
                 'created_at' => $i->created_at,
                 'source' => [
                     'type' => 'expense',
+                    'id' => $i->id,
+                ],
+            ]);
+
+            $inventoryExpenses = $mapQuery($inventoryExpenseQuery, fn($i) => [
+                'date' => $rawDate($i, 'date'),
+                'reff_no' => $i->reference_no ?? ('INV-' . $i->id),
+                'type' => 'invoice',
+                'method' => 'Inventory Purchase',
+                'bill' => (float) ($i->amount ?? 0),
+                'payment' => 0,
+                'description' => $i->remarks ?? 'Inventory Purchase',
+                'created_at' => $i->created_at,
+                'source' => [
+                    'type' => 'inventory_transaction',
                     'id' => $i->id,
                 ],
             ]);
@@ -437,6 +496,7 @@ class Supplier extends Model
             $adjustments = $mapQuery($adjustmentsQuery, $formatDetailedAdjustment);
 
             $statement = $expenses
+                ->merge($inventoryExpenses)
                 ->merge($payments)
                 ->merge($productions)
                 ->merge($adjustments)
@@ -454,6 +514,23 @@ class Supplier extends Model
                 'created_at' => $i->created_at,
                 'source' => [
                     'type' => 'expense',
+                    'id' => $i->id,
+                ],
+            ]);
+
+            $inventoryExpenses = $mapQuery($inventoryExpenseQuery, fn($i) => [
+                'date' => $rawDate($i, 'date'),
+                'reff_no' => $i->reference_no ?? ('INV-' . $i->id),
+                'type' => 'invoice',
+                'method' => 'Inventory Purchase',
+                'bill' => (float) ($i->amount ?? 0),
+                'payment' => 0,
+                'description' => $i->remarks
+                    ? $i->remarks . ' (' . $i->id . ')'
+                    : 'Inventory Purchase (' . $i->id . ')',
+                'created_at' => $i->created_at,
+                'source' => [
+                    'type' => 'inventory_transaction',
                     'id' => $i->id,
                 ],
             ]);
@@ -484,6 +561,7 @@ class Supplier extends Model
             $adjustments = $mapQuery($adjustmentsQuery, $formatDetailedAdjustment);
 
             $statement = $expenses
+                ->merge($inventoryExpenses)
                 ->merge($payments)
                 ->merge($productions)
                 ->merge($adjustments)

@@ -10,7 +10,9 @@
     window.trackInventoryType = function trackInventoryType(elem) {
         const fabricInput = document.getElementById("fabric_id");
         if (!fabricInput) return;
-        fabricInput.closest(".selectParent")?.classList.toggle("opacity-60", elem.value !== "fabric");
+        fabricInput.value = "-- Select Fabric --";
+        fabricInput.disabled = elem.value !== "fabric";
+        
     };
 
     window.validateForNextStep = function() {

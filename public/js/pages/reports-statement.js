@@ -30,6 +30,25 @@
             });
         }
 
+        function openInventoryTransactionStatementModal(data) {
+            if (!data) return;
+
+            createModal({
+                id: "modalForm",
+                name: data.supplier_name,
+                details: {
+                    Date: data.date,
+                    "Reff. No.": data.reff_no || "-",
+                    Item: data.item_name,
+                    Quantity: data.quantity,
+                    Unit: data.unit,
+                    "Unit Price": data.unit_price,
+                    Amount: data.amount,
+                    Remarks: data.remarks || "-",
+                },
+            });
+        }
+
         function openVoucherStatementModal(data) {
             if (!data?.data) return;
 
@@ -219,6 +238,11 @@
         function renderStatementRecordModal(payload) {
             if (payload?.type === "expense") {
                 openExpenseStatementModal(payload.data);
+                return;
+            }
+            
+            if (payload?.type === "inventory_transaction") {
+                openInventoryTransactionStatementModal(payload.data);
                 return;
             }
 

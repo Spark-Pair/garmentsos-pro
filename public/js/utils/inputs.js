@@ -122,6 +122,29 @@ function initializeArticleQuantityPair(pcsPerPacket, maxPcs = 0, pcsValue = '') 
     syncArticleQuantityPair('pcs', pcsPerPacket, maxPcs);
 }
 
+function isFooterActionVisible(btn) {
+    if (!btn || !btn.isConnected) return false;
+    if (btn.closest('[hidden], .hidden')) return false;
+    if (btn.disabled || btn.readOnly) return false;
+
+    const style = window.getComputedStyle(btn);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+
+    const rect = btn.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+}
+
+function getNextFooterActionButton() {
+    const ids = ['nextBtn', 'saveBtn', 'printAndSaveBtn', 'printBtn'];
+    for (const id of ids) {
+        const btn = document.getElementById(id);
+        if (isFooterActionVisible(btn)) {
+            return btn;
+        }
+    }
+    return null;
+}
+
 (function initEnterToNextField() {
     const fieldSelector = [
         'input:not([type="hidden"])',
@@ -134,13 +157,26 @@ function initializeArticleQuantityPair(pcsPerPacket, maxPcs = 0, pcsValue = '') 
 
     function isRenderedField(field) {
         if (!field) return false;
-        if (field.closest('[hidden], .hidden')) return false;
-        if (field.closest('.dropDownParent')) return false;
+
+        if (field.closest('.dropDownParent')) {
+            return false;
+        }
+
+        if (field.closest('[hidden], .hidden')) {
+            return false;
+        }
 
         const style = window.getComputedStyle(field);
-        if (style.display === 'none' || style.visibility === 'hidden') return false;
+
+        if (
+            style.display === 'none' ||
+            style.visibility === 'hidden'
+        ) {
+            return false;
+        }
 
         const rect = field.getBoundingClientRect();
+
         return rect.width > 0 && rect.height > 0;
     }
 
@@ -148,18 +184,29 @@ function initializeArticleQuantityPair(pcsPerPacket, maxPcs = 0, pcsValue = '') 
         if (!isRenderedField(field) || field.disabled || field.readOnly) return false;
         if (field.matches?.('button[type="submit"], input[type="submit"]')) return false;
         if (field.matches?.('[tabindex="-1"]')) return false;
+        if (field.classList.contains('select-add-btn')) return false;
 
         return true;
     }
 
     function fieldAnchor(field) {
-        const selectParent = field.closest?.('.selectParent');
-        if (!selectParent) return field;
+        if (!field) return field;
 
-        const visibleSelectInput = selectParent.querySelector(':scope > .form-group input:not([type="hidden"])')
-            || selectParent.querySelector('input:not([type="hidden"]):not(.dbInput)');
+        // Dropdown search input ko uske actual select field
+        // ke saath associate karo.
+        if (field.closest('.dropDownParent')) {
+            const selectParent = field.closest('.selectParent');
 
-        return visibleSelectInput || field;
+            if (!selectParent) {
+                return field;
+            }
+
+            return selectParent.querySelector(
+                ':scope > .form-group input:not([type="hidden"])'
+            ) || field;
+        }
+
+        return field;
     }
 
     function getFieldScope(field) {
@@ -172,6 +219,7 @@ function initializeArticleQuantityPair(pcsPerPacket, maxPcs = 0, pcsValue = '') 
     function getFocusableFields(scope) {
         return Array.from(scope.querySelectorAll(fieldSelector))
             .filter(field => !field.classList.contains('dbInput'))
+            .filter(field => !field.classList.contains('errorIcon'))
             .filter(isVisibleField)
             .map(fieldAnchor)
             .filter((field, index, fields) => fields.indexOf(field) === index);
@@ -180,6 +228,7 @@ function initializeArticleQuantityPair(pcsPerPacket, maxPcs = 0, pcsValue = '') 
     function getRenderedFields(scope) {
         return Array.from(scope.querySelectorAll(fieldSelector))
             .filter(field => !field.classList.contains('dbInput'))
+            .filter(field => !field.classList.contains('errorIcon'))
             .filter(isRenderedField)
             .map(fieldAnchor)
             .filter((field, index, fields) => fields.indexOf(field) === index);
@@ -207,13 +256,38 @@ function initializeArticleQuantityPair(pcsPerPacket, maxPcs = 0, pcsValue = '') 
         }, 80);
     }
 
-    function focusField(field) {
+    function focusField(field, options = {}) {
+        if (!field) return;
+
+        const fromKeyboard = options.fromKeyboard ?? false;
+
+        isKeyboardNavigationFocus = fromKeyboard;
+
         field.focus();
-        if (field.matches?.('input, textarea') && !isPickerField(field)) {
+
+        isKeyboardNavigationFocus = false;
+
+        if (fromKeyboard) {
+            return;
+        }
+
+        if (
+            field.matches?.('input, textarea') &&
+            !isPickerField(field) &&
+            !field.closest('.selectParent')
+        ) {
             field.select?.();
         }
 
-        openNativePicker(field);
+        if (isPickerField(field)) {
+            setTimeout(() => {
+                if (document.activeElement === field) {
+                    try {
+                        field.showPicker?.();
+                    } catch (_) { }
+                }
+            }, 50);
+        }
     }
 
     function waitForFieldAndFocus(field, options = {}) {
@@ -304,28 +378,59 @@ function initializeArticleQuantityPair(pcsPerPacket, maxPcs = 0, pcsValue = '') 
         window.addEventListener('load', run, { once: true });
     }
 
-    window.focusNextFormField = function focusNextFormField(currentField) {
+    window.focusNextFormField = function (currentField) {
         const current = fieldAnchor(currentField);
         const scope = getFieldScope(current);
-        const renderedFields = getRenderedFields(scope);
-        const renderedIndex = renderedFields.indexOf(current);
 
-        if (renderedIndex !== -1 && renderedIndex < renderedFields.length - 1) {
-            const immediateNext = renderedFields[renderedIndex + 1];
-            if (immediateNext.disabled || immediateNext.readOnly) {
-                return waitForFieldAndFocus(immediateNext);
+        const start = Date.now();
+        const timeout = 1500;
+
+        function findNext() {
+            const fields = getRenderedFields(scope);
+            const currentIndex = fields.indexOf(current);
+
+            if (currentIndex === -1) {
+                const firstField = getFocusableFields(scope)[0];
+
+                if (firstField) {
+                    focusField(firstField);
+                    return true;
+                }
+
+                return false;
             }
+
+            for (let i = currentIndex + 1; i < fields.length; i++) {
+                const field = fields[i];
+
+                if (!field?.isConnected) {
+                    continue;
+                }
+
+                if (isVisibleField(field)) {
+                    focusField(field, {
+                        fromKeyboard: true
+                    });
+
+                    return true;
+                }
+            }
+
+            const footerBtn = getNextFooterActionButton();
+            if (footerBtn) {
+                focusField(footerBtn);
+                return true;
+            }
+
+            if (Date.now() - start < timeout) {
+                setTimeout(findNext, 50);
+                return true;
+            }
+
+            return false;
         }
 
-        const fields = getFocusableFields(scope);
-        if (!fields.length) return false;
-
-        const currentIndex = fields.indexOf(current);
-        if (currentIndex === -1 || currentIndex >= fields.length - 1) return false;
-
-        const next = fields[currentIndex + 1];
-        focusField(next);
-        return true;
+        return findNext();
     };
 
     window.focusFirstFormField = function focusFirstFormField(scope = document, options = {}) {
@@ -343,26 +448,148 @@ function initializeArticleQuantityPair(pcsPerPacket, maxPcs = 0, pcsValue = '') 
 
         form.dataset.autoFocusApplied = 'true';
         deferUntilInterfaceReady(() => {
-            focusField(first);
+            focusField(first, false);
         }, options.delay ?? 80);
         return true;
     };
 
-    document.addEventListener('keydown', event => {
-        if (event.defaultPrevented) return;
-        if (event.key !== 'Enter') return;
-        if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+    window.focusPreviousFormField = function (currentField) {
+        const current = fieldAnchor(currentField);
+        const scope = getFieldScope(current);
 
-        const target = event.target;
+        const fields = getRenderedFields(scope);
+        const currentIndex = fields.indexOf(current);
+
+        if (currentIndex <= 0) {
+            return false;
+        }
+
+        for (let i = currentIndex - 1; i >= 0; i--) {
+            const field = fields[i];
+
+            if (!isVisibleField(field)) {
+                continue;
+            }
+
+            keyboardFieldNavigation = true;
+
+            // Select ko focus karte waqt uska normal auto-open
+            // behavior temporarily suppress hoga.
+            field.focus();
+
+            setTimeout(() => {
+                keyboardFieldNavigation = false;
+            }, 0);
+
+            return true;
+        }
+
+        return false;
+    };
+
+    document.addEventListener("keydown", event => {
+        if (event.defaultPrevented) return;
+
+        let target = event.target;
+
+        /*
+        * Custom select dropdown search input:
+        *
+        * Actual focus dropdown ke andar wale search input par hota hai,
+        * lekin form navigation ke liye usko visible select input maana jayega.
+        */
+        if (target?.closest?.('.dropDownParent')) {
+            const selectParent = target.closest('.selectParent');
+
+            if (selectParent) {
+                const selectInput =
+                    selectParent.querySelector(
+                        ':scope > .form-group input:not([type="hidden"])'
+                    ) ||
+                    selectParent.querySelector(
+                        'input:not([type="hidden"]):not(.dbInput)'
+                    );
+
+                if (selectInput) {
+                    /*
+                    * Shift + Enter
+                    * dropdown search se previous FORM field
+                    */
+                    if (event.key === 'Enter' && event.shiftKey) {
+                        event.preventDefault();
+                        event.stopImmediatePropagation();
+
+                        window.focusPreviousFormField(selectInput);
+                        return;
+                    }
+
+                    /*
+                    * Enter
+                    * dropdown ka normal selectKeyDown handle karega.
+                    */
+                    return;
+                }
+            }
+        }
+
         if (!target?.matches?.(fieldSelector)) return;
-        if (target.matches('textarea')) return;
-        if (target.matches('button, a[href], [role="button"]')) return;
-        if (target.closest('.dropDownParent')) return;
         if (!isVisibleField(target)) return;
 
-        if (window.focusNextFormField(target)) {
+        /*
+        * Shift + Enter = Previous field
+        */
+        if (event.key === "Enter" && event.shiftKey) {
             event.preventDefault();
+            event.stopImmediatePropagation();
+
+            window.focusPreviousFormField(target);
+            return;
         }
+
+        if (event.key !== "Enter") return;
+
+        event.preventDefault();
+
+        /*
+        * Date / time picker
+        */
+        if (isPickerField(target)) {
+            if (!target.value) {
+                try {
+                    target.showPicker?.();
+                } catch (_) { }
+
+                return;
+            }
+
+            window.focusNextFormField(target);
+            return;
+        }
+
+        /*
+        * Footer/action button
+        */
+        if (isActionField(target)) {
+            target.click();
+            return;
+        }
+
+        /*
+        * Normal field
+        */
+        window.focusNextFormField(target);
+    });
+
+    document.addEventListener("change", event => {
+        const target = event.target;
+
+        if (!isPickerField(target)) {
+            return;
+        }
+
+        setTimeout(() => {
+            window.focusNextFormField(target);
+        }, 50);
     });
 
     document.addEventListener('input', event => {
@@ -411,4 +638,22 @@ function initializeArticleQuantityPair(pcsPerPacket, maxPcs = 0, pcsValue = '') 
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
+
+    document.addEventListener('wizard:step-changed', event => {
+        const step = event.detail.step;
+
+        setTimeout(() => {
+            const container = document.querySelector(`.step${step}`);
+
+            if (!container) {
+                return;
+            }
+
+            const firstField = getFocusableFields(container)[0];
+
+            if (firstField) {
+                focusField(firstField);
+            }
+        }, 50);
+    });
 })();

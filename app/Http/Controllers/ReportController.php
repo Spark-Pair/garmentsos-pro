@@ -165,12 +165,13 @@ class ReportController extends Controller
         }
 
         $validated = $request->validate([
-            'type' => 'required|string|in:expense,voucher,supplier_payment,employee_payment,invoice,customer_payment,statement_adjustment',
+            'type' => 'required|string|in:expense,inventory_transaction,voucher,supplier_payment,employee_payment,invoice,customer_payment,statement_adjustment',
             'id' => 'required|integer|min:1',
         ]);
 
         $payload = match ($validated['type']) {
             'expense' => $this->expenseStatementPayload((int) $validated['id']),
+            'inventory_transaction' => $this->inventoryTransactionStatementPayload((int) $validated['id']),
             'voucher' => $this->voucherStatementPayload((int) $validated['id']),
             'supplier_payment' => $this->supplierPaymentStatementPayload((int) $validated['id']),
             'employee_payment' => $this->employeePaymentStatementPayload((int) $validated['id']),
@@ -1242,6 +1243,23 @@ class ReportController extends Controller
         return [
             'type' => 'expense',
             'data' => $expense->toFormattedArray(),
+        ];
+    }
+
+    private function inventoryTransactionStatementPayload(int $id): ?array
+    {
+        $inventory = app(ModuleBranchService::class)
+            ->applyScope(InventoryTransaction::with(['supplier:id,supplier_name', 'item'])->where('direction', 'in'), 'inventory_transactions')
+            ->find($id);
+        if (!$inventory) return null;
+
+        if ($this->isSupplierRole() && $inventory->supplier_id !== $this->currentSupplier()?->id) {
+            abort(403, 'You are not authorized to view this statement record.');
+        }
+
+        return [
+            'type' => 'inventory_transaction',
+            'data' => $inventory->toFormattedArray(),
         ];
     }
 

@@ -58,4 +58,21 @@ class InventoryTransaction extends Model
     {
         return $this->morphTo();
     }
+
+    public function toFormattedArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'date' => optional($this->date)->format('Y-m-d'),
+            'supplier_name' => $this->supplier?->supplier_name ?? '-',
+            'item_name' => $this->item?->name ?? '-',
+            'direction' => ucfirst($this->direction),
+            'quantity' => $this->quantity,
+            'unit' => $this->unit,
+            'unit_price' => $this->unit_price,
+            'amount' => $this->amount,
+            'reference_no' => $this->reference_no,
+            'remarks' => $this->remarks,
+        ];
+    }
 }
