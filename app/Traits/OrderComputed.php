@@ -91,6 +91,17 @@ trait OrderComputed
                     $q->where('customer_name', 'like', "%$value%")
                     ->orWhereHas('city', fn($sq) => $sq->where('title', 'like', "%$value%"));
                 });
+                
+            case 'city':
+                return $query->whereHas('customer.city', function ($q) use ($value) {
+                    $q->where('title', 'like', "%$value%")
+                    ->orWhere('short_title', 'like', "%$value%");
+                });
+                
+            case 'category':
+                return $query->whereHas('customer', function ($q) use ($value) {
+                    $q->where('category', 'like', "%$value%");
+                });
 
             case 'date':
                 $start = $value['start'] ?? null;

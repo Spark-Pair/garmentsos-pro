@@ -15,6 +15,18 @@
                 "placeholder" => "Enter customer name",
                                 "dataFilterPath" => "customer_name",
             ],
+            "City" => [
+                "id" => "city",
+                "type" => "text",
+                "placeholder" => "Enter city",
+                                "dataFilterPath" => "city",
+            ],
+            "Category" => [
+                "id" => "category",
+                "type" => "text",
+                "placeholder" => "Enter category",
+                                "dataFilterPath" => "category",
+            ],
             'Status' => [
                 'id' => 'status',
                 'type' => 'select',
