@@ -195,14 +195,17 @@ class PhysicalQuantityController extends Controller
             'category' => 'required|string',
         ]);
 
-        if ($validator->fails())
-        {
+        if ($validator->fails()) {
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
         $data = $validator->validated();
-        $data['branch_id'] = app(ModuleBranchService::class)->branchIdForCreate('physical_quantities');
+
+        $data['branch_id'] = app(ModuleBranchService::class)
+            ->branchIdForCreate('physical_quantities');
+
         $article = Article::findOrFail($data['article_id']);
+
         $articleUpdate = [
             'processed_by' => $data['processed_by'],
         ];
@@ -213,12 +216,34 @@ class PhysicalQuantityController extends Controller
             $data['pcs_per_packet'] = $article->pcs_per_packet;
         }
 
+        $pcsPerPacket = (int) ($data['pcs_per_packet'] ?? 0);
+
+        $newQuantity = $pcsPerPacket * (int) $data['packets'];
+
+        $totalStock = (int) $article->quantity + (int) $article->extra_pcs;
+
+        $currentPhysicalStock = (int) $article->physical_quantity;
+
+        $remainingQuantity = $totalStock - $currentPhysicalStock;
+
+        if ($newQuantity > $remainingQuantity) {
+            return redirect()
+                ->back()
+                ->withErrors([
+                    'packets' => 'Quantity cannot be greater than the remaining stock.',
+                ])
+                ->withInput();
+        }
+
         $article->update($articleUpdate);
+
         unset($data['pcs_per_packet'], $data['processed_by']);
 
         PhysicalQuantity::create($data);
 
-        return redirect()->route('physical-quantities.create')->with('success', 'Physical quantity added successfully');
+        return redirect()
+            ->route('physical-quantities.create')
+            ->with('success', 'Physical quantity added successfully');
     }
 
     /**

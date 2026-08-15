@@ -18,7 +18,7 @@
 
         const totalPhysicalQuantityDom = document.getElementById("currentPhysicalQuantity");
         const finalOrderedQuantityDom = document.getElementById("finalOrderedQuantity");
-        const remainingqQuantityDom = document.getElementById("remainingquantity");
+        const remainingQuantityDom = document.getElementById("remainingquantity");
         const finalOrderAmountDom = document.getElementById("finalOrderAmount");
 
         let totalQuantity = 0;
@@ -274,8 +274,8 @@
 
         function calculateTotal() {
             if (selectedArticle) {
-                let pcsPerPacket = masterUnitValue();
-                let packets = packetsDom.value;
+                let pcsPerPacket = masterUnitValue() || Number(selectedArticle.pcs_per_packet || 0);
+                let packets = packetsDom.value || 0;
 
                 totalQuantity = pcsPerPacket * packets;
                 totalAmount = totalQuantity * parseFormattedNumber(selectedArticle.sales_rate);
@@ -295,22 +295,54 @@
         const totalQtyErrorDom = document.getElementById("total-qty-error");
 
         function updateRemainingQuantity() {
-            if (!selectedArticle) return;
+            if (!selectedArticle) {
+                setFieldError(packetsDom);
+                return;
+            }
 
-            const currentPhysical = Number(selectedArticle.physical_quantity || 0);
-            const remaining = (selectedArticle.quantity + selectedArticle.extra_pcs) - (currentPhysical + totalQuantity);
+            const totalStock =
+                Number(selectedArticle.quantity || 0) +
+                Number(selectedArticle.extra_pcs || 0);
 
-            remainingqQuantityDom.innerText = formatPcsAndPackets(remaining);
+            const currentPhysical =
+                Number(selectedArticle.physical_quantity || 0);
 
-            if (remaining < 0) {
-                totalQtyDom.classList.add("border-[var(--border-error)]");
-                totalQtyErrorDom.innerText = `Extra quantity: ${formatPcsAndPackets(Math.abs(remaining))}`;
-                totalQtyErrorDom.classList.remove("hidden");
+            const availableQuantity =
+                totalStock - currentPhysical;
+
+            const packetSize =
+                Number(masterUnitValue() || selectedArticle.pcs_per_packet || 0);
+
+            const maxPackets =
+                packetSize > 0
+                    ? Math.floor(availableQuantity / packetSize)
+                    : 0;
+
+            packetsDom.max = maxPackets;
+
+            let packets =
+                Number(packetsDom.value || 0);
+
+            if (packets > maxPackets) {
+                packets = maxPackets;
+                packetsDom.value = maxPackets;
+
+                calculateTotal();
+            }
+
+            const remaining =
+                availableQuantity - totalQuantity;
+
+            remainingQuantityDom.innerText =
+                formatPcsAndPackets(Math.max(0, remaining));
+
+            if (Number(packetsDom.value || 0) >= maxPackets) {
+                setFieldError(
+                    packetsDom,
+                    `Quantity cannot exceed ${formatPcsAndPackets(availableQuantity)}`
+                );
             } else {
-                totalQtyDom.classList.remove("border-[var(--border-error)]");
-                totalQtyDom.classList.add("border-gray-600");
-                totalQtyErrorDom.classList.add("hidden");
-                totalQtyErrorDom.innerText = "";
+                setFieldError(packetsDom);
             }
         }
 

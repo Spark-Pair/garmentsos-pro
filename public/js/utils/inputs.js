@@ -19,25 +19,81 @@ function checkMax(input) {
     }
 }
 
-function setQuantityPairError(input, message = '') {
+// function setQuantityPairError(input, message = '') {
+//     if (!input) return;
+
+//     const errorElem = document.getElementById(`${input.id}-error`);
+
+//     const errorIcon = errorElem
+//         ?.closest('.errorIconWrap')
+//         ?.querySelector('.errorIcon');
+
+//     if (message) {
+//         input.classList.add('border-[var(--border-error)]');
+
+//         if (errorElem) {
+//             errorElem.textContent = message;
+//             errorElem.classList.remove('hidden');
+//         }
+
+//         errorIcon?.classList.remove(
+//             'opacity-0',
+//             'pointer-events-none'
+//         );
+
+//         return;
+//     }
+
+//     input.classList.remove('border-[var(--border-error)]');
+
+//     if (errorElem) {
+//         errorElem.textContent = '';
+//         errorElem.classList.add('hidden');
+//     }
+
+//     errorIcon?.classList.add(
+//         'opacity-0',
+//         'pointer-events-none'
+//     );
+// }
+
+window.setFieldError = function setFieldError(input, message = '') {
     if (!input) return;
 
     const errorElem = document.getElementById(`${input.id}-error`);
+
+    const errorIcon = errorElem
+        ?.closest('.errorIconWrap')
+        ?.querySelector('.errorIcon');
+
     if (message) {
         input.classList.add('border-[var(--border-error)]');
+
         if (errorElem) {
             errorElem.textContent = message;
             errorElem.classList.remove('hidden');
         }
+
+        errorIcon?.classList.remove(
+            'opacity-0',
+            'pointer-events-none'
+        );
+
         return;
     }
 
     input.classList.remove('border-[var(--border-error)]');
+
     if (errorElem) {
         errorElem.textContent = '';
         errorElem.classList.add('hidden');
     }
-}
+
+    errorIcon?.classList.add(
+        'opacity-0',
+        'pointer-events-none'
+    );
+};
 
 function integerInputValue(input) {
     const raw = String(input?.value ?? '').trim();
@@ -62,16 +118,16 @@ function syncArticleQuantityPair(source, pcsPerPacket, maxPcs = 0) {
     const max = parseInt(maxPcs || pcsInput.max || 0, 10);
     let valid = true;
 
-    setQuantityPairError(pcsInput);
-    setQuantityPairError(packetsInput);
+    setFieldError(pcsInput);
+    setFieldError(packetsInput);
 
     if (source === 'packets') {
         const packets = integerInputValue(packetsInput);
         if (!packets.valid) {
-            setQuantityPairError(packetsInput, 'Packets must be a whole number.');
+            setFieldError(packetsInput, 'Packets must be a whole number.');
             valid = false;
         } else if (unit <= 0 && !packets.empty) {
-            setQuantityPairError(packetsInput, 'Pcs per packet is missing for this article.');
+            setFieldError(packetsInput, 'Pcs per packet is missing for this article.');
             valid = false;
         } else if (packets.empty) {
             pcsInput.value = '';
@@ -79,25 +135,25 @@ function syncArticleQuantityPair(source, pcsPerPacket, maxPcs = 0) {
             const pcs = packets.value * unit;
             pcsInput.value = pcs || '';
             if (max > 0 && pcs > max) {
-                setQuantityPairError(pcsInput, `Quantity cannot exceed ${max} pcs.`);
+                setFieldError(pcsInput, `Quantity cannot exceed ${max} pcs.`);
                 valid = false;
             }
         }
     } else {
         const pcs = integerInputValue(pcsInput);
         if (!pcs.valid) {
-            setQuantityPairError(pcsInput, 'Quantity must be a whole number.');
+            setFieldError(pcsInput, 'Quantity must be a whole number.');
             valid = false;
         } else if (pcs.empty) {
             packetsInput.value = '';
         } else if (max > 0 && pcs.value > max) {
-            setQuantityPairError(pcsInput, `Quantity cannot exceed ${max} pcs.`);
+            setFieldError(pcsInput, `Quantity cannot exceed ${max} pcs.`);
             valid = false;
         } else if (unit <= 0) {
             packetsInput.value = '';
         } else if (pcs.value % unit !== 0) {
             packetsInput.value = '';
-            setQuantityPairError(pcsInput, `Quantity must make whole packets of ${unit} pcs.`);
+            setFieldError(pcsInput, `Quantity must make whole packets of ${unit} pcs.`);
             valid = false;
         } else {
             packetsInput.value = pcs.value / unit;
