@@ -28,31 +28,7 @@
             ],
         ];
 
-        $branchRows = $branches->map(function ($branch) {
-            $logoUrl = $branch->logo_path
-                ? route('branch-logos.show', $branch)
-                : null;
-
-            return [
-                'id' => $branch->id,
-                'name' => $branch->display_name ?: $branch->name,
-                'code' => $branch->code,
-                'status' => $branch->status,
-                'image' => $logoUrl,
-                'manage_url' => route('developer.branches.show', $branch),
-                'edit_url' => route('developer.branches.edit', $branch),
-                'details' => [
-                    'Code' => $branch->code,
-                    'Prefix' => $branch->prefix ?: '-',
-                    'Main Branch' => $branch->is_main ? 'Yes' : 'No',
-                    'Business Name' => $branch->display_name ?: $branch->name,
-                    'Phone' => $branch->phone ?: '-',
-                    'City' => $branch->city ?: '-',
-                    'Address' => $branch->address ?: '-',
-                    'Status' => ucfirst($branch->status),
-                ],
-            ];
-        })->values();
+        $branchRows = collect($branchRows ?? []);
     @endphp
 
     <div>

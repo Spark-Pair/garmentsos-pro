@@ -17,7 +17,7 @@ use Illuminate\Validation\Rule;
 
 class BranchController extends Controller
 {
-    public function index(ModuleBranchService $branches)
+    public function index(Request $request, ModuleBranchService $branches)
     {
         if ($resp = $this->denyIfNoRole(['developer'])) {
             return $resp;
@@ -26,10 +26,78 @@ class BranchController extends Controller
         $branches->ensureMainBranch();
         $branches->backfillManagerAccess();
 
+        $branchRows = Branch::query()
+            ->orderByDesc('is_main')
+            ->orderBy('name')
+            ->get();
+
+        if ($request->ajax()) {
+            return response()->json([
+                'data' => $this->formattedBranchRows($branchRows, $request),
+                'authLayout' => 'table',
+            ]);
+        }
+
         return view('developer.branches.index', [
-            'branches' => Branch::query()->orderByDesc('is_main')->orderBy('name')->get(),
+            'branches' => $branchRows,
+            'branchRows' => $this->formattedBranchRows($branchRows, $request),
             'moduleLabels' => $branches->moduleLabels(),
         ]);
+    }
+
+    protected function formattedBranchRows($branches, Request $request)
+    {
+        $name = trim((string) $request->query('name', ''));
+        $code = trim((string) $request->query('code', ''));
+        $status = trim((string) $request->query('status', ''));
+        $limit = (int) $request->query('limit', 0);
+
+        return $branches
+            ->filter(function (Branch $branch) use ($name, $code, $status) {
+                if ($name !== '' && stripos($branch->displayName(), $name) === false) {
+                    return false;
+                }
+
+                if ($code !== '' && stripos((string) $branch->code, $code) === false) {
+                    return false;
+                }
+
+                if ($status !== '' && strcasecmp((string) $branch->status, $status) !== 0) {
+                    return false;
+                }
+
+                return true;
+            })
+            ->when($limit > 0, fn ($rows) => $rows->take($limit))
+            ->map(fn (Branch $branch) => $this->formattedBranchRow($branch))
+            ->values();
+    }
+
+    protected function formattedBranchRow(Branch $branch): array
+    {
+        $logoUrl = $branch->logo_path
+            ? route('branch-logos.show', $branch)
+            : null;
+
+        return [
+            'id' => $branch->id,
+            'name' => $branch->displayName(),
+            'code' => $branch->code,
+            'status' => $branch->status,
+            'image' => $logoUrl,
+            'manage_url' => route('developer.branches.show', $branch),
+            'edit_url' => route('developer.branches.edit', $branch),
+            'details' => [
+                'Code' => $branch->code,
+                'Prefix' => $branch->prefix ?: '-',
+                'Main Branch' => $branch->is_main ? 'Yes' : 'No',
+                'Business Name' => $branch->displayName(),
+                'Phone' => $branch->phone ?: '-',
+                'City' => $branch->city ?: '-',
+                'Address' => $branch->address ?: '-',
+                'Status' => ucfirst($branch->status),
+            ],
+        ];
     }
 
     public function create()
@@ -85,7 +153,7 @@ class BranchController extends Controller
         ]);
     }
 
-    public function access(ModuleBranchService $branches)
+    public function access(Request $request, ModuleBranchService $branches)
     {
         if ($resp = $this->denyIfNoRole(['developer'])) {
             return $resp;
@@ -96,6 +164,20 @@ class BranchController extends Controller
 
         $moduleLabels = $branches->moduleLabels();
 
+        $accessRows = AppPermissionRule::query()
+            ->with('user')
+            ->orderBy('role')
+            ->orderBy('user_id')
+            ->orderBy('module_key')
+            ->get();
+
+        if ($request->ajax()) {
+            return response()->json([
+                'data' => $this->formattedAccessRows($accessRows, $moduleLabels, $request),
+                'authLayout' => 'table',
+            ]);
+        }
+
         return view('developer.branches.access', [
             'moduleLabels' => $moduleLabels,
             'moduleOptions' => collect($moduleLabels)
@@ -103,13 +185,40 @@ class BranchController extends Controller
                 ->all(),
             'roleLabels' => ['developer', 'owner', 'admin', 'manager', 'accountant', 'store_keeper', 'guest', 'supplier'],
             'users' => User::query()->select('id', 'name', 'username', 'role')->orderBy('name')->get(),
-            'accessRows' => AppPermissionRule::query()
-                ->with('user')
-                ->orderBy('role')
-                ->orderBy('user_id')
-                ->orderBy('module_key')
-                ->get(),
+            'accessRows' => $accessRows,
+            'formattedAccessRows' => $this->formattedAccessRows($accessRows, $moduleLabels, $request),
         ]);
+    }
+
+    protected function formattedAccessRows($accessRows, array $moduleLabels, Request $request)
+    {
+        $limit = (int) $request->query('limit', 0);
+
+        return $accessRows
+            ->when($limit > 0, fn ($rows) => $rows->take($limit))
+            ->map(fn (AppPermissionRule $row) => $this->formattedAccessRow($row, $moduleLabels))
+            ->values();
+    }
+
+    protected function formattedAccessRow(AppPermissionRule $row, array $moduleLabels): array
+    {
+        $permissions = collect([
+            $row->can_view ? 'view' : null,
+            $row->can_create ? 'create' : null,
+            $row->can_update ? 'edit' : null,
+            $row->can_delete ? 'delete' : null,
+            $row->can_override ? 'developer mode' : null,
+        ])->filter()->values()->all();
+
+        return [
+            'id' => $row->id,
+            'role_user' => $row->user
+                ? (($row->user->name ?? $row->user->username) . ' (user)')
+                : ($row->role ?: '-'),
+            'subtitle' => $row->user?->username ?: 'Role rule',
+            'module' => $row->module_key ? ($moduleLabels[$row->module_key] ?? $row->module_key) : 'All modules',
+            'permissions' => $permissions,
+        ];
     }
 
     public function store(Request $request, ModuleBranchService $branches): RedirectResponse

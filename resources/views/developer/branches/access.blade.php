@@ -51,6 +51,8 @@
                             <div class="text-right pr-5">Permissions</div>
                         </div>
 
+                        <p id="noItemsError" style="display: none" class="text-sm text-[var(--border-error)] mt-3">No permission rules found</p>
+
                         <div class="overflow-y-auto grow my-scrollbar-2">
                             <div class="search_container grid grid-cols-1 gap-0 grow text-sm">
                                 @forelse ($accessRows as $row)
@@ -85,3 +87,35 @@
         </div>
     </section>
 @endsection
+
+@push('page-scripts')
+<script>
+    window.createRow = function createRow(data) {
+        const escapeText = value => String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+
+        const permissionHtml = Array.isArray(data.permissions) && data.permissions.length
+            ? data.permissions.map(permission => `
+                <span class="rounded-lg border border-[var(--h-bg-color)] bg-[var(--h-bg-color)]/40 px-2 py-1">${escapeText(permission)}</span>
+            `).join('')
+            : '<span class="text-[var(--secondary-text)]">No permissions</span>';
+
+        return `
+            <div class="item row grid grid-cols-[1.2fr_1fr_1.3fr] items-center border-b border-[var(--h-bg-color)] py-2 transition-all hover:bg-[var(--h-secondary-bg-color)]">
+                <div class="text-left pl-5">
+                    <div class="font-medium">${escapeText(data.role_user || '-')}</div>
+                    <div class="text-[11px] text-[var(--secondary-text)]">${escapeText(data.subtitle || 'Role rule')}</div>
+                </div>
+                <div class="text-left">${escapeText(data.module || 'All modules')}</div>
+                <div class="flex flex-wrap justify-end gap-1 pr-5 text-[11px] text-[var(--secondary-text)]">
+                    ${permissionHtml}
+                </div>
+            </div>
+        `;
+    };
+</script>
+@endpush
