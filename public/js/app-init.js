@@ -72,6 +72,7 @@
         if (typeof initGlobalUI === 'function') initGlobalUI();
         if (typeof initNegativeValueHighlighter === 'function') initNegativeValueHighlighter();
         if (typeof initPreviewTextFitting === 'function') initPreviewTextFitting();
+        initMobileDocumentPreviewFitting();
         if (config.authenticated && typeof initActivityPing === 'function') initActivityPing();
 
         if (config.pusherEnabled) {
@@ -178,6 +179,151 @@
     }
 
     window.initAppCommon = initAppCommon;
+
+    function initMobileDocumentPreviewFitting() {
+        if (window.__mobileDocumentPreviewFittingReady) return;
+        window.__mobileDocumentPreviewFittingReady = true;
+
+        let resizeTimer = null;
+        const scheduleFit = () => {
+            window.clearTimeout(resizeTimer);
+            resizeTimer = window.setTimeout(() => {
+                window.fitDocumentPreviewsToMobile?.();
+            }, 80);
+        };
+
+        const observer = new MutationObserver(scheduleFit);
+        observer.observe(document.body, {
+            attributes: true,
+            attributeFilter: ['class'],
+            childList: true,
+            subtree: true,
+        });
+
+        window.addEventListener('resize', scheduleFit);
+        window.addEventListener('orientationchange', scheduleFit);
+        scheduleFit();
+    }
+
+    window.fitDocumentPreviewsToMobile = function fitDocumentPreviewsToMobile(root = document) {
+        const isMobile = window.matchMedia('(max-width: 768px)').matches;
+        const containers = Array.from(root.querySelectorAll?.('#preview-container, .preview-container') || []);
+
+        containers.forEach(container => {
+            if (container.closest('#printIframe')) return;
+
+            const previewPages = Array.from(container.querySelectorAll('.preview-page'));
+            const pages = previewPages.length
+                ? previewPages
+                : Array.from(container.querySelectorAll('.preview'));
+            if (!pages.length) return;
+
+            if (!isMobile) {
+                container.previousElementSibling
+                    ?.matches?.('[data-mobile-preview-toolbar="auto"]') &&
+                    container.previousElementSibling.remove();
+                delete container.dataset.mobilePreviewFit;
+                delete container.dataset.mobilePreviewBaseScale;
+                delete container.dataset.mobilePreviewZoomSteps;
+                container.style.removeProperty('--mobile-preview-scale');
+                container.style.removeProperty('--mobile-preview-width');
+                container.style.removeProperty('--mobile-preview-height');
+                container.style.removeProperty('width');
+                container.style.removeProperty('min-width');
+                container.style.removeProperty('max-width');
+                container.style.removeProperty('transform');
+                container.style.removeProperty('transform-origin');
+                pages.forEach(page => {
+                    page.style.removeProperty('zoom');
+                    page.style.removeProperty('transform');
+                    page.style.removeProperty('transform-origin');
+                    page.style.removeProperty('margin-left');
+                    page.style.removeProperty('margin-right');
+                    page.style.removeProperty('margin-bottom');
+                });
+                return;
+            }
+
+            // ensureMobilePreviewToolbar(container);
+
+            const scrollParent = container.closest('.step2, .modal-body, .details, main') || container.parentElement;
+            const availableWidth = Math.max(260, (scrollParent?.clientWidth || window.innerWidth) - 24);
+            const firstPage = pages[0];
+            const previousScale = Number(firstPage.dataset.mobilePreviewAppliedScale || 1) || 1;
+            const measuredRect = firstPage.getBoundingClientRect();
+            const measuredWidth = measuredRect.width / previousScale;
+            const measuredHeight = measuredRect.height / previousScale;
+
+            if (!measuredWidth || !measuredHeight) return;
+
+            const baseScale = Math.min(1, Math.max(0.32, availableWidth / measuredWidth));
+            const zoomSteps = Number(container.dataset.mobilePreviewZoomSteps || 0);
+            const scale = Math.min(1.8, Math.max(0.32, baseScale + (zoomSteps * 0.1)));
+            const scaledWidth = measuredWidth * scale;
+            const scaledHeight = measuredHeight * scale;
+
+            container.dataset.mobilePreviewFit = '1';
+            container.dataset.mobilePreviewBaseScale = String(baseScale);
+            container.dataset.mobilePreviewScale = String(scale);
+            container.style.setProperty('--mobile-preview-scale', String(scale));
+            container.style.width = `${Math.ceil(scaledWidth)}px`;
+            container.style.minWidth = `${Math.ceil(scaledWidth)}px`;
+            container.style.maxWidth = '100%';
+
+            pages.forEach(page => {
+                page.dataset.mobilePreviewAppliedScale = String(scale);
+                page.style.removeProperty('zoom');
+                page.style.transform = `scale(${scale})`;
+                page.style.transformOrigin = 'top left';
+                page.style.marginLeft = '0';
+                page.style.marginRight = `${Math.ceil(scaledWidth - measuredWidth)}px`;
+                page.style.marginBottom = `${Math.ceil(scaledHeight - measuredHeight)}px`;
+            });
+
+            const resetButton = previewToolbarFor(container)?.querySelector('[data-statement-zoom="reset"], [data-preview-zoom="reset"]');
+            if (resetButton && container.id === 'preview-container') {
+                resetButton.textContent = `${Math.round(scale * 100)}%`;
+            }
+        });
+    };
+
+    function previewToolbarFor(container) {
+        const previous = container.previousElementSibling;
+        if (previous?.matches?.('.statement-preview-toolbar, [data-mobile-preview-toolbar]')) {
+            return previous;
+        }
+
+        return null;
+    }
+
+    function ensureMobilePreviewToolbar(container) {
+        if (previewToolbarFor(container)) return;
+
+        const toolbar = document.createElement('div');
+        toolbar.dataset.mobilePreviewToolbar = 'auto';
+        toolbar.className = 'sticky top-0 z-20 mb-2 flex justify-end gap-2 bg-white/95 p-2 text-black shadow-sm';
+        toolbar.innerHTML = `
+            <button type="button" class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold" data-preview-zoom="out">-</button>
+            <button type="button" class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold" data-preview-zoom="reset">100%</button>
+            <button type="button" class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold" data-preview-zoom="in">+</button>
+        `;
+
+        toolbar.querySelectorAll('[data-preview-zoom]').forEach(button => {
+            button.addEventListener('click', () => {
+                let zoomSteps = Number(container.dataset.mobilePreviewZoomSteps || 0);
+                const action = button.dataset.previewZoom;
+
+                if (action === 'in') zoomSteps = Math.min(10, zoomSteps + 1);
+                if (action === 'out') zoomSteps = Math.max(-3, zoomSteps - 1);
+                if (action === 'reset') zoomSteps = 0;
+
+                container.dataset.mobilePreviewZoomSteps = String(zoomSteps);
+                window.fitDocumentPreviewsToMobile?.();
+            });
+        });
+
+        container.insertAdjacentElement('beforebegin', toolbar);
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
         const bodyConfig = hydrateConfigFromBody();

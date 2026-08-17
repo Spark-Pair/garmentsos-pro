@@ -591,9 +591,44 @@
 
             if ($previewInResponse.length) {
                 $(".step2").html($previewInResponse.html());
+                // setupStatementZoom();
             } else {
                 console.warn(".step2 not found in response HTML.");
             }
+        }
+
+        function setupStatementZoom() {
+            const container = document.getElementById("preview-container");
+            const toolbar = document.querySelector(".statement-preview-toolbar");
+            if (!container || !toolbar) return;
+
+            let zoomSteps = Number(container.dataset.mobilePreviewZoomSteps || 0);
+            const applyZoom = (reset = false) => {
+                if (reset) {
+                    zoomSteps = 0;
+                }
+
+                container.dataset.mobilePreviewZoomSteps = String(zoomSteps);
+                window.fitDocumentPreviewsToMobile?.(document);
+                window.requestAnimationFrame(() => window.fitDocumentPreviewsToMobile?.(document));
+                window.setTimeout(() => window.fitDocumentPreviewsToMobile?.(document), 120);
+                window.setTimeout(() => window.fitDocumentPreviewsToMobile?.(document), 320);
+            };
+
+            toolbar.classList.remove("hidden");
+            toolbar.classList.add("flex");
+            toolbar.querySelectorAll("[data-statement-zoom]").forEach(button => {
+                if (button.dataset.zoomBound) return;
+                button.dataset.zoomBound = "1";
+                button.addEventListener("click", () => {
+                    const action = button.dataset.statementZoom;
+                    if (action === "in") zoomSteps = Math.min(10, zoomSteps + 1);
+                    if (action === "out") zoomSteps = Math.max(-3, zoomSteps - 1);
+                    applyZoom(action === "reset");
+                });
+            });
+
+            applyZoom();
         }
 
         window.onClickOnPrintBtn = function onClickOnPrintBtn() {
@@ -601,6 +636,11 @@
             const clone = preview.cloneNode(true);
 
             clone.querySelectorAll(":scope > hr").forEach(hr => hr.remove());
+            clone.querySelectorAll(".preview, .preview-page").forEach(page => {
+                page.style.removeProperty("zoom");
+                page.style.removeProperty("margin-left");
+                page.style.removeProperty("margin-right");
+            });
 
             window.DocumentPrint.printHtml({
                 title: "Print Statement",
@@ -664,6 +704,7 @@
         }
 
         forcePortalSelections();
+        // setupStatementZoom();
     }
 
     window.initReportsStatement = initReportsStatement;

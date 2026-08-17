@@ -130,7 +130,7 @@
         </div>
 
         <!-- Step 2: view order -->
-        <div class="step2 hidden space-y-4 text-black h-[35rem] overflow-y-auto my-scrollbar-2">
+        <div class="step2 hidden space-y-4 text-black h-[35rem] overflow-auto my-scrollbar-2">
             @if (isset($data))
                 @php
                     $statements = collect($data['statements']);
@@ -180,7 +180,12 @@
                 @endphp
 
                 {{-- First Page (29 rows) --}}
-                <div id="preview-container" class="h-full relative">
+                <div class="statement-preview-toolbar sticky top-0 z-20 mb-2 hidden justify-end gap-2 bg-white/95 p-2 text-black shadow-sm md:hidden">
+                    <button type="button" class="statement-zoom-btn rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold" data-statement-zoom="out">-</button>
+                    <button type="button" class="statement-zoom-btn rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold" data-statement-zoom="reset">100%</button>
+                    <button type="button" class="statement-zoom-btn rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold" data-statement-zoom="in">+</button>
+                </div>
+                <div id="preview-container" class="statement-preview-container h-full relative">
                     <div class="preview-page w-[210mm] h-[297mm] mx-auto overflow-hidden relative bg-white p-[0.19in] rounded-md">
                         <div id="preview" class="preview flex flex-col h-full">
                             <div id="preview-document" class="preview-document flex flex-col h-full px-2">
