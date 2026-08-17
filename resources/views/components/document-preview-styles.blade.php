@@ -35,6 +35,59 @@
         print-color-adjust: exact;
     }
 
+    .gos-a4-document {
+        box-sizing: border-box;
+        font-size: 11px;
+        line-height: 1.28;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .gos-a4-document hr {
+        margin-top: 8px !important;
+        margin-bottom: 8px !important;
+    }
+
+    .gos-a4-document .th,
+    .gos-a4-document .td {
+        align-items: center;
+        display: flex;
+        font-size: 11px !important;
+        justify-content: center;
+        line-height: 1.12 !important;
+        min-width: 0;
+        overflow: hidden !important;
+        text-align: center;
+        white-space: nowrap !important;
+    }
+
+    .gos-a4-document .thead .tr,
+    .gos-a4-document .tbody .tr {
+        min-height: 0;
+        padding: 4.5px 9px !important;
+    }
+
+    .gos-a4-document .tbody hr {
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+    }
+
+    .gos-a4-document .body,
+    .gos-a4-document #header,
+    .gos-a4-document .header,
+    .gos-a4-document #banner,
+    .gos-a4-document .banner,
+    .gos-a4-document .footer {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+    }
+
+    .gos-a4-document .footer,
+    .gos-a4-document .footer * {
+        font-size: 12px !important;
+        line-height: 1.2 !important;
+    }
+
     .gos-a5-document hr {
         margin-top: 6px !important;
         margin-bottom: 6px !important;
@@ -102,6 +155,25 @@
 
     .gos-a5-document .document-number {
         font-size: 12.8px !important;
+        font-weight: 700 !important;
+        line-height: 1.16 !important;
+    }
+
+    .gos-a4-document .right,
+    .gos-a4-document .date,
+    .gos-a4-document .number,
+    .gos-a4-document .document-number,
+    .gos-a4-document .preview-copy,
+    .gos-a4-document .copy,
+    .gos-a4-document .person,
+    .gos-a4-document .address,
+    .gos-a4-document .phone {
+        font-size: 13px !important;
+        line-height: 1.22 !important;
+    }
+
+    .gos-a4-document .document-number {
+        font-size: 13.5px !important;
         font-weight: 700 !important;
         line-height: 1.16 !important;
     }
@@ -333,6 +405,12 @@
         font-weight: 700 !important;
         line-height: 1.12 !important;
     }
+    
+    .gos-a4-invoice .text-2xl {
+        font-size: 23px !important;
+        font-weight: 800 !important;
+        line-height: 1.12 !important;
+    }
 
     .gos-a5-invoice .customer {
         font-size: 13.8px !important;
@@ -413,13 +491,13 @@
     .gos-a5-invoice .thead .tr {
         column-gap: 0;
         min-height: 28px;
-        padding: 3px 7px !important;
+        padding: 3px 9px !important;
     }
 
     .gos-a5-invoice .tbody .tr {
         column-gap: 0;
         min-height: 38px;
-        padding: 3px 7px !important;
+        padding: 3px 9px !important;
     }
 
     .cargo-list-preview .thead .tr {
@@ -503,9 +581,9 @@
         text-align: right;
     }
 
-    .gos-a5-invoice .invoice-item-row {
+    /* .gos-a5-invoice .invoice-item-row {
         border-top: 0.5px solid #c8ced8;
-    }
+    } */
 
     .gos-a5-invoice .invoice-item-row:first-child {
         border-top: 0;

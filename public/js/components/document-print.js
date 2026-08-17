@@ -82,11 +82,16 @@
         `;
     }
 
-    function a5PrintStyle(extraStyle = '') {
+    function documentPrintStyle(extraStyle = '', pageSize = 'A5') {
+        const isA4 = pageSize === 'A4';
+        const pageWidth = isA4 ? '210mm' : '148mm';
+        const pageHeight = isA4 ? '297mm' : '210mm';
+        const pageMargin = isA4 ? '4mm' : '3mm';
+
         return `
             @page {
-                size: A5 portrait;
-                margin: 3mm;
+                size: ${pageSize} portrait;
+                margin: ${pageMargin};
             }
 
             @media print {
@@ -106,14 +111,23 @@
                 }
 
                 .preview {
-                    width: 148mm !important;
-                    height: 210mm !important;
-                    max-width: 148mm !important;
-                    max-height: 210mm !important;
+                    zoom: 1 !important;
+                    width: ${pageWidth} !important;
+                    height: ${pageHeight} !important;
+                    max-width: ${pageWidth} !important;
+                    max-height: ${pageHeight} !important;
                     overflow: hidden !important;
                     break-after: page;
                     page-break-after: always;
                     page-break-inside: avoid;
+                }
+
+                .preview.cargo-list-preview,
+                .cargo-list-preview {
+                    width: 210mm !important;
+                    height: 297mm !important;
+                    max-width: 210mm !important;
+                    max-height: 297mm !important;
                 }
 
                 .preview,
@@ -160,7 +174,7 @@
                 <head>
                     <title>${title || 'Print Document'}</title>
                     ${document.head.innerHTML}
-                    <style>${a5PrintStyle(extraStyle)}</style>
+                    <style>${documentPrintStyle(extraStyle, previewHtml.includes('cargo-list-preview') ? 'A4' : 'A5')}</style>
                 </head>
                 <body>
                     <div id="preview-container" class="preview-container">${previewHtml}</div>

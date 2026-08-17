@@ -1,6 +1,8 @@
 (function (window) {
     'use strict';
 
+    const currentUser = window.currentUser || {};
+
     const invoiceDetailLine = (orderedArticle, article) => {
         const description = String(orderedArticle?.description ?? '').trim();
         const fabricType = String(article?.fabric_type ?? orderedArticle?.fabric_type ?? orderedArticle?.article?.fabric_type ?? orderedArticle?.articles?.fabric_type ?? '').trim();
@@ -176,11 +178,19 @@
             hour: '2-digit',
             minute: '2-digit',
             hour12: true,
-        }).replace(',', '');
+        });
+    }
+
+    function documentCreatedTime(value) {
+        const rawValue = String(value || '').trim();
+        const timestamp = rawValue || printDateTime();
+        const parts = timestamp.split(',');
+
+        return (parts[1] || parts[0] || '').trim();
     }
 
     function rowDivider(index, borderClass = 'border-black') {
-        return index === 0 ? '' : `<hr class="w-full my-2 ${borderClass}">`;
+        return index === 0 ? '' : `<hr class="w-full my-2 ${borderClass} border-dashed">`;
     }
 
     // Preview section ko clean karo
@@ -272,18 +282,18 @@
 
         } else if (data.preview.type == "cargo_list") {
             const cargoInvoices = Array.isArray(previewData.invoices) ? previewData.invoices : [];
-            const cargoPages = chunkArray(cargoInvoices, 26, false);
+            const cargoPages = chunkArray(cargoInvoices, 38, false);
             let cargoSerial = 1;
 
             cargoPages.forEach((cargoChunk, pageIndex) => {
                 invoiceTableHeader = `
-                    <div class="th text-sm font-medium w-[6%]">S.No</div>
-                    <div class="th text-sm font-medium w-[16%]">Date</div>
-                    <div class="th text-sm font-medium w-[17%]">Invoice No.</div>
-                    <div class="th text-sm font-medium w-[17%]">Shipment No.</div>
-                    <div class="th text-sm font-medium w-[10%]">Carton</div>
+                    <div class="th text-sm font-medium w-[5%]">S.No</div>
+                    <div class="th text-sm font-medium w-[13%]">Date</div>
+                    <div class="th text-sm font-medium w-[15%]">Invoice No.</div>
+                    <div class="th text-sm font-medium w-[15%]">Shipment No.</div>
+                    <div class="th text-sm font-medium w-[8%]">Carton</div>
                     <div class="th text-sm font-medium grow">Customer</div>
-                    <div class="th text-sm font-medium w-[12%]">City</div>
+                    <div class="th text-sm font-medium w-[16%]">City</div>
                 `;
 
                 invoiceTableBody = cargoChunk.map((invoice, index) => {
@@ -291,13 +301,13 @@
                     <div>
                         ${rowDivider(index)}
                         <div class="tr flex justify-between w-full px-2 gap-2">
-                            <div class="td text-sm font-semibold w-[6%] truncate">${cargoSerial++}.</div>
-                            <div class="td text-sm font-semibold w-[16%] truncate">${formatDate(invoice.date)}</div>
-                            <div class="td text-sm font-semibold w-[17%] truncate">${invoice.invoice_no || '-'}</div>
-                            <div class="td text-sm font-semibold w-[17%] truncate">${invoice.shipment_no || '-'}</div>
-                            <div class="td text-sm font-semibold w-[10%] truncate">${invoice.carton_count}</div>
+                            <div class="td text-sm font-semibold w-[5%] truncate">${cargoSerial++}.</div>
+                            <div class="td text-sm font-semibold w-[13%] truncate">${formatDate(invoice.date)}</div>
+                            <div class="td text-sm font-semibold w-[15%] truncate">${invoice.invoice_no || '-'}</div>
+                            <div class="td text-sm font-semibold w-[15%] truncate">${invoice.shipment_no || '-'}</div>
+                            <div class="td text-sm font-semibold w-[8%] truncate">${invoice.carton_count}</div>
                             <div class="td text-sm font-semibold grow truncate capitalize">${invoice.customer?.customer_name || '-'}</div>
-                            <div class="td text-sm font-semibold w-[12%] truncate">${invoice.customer?.city?.title || '-'}</div>
+                            <div class="td text-sm font-semibold w-[16%] truncate">${invoice.customer?.city?.title || '-'}</div>
                         </div>
                     </div>
                     `;
@@ -327,7 +337,7 @@
                     <div class="th text-sm font-medium ">Pcs.</div>
                     <div class="th text-sm font-medium ">Rate</div>
                     <div class="th text-sm font-medium ">Amount</div>
-                    ${data.preview.type == 'order' ? '<div class="th text-sm font-medium text-center">Dispatch</div>' : ''}
+                    ${data.preview.type == 'order' ? '<div class="th text-sm font-medium text-right">Dispatch</div>' : ''}
                 ` : `
                     <div class="th text-sm font-medium ">S.No</div>
                     <div class="th text-sm font-medium ">Article</div>
@@ -336,7 +346,7 @@
                     <div class="th text-sm font-medium ">Pcs.</div>
                     <div class="th text-sm font-medium ">Rate/Pc.</div>
                     <div class="th text-sm font-medium ">Amount</div>
-                    ${data.preview.type == 'order' ? '<div class="th text-sm font-medium text-center ">Dispatch</div>' : ''}
+                    ${data.preview.type == 'order' ? '<div class="th text-sm font-medium text-right ">Dispatch</div>' : ''}
                 `;
 
                 // Agar empty array hai (second page for totals only)
@@ -384,7 +394,7 @@
                                             <div class="td text-sm font-semibold truncate">${qty}</div>
                                             <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(salesRate)}</div>
                                             <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(total)}</div>
-                                            ${data.preview.type == 'order' ? `<div class="td text-sm font-semibold text-center">${dispatched}</div>` : ''}
+                                            ${data.preview.type == 'order' ? `<div class="td text-sm font-semibold text-right">${dispatched}</div>` : ''}
                                         </div>
                                     </div>
                                 `;
@@ -402,7 +412,7 @@
                                         <div class="td text-sm font-semibold truncate">${qty}</div>
                                         <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(salesRate)}</div>
                                         <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(total)}</div>
-                                        ${data.preview.type == 'order' ? `<div class="td text-sm text-center font-semibold truncate">${orderedArticle.dispatched_pcs > 0 ? orderedArticle.dispatched_pcs : ''}</div>` : ''}
+                                        ${data.preview.type == 'order' ? `<div class="td text-sm text-right font-semibold truncate">${orderedArticle.dispatched_pcs > 0 ? orderedArticle.dispatched_pcs : ''}</div>` : ''}
                                     </div>
                                 </div>
                             `;
@@ -430,9 +440,10 @@
     function renderPreviewPage(data, previewData, cartonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, pageIndex, totalPages = 1) {
         const previewCompany = previewData?.branch_branding || companyData;
         const previewCompanyLogoUrl = previewLogoUrl(previewCompany, companyLogoBase);
-        const isCompactDocument = data.preview.size == "A5" || data.preview.type == "order" || data.preview.type == "invoice" || data.preview.type == "shipment" || data.preview.type == "cargo_list";
-        const pageSizeClass = isCompactDocument ? "w-[148mm] h-[210mm]" : "w-[208mm] h-[302mm]";
-        const pageTextClass = isCompactDocument ? `gos-a5-document ${data.preview.type == "invoice" || data.preview.type == "order" || data.preview.type == "shipment" || data.preview.type == "cargo_list" ? "gos-a5-invoice" : ""}` : "";
+        const isCargoList = data.preview.type == "cargo_list";
+        const isCompactDocument = data.preview.size == "A5" || data.preview.type == "order" || data.preview.type == "invoice" || data.preview.type == "shipment";
+        const pageSizeClass = isCargoList ? "w-[210mm] h-[297mm]" : (isCompactDocument ? "w-[148mm] h-[210mm]" : "w-[208mm] h-[302mm]");
+        const pageTextClass = isCargoList ? "gos-a4-document cargo-list-a4-document" : (isCompactDocument ? `gos-a5-document ${data.preview.type == "invoice" || data.preview.type == "order" || data.preview.type == "shipment" ? "gos-a5-invoice" : ""}` : "");
         const documentNo = data.preview.type == 'order'
             ? previewData.order_no
             : data.preview.type == 'invoice'
@@ -456,6 +467,9 @@
             : previewData.shipment_no
                 ? `Shipment No.: ${previewData.shipment_no}`
                 : '';
+        const documentTime = documentCreatedTime(previewData.created_at);
+        const documentTimeSuffix = documentTime ? `, ${documentTime}` : '';
+
         return `
             <div id="preview" class="preview ${data.preview.type == 'cargo_list' ? 'cargo-list-preview ' : ''}${pageSizeClass} ${pageTextClass} overflow-hidden flex flex-col">
                 <div class="${data.preview.type == 'cargo_list' ? 'cargo-list-document ' : ''}flex flex-col h-full">
@@ -493,7 +507,7 @@
                     <hr class="w-full my-3 border-black">
                     ${data.preview.type != 'form' ? `
                         <div id="header" class="header w-full flex justify-between px-5">
-                            <div class="left ${data.preview.type == "order" || data.preview.type == "invoice" ? 'grow min-w-0 pr-3' : 'w-50'} space-y-1">
+                            <div class="left ${data.preview.type == "order" || data.preview.type == "invoice" || data.preview.type == "cargo_list" ? 'grow min-w-0 pr-3' : 'w-50'} space-y-1">
                                 ${data.preview.type == "order" || data.preview.type == "invoice" ? `
                                     <div class="customer text-lg leading-none capitalize font-medium text-nowrap">M/s: ${previewData.customer.customer_name}</div>
                                     <div class="person text-md text-lg leading-none">${customerTitlePhoneLine(previewData.customer)}</div>
@@ -502,10 +516,10 @@
                                 ` : data.preview.type == "shipment" ? `
                                     <div class="address text-md leading-none capitalize">${previewData.city ? 'City: ' + previewData.city : ''}</div>
                                 ` : data.preview.type == "cargo_list" ? `
-                                    <div class="cargo-name capitalize font-semibold text-md leading-none">Cargo Name: ${previewData.cargo_name}</div>
-                                    <div class="date leading-none">Date: ${formatDate(previewData.date)}</div>
+                                    <div class="cargo-name capitalize font-semibold text-sm leading-none">Cargo Name: ${previewData.cargo_name}</div>
+                                    <div class="date leading-none text-sm">Date: ${formatDate(previewData.date)}${documentTimeSuffix}</div>
                                 ` : `
-                                    <div class="date leading-none">Date: ${formatDate(previewData.date)}</div>
+                                    <div class="date leading-none">Date: ${formatDate(previewData.date)}${documentTimeSuffix}</div>
                                     <div class="number leading-none capitalize">${data.preview.type.replace('_', ' ')} No.: ${data.preview.type == 'shipment' ? previewData.shipment_no : data.preview.type == 'voucher' ? previewData.voucher_no : data.preview.type == 'cargo_list' ? previewData.cargo_no : ''}</div>
                                 `}
                             </div>
@@ -516,7 +530,7 @@
                             ` : ''}
                             <div class="right ${data.preview.type == "order" || data.preview.type == "invoice" ? 'shrink-0 min-w-[38%]' : 'w-50'} my-auto text-right text-sm text-black space-y-1.5">
                                 ${data.preview.type == "order" || data.preview.type == "invoice" || data.preview.type == "shipment" ? `
-                                    <div class="date leading-none">Date: ${formatDate(previewData.date)}</div>
+                                    <div class="date leading-none">Date: ${formatDate(previewData.date)}${documentTimeSuffix}</div>
                                     ${data.preview.type == 'invoice' && invoiceSourceNo ? `<div class="number leading-none capitalize">${invoiceSourceNo}</div>` : ''}
                                 ` : ''}
                                 ${data.preview.type != 'shipment' ? `<div class="preview-copy leading-none capitalize">${data.preview.type.replace('_', ' ')} Copy: ${previewData.copy_label || data.preview.copyLabel || ((data.preview.type == 'voucher' && !previewData.supplier) ? 'Staff' : (data.preview.type == 'voucher' && previewData.supplier) ? 'Supplier' : data.preview.type == 'cargo_list' ? 'Cargo' : 'Customer')}</div>` : ''}
@@ -568,7 +582,7 @@
                     <hr class="w-full my-3 border-black">
                     <div class="footer flex w-full text-sm px-5 justify-between text-black">
                         <p class="leading-none text-sm">Powered by SparkPair | +92 316 5825495</p>
-                        ${['invoice', 'order', 'shipment', 'cargo_list'].includes(data.preview.type) ? `<p class="leading-none text-sm">${pageIndex + 1} of ${totalPages} | ${printDateTime()}</p>` : ''}
+                        ${['invoice', 'order', 'shipment', 'cargo_list'].includes(data.preview.type) ? `<p class="leading-none text-sm"><span class="capitalize">${data.preview.data.creator?.name || currentUser?.name || '-'}</span> | ${printDateTime()} | ${pageIndex + 1} of ${totalPages}</p>` : ''}
                     </div>
                 </div>
             </div>

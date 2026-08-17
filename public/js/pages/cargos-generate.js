@@ -267,7 +267,7 @@
             previewContainer.innerHTML = window.DocumentPreview.render({
                 preview: {
                     type: 'cargo_list',
-                    size: 'A5',
+                    size: 'A4',
                     document: 'Cargo List',
                     data: {
                         cargo_no: cargoNo,
@@ -283,9 +283,9 @@
             });
             previewContainer.insertAdjacentHTML('beforeend', `<input type="hidden" name="cargo_no" value="${cargoNo}" />`);
         } else {
-            previewContainer.className = 'w-[148mm] h-[210mm] mx-auto overflow-hidden relative';
+            previewContainer.className = 'w-[210mm] h-[297mm] mx-auto overflow-hidden relative';
             previewContainer.innerHTML =
-                '<div id="preview" class="preview cargo-list-preview w-[148mm] h-[210mm] gos-a5-document gos-a5-invoice overflow-hidden flex flex-col"><h1 class="text-[var(--border-error)] font-medium text-center mt-5">No Preview avalaible.</h1></div>';
+                '<div id="preview" class="preview cargo-list-preview w-[210mm] h-[297mm] gos-a4-document cargo-list-a4-document overflow-hidden flex flex-col"><h1 class="text-[var(--border-error)] font-medium text-center mt-5">No Preview avalaible.</h1></div>';
         }
     };
 
