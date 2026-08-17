@@ -810,9 +810,6 @@
                         })),
                     };
 
-                    console.log(previewData);
-                    
-
                     previewDom.className = "h-auto mx-auto relative flex flex-col";
                     previewDom.innerHTML = [
                         buildInvoicePreviewLikeModal(previewData, 'Customer'),
