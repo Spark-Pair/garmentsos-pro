@@ -18,8 +18,8 @@
                 data-json='${jsonAttr(data)}'>
 
                 <span class="text-left pl-5 col-span-2">${data.name}</span>
-                <span class="text-left pl-5">${data.username}</span>
-                <span class="text-center capitalize">${data.role}</span>
+                <span class="text-left pl-5">${data.details['Username']}</span>
+                <span class="text-center capitalize">${data.details['Role']}</span>
                 <span class="text-right pr-5 capitalize ${data.status === 'active' ? 'text-[var(--border-success)]' : 'text-[var(--border-error)]'}">${data.status}</span>
             </div>`;
         }

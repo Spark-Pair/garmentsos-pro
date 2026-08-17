@@ -23,7 +23,7 @@ class UserController extends Controller
             return $resp;
         }
 
-        $authLayout = $this->getAuthLayout($request->route()->getName());
+        $authLayout = $this->getAuthLayout($request->route()->getName()) ?? 'grid';
 
         if ($request->ajax()) {
             $users = app(ModuleBranchService::class)->applyScope(User::whereNotIn('role', ['supplier', 'customer', 'developer']), 'users')
