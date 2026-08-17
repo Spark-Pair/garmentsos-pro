@@ -816,18 +816,21 @@ class InvoiceController extends Controller
      */
     public function edit(invoice $invoice)
     {
+        if (
+            !$this->checkRole(['developer', 'owner', 'admin', 'accountant']) &&
+            !app_can('orders', 'override')
+        ) {
+            return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
+        }
+
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($invoice, 'invoices');
     
-        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant'])) {
-            return $resp;
-        }
-    
-        $invoice->load(['customer.city', 'invoiceArticles.article', 'order', 'shipment.articles.article']);
+        $invoice->load(['customer.city', 'invoiceArticles.article', 'order', 'shipment.articles.article', 'creator']);
     
         // Detect the real invoice type from what's actually stored on the record,
         // instead of assuming "order" like the old code did.
         $invoiceType = $invoice->shipment_no ? 'shipment' : 'order';
-        $isDeveloper = Auth::user()?->role === 'developer';
+        $isDeveloper = Auth::user()?->role === 'developer' || app_can('orders', 'override');
     
         $branches = app(ModuleBranchService::class);
     
@@ -948,7 +951,7 @@ class InvoiceController extends Controller
                 ->with('error', $this->dependencyBlockMessage('Invoice', $dependencies));
         }
     
-        $isDeveloper = Auth::user()?->role === 'developer';
+        $isDeveloper = Auth::user()?->role === 'developer' || app_can('invoices', 'override');;
         $invoiceType = $invoice->shipment_no ? 'shipment' : 'order';
     
         return $invoiceType === 'order'
