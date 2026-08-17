@@ -15,6 +15,11 @@ const GlobalFilterManager = {
         if (!document.querySelector('.search_container')) return;
 
         rootAuthLayout = this.currentLayout();
+
+        // IMPORTANT:
+        // If server-side Blade already rendered rows, cache them first.
+        this.cacheInitialServerData();
+
         this.restoreSavedFilters();
         this.bindFilterEvents();
         this.bindShortcutEvents();
@@ -22,7 +27,67 @@ const GlobalFilterManager = {
         if (Object.keys(this.collectFilters()).length > 0) {
             this.applyFilters({ persist: false });
         } else {
-            this.loadInitialData();
+            // Do NOT make another AJAX request.
+            // The page already contains the initial records.
+            this.useInitialServerData();
+        }
+    },
+
+    cacheInitialServerData() {
+        const container = document.querySelector('.search_container');
+
+        if (!container) {
+            window.__initialFilterData = [];
+            return;
+        }
+
+        const rows = container.querySelectorAll('[data-json]');
+
+        window.__initialFilterData = Array.from(rows)
+            .map(row => {
+                try {
+                    return JSON.parse(row.dataset.json || '{}');
+                } catch (error) {
+                    console.warn('Unable to parse initial row JSON:', error);
+                    return null;
+                }
+            })
+            .filter(Boolean);
+
+        window.allDataArray = window.__initialFilterData;
+        window.visibleData = window.__initialFilterData;
+    },
+
+    useInitialServerData() {
+        const items = Array.isArray(window.__initialFilterData)
+            ? window.__initialFilterData
+            : [];
+
+        window.allDataArray = items;
+        window.visibleData = items;
+
+        const calculations = {};
+
+        if (typeof window.renderCalculation === 'function') {
+            window.renderCalculation(calculations);
+        }
+
+        // Keep the Blade-rendered rows exactly as they are.
+        // Only notify other page components.
+        document.dispatchEvent(
+            new CustomEvent('app:data:rendered', {
+                detail: {
+                    items
+                }
+            })
+        );
+
+        const noItemsError = document.getElementById('noItemsError');
+
+        if (noItemsError) {
+            noItemsError.style.display = items.length === 0
+                ? 'block'
+                : 'none';
         }
     },
 
@@ -251,15 +316,51 @@ const GlobalFilterManager = {
 
     async fetchData(url) {
         const response = await fetch(url, {
+            method: 'GET',
+            credentials: 'same-origin',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
                 'Accept': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
+                'Cache-Control': 'no-cache',
+                'X-CSRF-TOKEN': document.querySelector(
+                    'meta[name="csrf-token"]'
+                )?.content || ''
             }
         });
 
+        const contentType = response.headers.get('content-type') || '';
+
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const text = await response.text();
+
+            console.error('Filter request failed:', {
+                url,
+                status: response.status,
+                contentType,
+                response: text.substring(0, 500)
+            });
+
+            throw new Error(
+                `HTTP ${response.status} returned from ${url}`
+            );
+        }
+
+        // Laravel returned HTML instead of JSON.
+        if (!contentType.includes('application/json')) {
+            const text = await response.text();
+
+            console.error('Expected JSON but Laravel returned HTML:', {
+                url,
+                finalUrl: response.url,
+                status: response.status,
+                contentType,
+                response: text.substring(0, 1000)
+            });
+
+            throw new Error(
+                'Server returned HTML instead of JSON. ' +
+                'Check the controller response or authentication redirect.'
+            );
         }
 
         return await response.json();
