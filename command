@@ -8,3 +8,7 @@ git diff >> changes-report.txt
 git diff --cached >> changes-report.txt
 
 ---- ------
+
+git diff (git describe --tags --abbrev=0)..HEAD > unreleased-changes.txt
+
+---- -----
