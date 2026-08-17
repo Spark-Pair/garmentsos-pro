@@ -94,13 +94,13 @@
                         @php
                             $serial = 1; // har page pe reset
                         @endphp
-                        <div class="preview-page w-[210mm] h-[297mm] mx-auto overflow-hidden relative bg-white p-[0.19in] rounded-md">
+                        <div class="preview-page w-[210mm] h-[297mm] mx-auto overflow-hidden relative bg-white rounded-md">
                             <div id="preview" class="preview flex flex-col h-full">
-                                <div id="preview-document" class="preview-document flex flex-col h-full px-2">
+                                <div id="preview-document" class="preview-document flex flex-col h-full">
                                     <div id="preview-banner" class="preview-banner w-full flex justify-between items-center px-8 pr-8">
                                         <div class="flex items-center gap-3">
                                             @if($companyData->logo_url)
-                                                <div class="w-[13.5rem] flex items-center justify-start gap-2.5" style="height: 2.1rem">
+                                                <div class="w-[13.5rem] flex items-center justify-start gap-2.5" style="height: 2.5rem">
                                                     <img
                                                         src="{{ $companyData->logo_url }}"
                                                         alt="garmentsos-pro"
@@ -117,12 +117,12 @@
                                         <div class="right">
                                             <div>
                                                 <h1 class="text-lg font-medium text-[var(--primary-color)] pr-2 capitalize">{{ $reportHeading }}</h1>
-                                                <div class="total-bill leading-none mt-0.5 text-xs">Total Records: {{ $data['rows']->count() }} | Branches: {{ implode(', ', $selectedBranchLabels) }} | Print Date: {{ $today = now()->format('d-M-Y') }}</div>
+                                                <div class="total-bill leading-none text-xs">Total Records: {{ $data['rows']->count() }} | Branches: {{ implode(', ', $selectedBranchLabels) }}</div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <hr class="w-full my-2 border-gray-700">
+                                    <hr class="w-full my-1 border-gray-700">
 
                                     <div id="preview-body" class="preview-body w-[95%] grow mx-auto">
                                         <div class="preview-table w-full">
@@ -134,7 +134,7 @@
                                                             <div class="preview-table w-full">
                                                             <div class="table w-full border border-gray-700 rounded-lg p-1 text-xs">
                                                                 <div class="thead w-full">
-                                                                    <div class="tr flex w-full px-2 py-0 bg-[var(--primary-color)] text-white text-center rounded-md">
+                                                                    <div class="tr flex w-full px-2 py-1.5 bg-[var(--primary-color)] text-white text-center rounded-md">
                                                                         <div class="th font-medium overflow-hidden w-[8%] text-left">#</div>
                                                                         <div class="th font-medium overflow-hidden w-[30%] text-left">Article/pckt.</div>
                                                                         <div class="th font-medium overflow-hidden grow">Proc. By</div>
@@ -142,11 +142,11 @@
                                                                         <div class="th font-medium overflow-hidden w-[20%]">{{ $secondaryLabel }}</div>
                                                                     </div>
                                                                 </div>
-                                                                <div id="tbody" class="tbody w-full mt-1.5 pb-1">
+                                                                <div id="tbody" class="tbody w-full mt-0.5">
                                                                     @foreach ($page[$column] as $row)
                                                                         <div>
                                                                             @unless($loop->first)
-                                                                                <hr class="w-full my-1 border-dotted">
+                                                                                <hr class="w-full my-0.5 border-dotted">
                                                                             @endunless
                                                                             <div class="tr flex  w-full px-2 text-center gap-0.5">
                                                                                 <div class="td font-medium overflow-hidden w-[8%] text-left capitalize truncate">{{ $serial++ }}.</div>
@@ -172,10 +172,10 @@
                                         </div>
                                     </div>
 
-                                    <hr class="w-full my-2 border-gray-700">
+                                    <hr class="w-full my-1 border-gray-700">
                                     <div class="tfooter flex w-full text-sm px-4 justify-between text-gray-800 leading-none text-xs" style="font-size: 0.70rem">
                                         <p>Powered by SparkPair &copy; {{ now()->year }} SparkPair | +92 316 5825495</p>
-                                        <p>Page {{ $loop->iteration }} of {{ $totalPages }}</p>
+                                        <p>{{ $loop->iteration }} of {{ $totalPages }} | {{ $today = now()->format('d-M-Y, g:i A') }}</p>
                                     </div>
                                 </div>
                             </div>
