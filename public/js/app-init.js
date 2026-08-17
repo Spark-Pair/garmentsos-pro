@@ -188,4 +188,15 @@
             window.visibleData = event.detail?.items || window.allDataArray || [];
         });
     });
+
+    window.formatPcsAndPackets = function formatPcsAndPackets(quantity, pcsPerPacket, packets = getPacketsFromPcs(quantity, pcsPerPacket)) {
+        return `${quantity} pcs | ${packets} pkts`;
+    }
+
+    window.getPacketsFromPcs = function getPacketsFromPcs(quantity, pcsPerPacket) {
+        const packetSize = Number(pcsPerPacket || 0);
+        if (!packetSize) return 0;
+
+        return Number(quantity || 0) / packetSize;
+    }
 })();

@@ -36,17 +36,6 @@
                 maximumFractionDigits,
             }).format(numericValue);
         }
-        
-        function getPacketsFromPcs(quantity, pcsPerPacket = selectedArticle?.pcs_per_packet) {
-            const packetSize = Number(pcsPerPacket || 0);
-            if (!packetSize) return 0;
-
-            return Number(quantity || 0) / packetSize;
-        }
-
-        function formatPcsAndPackets(quantity, packets = getPacketsFromPcs(quantity)) {
-            return `${formatNumber(quantity, 0)} pcs | ${formatNumber(packets)} pkts`;
-        }
 
         function masterUnitValue() {
             return Number(pcsPerPacketDbDom?.value || pcsPerPacketDom?.value || 0);
@@ -176,6 +165,7 @@
             );
             let value = `${selectedArticle.article_no} | ${selectedArticle.season} | ${selectedArticle.size} | ${selectedArticle.category} | ${formatPcsAndPackets(
                 totalArticleQuantity,
+                selectedArticle.pcs_per_packet,
                 totalArticlePackets
             )} | Rs. ${formatNumbersWithDigits(selectedArticle.sales_rate, 1, 1)}`;
             articleSelectInputDOM.value = value;
@@ -189,6 +179,7 @@
 
             totalPhysicalQuantityDom.innerText = formatPcsAndPackets(
                 selectedArticle.physical_quantity,
+                selectedArticle.pcs_per_packet,
                 selectedArticle.physical_packets
             );
 
@@ -283,7 +274,7 @@
                 finalOrderedQuantityDom.textContent = new Intl.NumberFormat("en-US").format(
                     totalQuantity
                 );
-                finalOrderedQuantityDom.textContent = formatPcsAndPackets(totalQuantity);
+                finalOrderedQuantityDom.textContent = formatPcsAndPackets(totalQuantity, selectedArticle?.pcs_per_packet);
 
                 finalOrderAmountDom.innerText = formatMoney(totalAmount);
             } else {
@@ -334,12 +325,12 @@
                 availableQuantity - totalQuantity;
 
             remainingQuantityDom.innerText =
-                formatPcsAndPackets(Math.max(0, remaining));
+                formatPcsAndPackets(Math.max(0, remaining), selectedArticle?.pcs_per_packet);
 
             if (Number(packetsDom.value || 0) >= maxPackets) {
                 setFieldError(
                     packetsDom,
-                    `Quantity cannot exceed ${formatPcsAndPackets(availableQuantity)}`
+                    `Quantity cannot exceed ${formatPcsAndPackets(availableQuantity, selectedArticle?.pcs_per_packet)}`
                 );
             } else {
                 setFieldError(packetsDom);

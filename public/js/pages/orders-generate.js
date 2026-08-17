@@ -233,23 +233,26 @@
                     {
                         category: 'input',
                         label: 'Orderable Quantity',
-                        value: `${formatNumbersDigitLess(data.orderable_quantity)} Pcs | ${formatNumbersWithDigits(data.orderable_quantity_packets)} Pkts`,
+                        value: `${formatPcsAndPackets(data.orderable_quantity, data.pcs_per_packet)}`,
                         disabled: true,
-                        full: true,
                     },
                     {
                         category: 'input',
                         label: 'Invoiceable Quantity (Current Stock)',
-                        value: `${formatNumbersDigitLess(data.current_stock)} Pcs | ${formatNumbersWithDigits(data.current_stock_packets)} Pkts`,
+                        value: `${formatPcsAndPackets(data.current_stock, data.pcs_per_packet)}`,
                         disabled: true,
-                        full: true,
                     },
                     {
                         category: 'input',
                         label: 'Unit',
                         value: `${formatNumbersDigitLess(data.pcs_per_packet)} Pcs per Packet`,
                         disabled: true,
-                        full: true,
+                    },
+                    {
+                        category: 'input',
+                        label: 'B. C.',
+                        value: `${formatPcsAndPackets(data.b_c_quantity, data.pcs_per_packet)}`,
+                        disabled: true,
                     },
                     {
                         category: 'input',
