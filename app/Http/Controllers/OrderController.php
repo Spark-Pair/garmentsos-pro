@@ -366,14 +366,18 @@ class OrderController extends Controller
      */
     public function edit(Order $order)
     {
-        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant'])) {
-            return $resp;
+        if (
+            !$this->checkRole(['developer', 'owner', 'admin', 'accountant']) &&
+            !app_can('orders', 'override')
+        ) {
+            return redirect(route('home'))->with('error', 'You do not have permission to access this page.');
         }
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($order, 'orders');
 
         $order->load([
             'customer.city',
             'articles.article',
+            'creator',
         ]);
 
         $orderPayload = [
@@ -382,6 +386,11 @@ class OrderController extends Controller
             'branch_id' => $order->branch_id,
             'branch_branding' => app(ModuleBranchService::class)->documentBranding('orders', $order),
             'date' => $order->date?->format('Y-m-d'),
+            'created_at' => $order->created_at?->format('Y-m-d, h:i A'),
+            'creator' => $order->creator ? [
+                'id' => $order->creator->id,
+                'name' => $order->creator->name,
+            ] : null,
             'netAmount' => $order->netAmount,
             'deliver_to' => $order->deliver_to,
             'customer' => [
@@ -442,7 +451,10 @@ class OrderController extends Controller
 
     public function update(Request $request, Order $order)
     {
-        if (!$this->checkRole(['developer', 'owner', 'admin', 'accountant'])) {
+        if (
+            !$this->checkRole(['developer', 'owner', 'admin', 'accountant']) &&
+            !app_can('orders', 'override')
+        ) {
             return redirect(route('home'))
                 ->with('error', 'You do not have permission to access this page.');
         }

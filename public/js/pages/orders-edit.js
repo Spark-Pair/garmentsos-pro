@@ -673,6 +673,8 @@
                     data: {
                         order_no: order.order_no,
                         date: orderDateForRequest(),
+                        created_at: order?.created_at,
+                        creator: order?.creator,
                         customer: customerData,
                         deliver_to: document.getElementById('deliver_to')?.value || order?.deliver_to || '',
                         discount: discountDOM?.value || 0,

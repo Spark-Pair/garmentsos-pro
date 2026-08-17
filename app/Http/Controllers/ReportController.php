@@ -1341,6 +1341,7 @@ class ReportController extends Controller
             'invoiceArticles.article',
             'salesReturns',
             'customer.city',
+            'creator',
         ]), 'invoices')->find($id);
         if (!$invoice) return null;
 

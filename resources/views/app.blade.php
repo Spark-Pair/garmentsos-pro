@@ -1013,6 +1013,8 @@
     </form>
 
     <script>
+        window.currentUser = @json(Auth::user());
+        
         document.addEventListener('DOMContentLoaded', () => {
             const syncToggleVisual = (input) => {
                 const toggle = input?.closest('.app-toggle');

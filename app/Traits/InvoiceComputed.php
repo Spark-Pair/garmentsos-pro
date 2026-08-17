@@ -176,6 +176,12 @@ trait InvoiceComputed
                     'netAmount' => (float) ($this->shipment->netAmount ?? 0),
                 ] : null,
                 'invoice_articles' => $invoiceArticles,
+                'created_at' => $this->created_at?->format('Y-m-d, h:i A'),
+                'updated_at' => $this->updated_at?->format('Y-m-d, h:i A'),
+                'creator' => $this->creator ? [
+                    'id' => $this->creator->id,
+                    'name' => $this->creator->name,
+                ] : null,
             ],
             'oncontextmenu' => "generateContextMenu(event)",
             'onclick' => "generateModal(this)",
