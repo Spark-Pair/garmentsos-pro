@@ -132,11 +132,8 @@
                                 btnId="loadInvoiceOrderBtn"
                                 btnText="Load Articles" />
                         @else
-                            <x-select label="Order Number" name="order_no" id="order_no"
-                                :options="$ordersOptions"
-                                :value="old('order_no', $invoice->order_no)"
-                                required showDefault
-                                disabled />
+                            <x-input label="Order Number" name="order_no" id="order_no"
+                                value="{{ old('order_no', $invoice->order_no) }}" required readonly />
                         @endif
                     </div>
                 </div>
@@ -173,11 +170,9 @@
                                 :value="old('shipment_no', $invoice->shipment_no)"
                                 required showDefault />
                         @else
-                            <x-select label="Shipment Number" name="shipment_no" id="shipment_no"
-                                :options="$shipmentsOptions"
-                                :value="old('shipment_no', $invoice->shipment_no)"
-                                required showDefault
-                                disabled />
+                            <x-input label="Shipment Number" name="shipment_no" id="shipment_no"
+                                value="old('shipment_no', $invoice->shipment_no)"
+                                required readonly />
                         @endif
                         
                         <x-input label="Carton Count" name="carton_count" id="carton_count" type="number" min="1"
