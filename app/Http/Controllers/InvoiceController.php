@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Collection;
 
 use function PHPSTORM_META\type;
 
@@ -440,11 +441,9 @@ class InvoiceController extends Controller
                 );
 
                 $this->validateInvoiceStock(
-                    $lines
-                        ->groupBy('article_id')
-                        ->map(
-                            fn ($group) => $group->sum('invoice_pcs')
-                        ),
+                    $lines->groupBy('article_id')->map(
+                        fn ($group) => $group->sum('invoice_pcs')
+                    ),
                     $orderDb->id
                 );
 
@@ -818,14 +817,21 @@ class InvoiceController extends Controller
     public function edit(invoice $invoice)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($invoice, 'invoices');
-
+    
         if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant'])) {
             return $resp;
         }
-
-        $invoice->load(['customer.city', 'invoiceArticles.article', 'order', 'shipment']);
-
-        $customers = app(ModuleBranchService::class)->applyRelatedScope(Customer::with('city'), 'customers', 'invoices')
+    
+        $invoice->load(['customer.city', 'invoiceArticles.article', 'order', 'shipment.articles.article']);
+    
+        // Detect the real invoice type from what's actually stored on the record,
+        // instead of assuming "order" like the old code did.
+        $invoiceType = $invoice->shipment_no ? 'shipment' : 'order';
+        $isDeveloper = Auth::user()?->role === 'developer';
+    
+        $branches = app(ModuleBranchService::class);
+    
+        $customers = $branches->applyRelatedScope(Customer::with('city'), 'customers', 'invoices')
             ->orderBy('customer_name')
             ->get()
             ->mapWithKeys(fn (Customer $customer) => [
@@ -843,55 +849,88 @@ class InvoiceController extends Controller
                 ],
             ])
             ->all();
-
-        $branches = app(ModuleBranchService::class);
-        $ordersOptions = $branches->applyRelatedScope(Order::query(), 'orders', 'invoices')
-            ->where(function ($query) use ($invoice) {
-                $query->where('status', '!=', 'invoiced');
-
-                if ($invoice->order_no) {
-                    $query->orWhere('order_no', $invoice->order_no);
-                }
-            })
-            ->orderByDesc('id')
-            ->pluck('order_no', 'order_no')
-            ->map(fn ($orderNo) => ['text' => $orderNo])
-            ->toArray();
-
-        $articleIds = $invoice->order?->articles?->pluck('article_id')->merge($invoice->invoiceArticles->pluck('article_id'))->unique()->values() ?? collect();
-        $articles = Article::whereIn('id', $articleIds)
-            ->orderBy('article_no')
-            ->get()
-            ->keyBy('id')
-            ->map(fn (Article $article) => [
-                'text' => trim($article->article_no . ' | ' . ($article->description ?? '')),
-                'data_option' => [
-                    'id' => $article->id,
-                    'article_no' => $article->article_no,
-                    'description' => $article->description,
-                    'fabric_type' => $article->fabric_type,
-                    'pcs_per_packet' => $article->pcs_per_packet,
-                    'sales_rate' => $article->sales_rate,
-                ],
-            ])
-            ->all();
-
-        $branchBranding = app(ModuleBranchService::class)->documentBranding('invoices');
-
-        return view('invoices.edit', compact('invoice', 'customers', 'articles', 'branchBranding', 'ordersOptions'));
+    
+        $ordersOptions = [];
+        $shipmentsOptions = [];
+        $articles = [];
+    
+        if ($invoiceType === 'order') {
+            $ordersOptions = $branches->applyRelatedScope(Order::query(), 'orders', 'invoices')
+                ->where(function ($query) use ($invoice) {
+                    $query->where('status', '!=', 'invoiced');
+    
+                    if ($invoice->order_no) {
+                        $query->orWhere('order_no', $invoice->order_no);
+                    }
+                })
+                ->orderByDesc('id')
+                ->pluck('order_no', 'order_no')
+                ->map(fn ($orderNo) => ['text' => $orderNo])
+                ->toArray();
+    
+            $articleIds = $invoice->order?->articles?->pluck('article_id')
+                ->merge($invoice->invoiceArticles->pluck('article_id'))
+                ->unique()
+                ->values() ?? collect();
+    
+            $articles = Article::whereIn('id', $articleIds)
+                ->orderBy('article_no')
+                ->get()
+                ->keyBy('id')
+                ->map(fn (Article $article) => [
+                    'text' => trim($article->article_no . ' | ' . ($article->description ?? '')),
+                    'data_option' => [
+                        'id' => $article->id,
+                        'article_no' => $article->article_no,
+                        'description' => $article->description,
+                        'fabric_type' => $article->fabric_type,
+                        'pcs_per_packet' => $article->pcs_per_packet,
+                        'sales_rate' => $article->sales_rate,
+                    ],
+                ])
+                ->all();
+        } else {
+            // Shipment invoice: only offer shipments that are still open for
+            // invoicing, or the invoice's own current shipment.
+            $shipmentsOptions = $branches->applyRelatedScope(Shipment::query(), 'shipments', 'invoices')
+                ->where(function ($query) use ($invoice) {
+                    $query->orWhere('shipment_no', $invoice->shipment_no);
+                })
+                ->orderByDesc('id')
+                ->pluck('shipment_no', 'shipment_no')
+                ->map(fn ($shipmentNo) => ['text' => $shipmentNo])
+                ->toArray();
+        }
+    
+        $branchBranding = $branches->documentBranding('invoices');
+    
+        return view('invoices.edit', compact(
+            'invoice',
+            'customers',
+            'articles',
+            'branchBranding',
+            'ordersOptions',
+            'shipmentsOptions',
+            'invoiceType',
+            'isDeveloper'
+        ));
     }
-
+    
     /**
      * Update the specified resource in storage.
+     *
+     * Dispatches to the correct type-specific updater based on the invoice's
+     * current type, since order and shipment invoices have different fields
+     * and recalculation logic.
      */
     public function update(Request $request, invoice $invoice)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($invoice, 'invoices');
-
+    
         if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant'])) {
             return $resp;
         }
-
+    
         $dependencies = $this->dependencyCounts([
             'bilty' => ['bilties', 'invoice_id', $invoice->id],
             'sales returns' => ['sales_returns', 'invoice_id', $invoice->id],
@@ -902,16 +941,42 @@ class InvoiceController extends Controller
                     ->count();
             },
         ]);
-
+    
         if (!empty($dependencies)) {
             return redirect()->back()
                 ->withInput()
                 ->with('error', $this->dependencyBlockMessage('Invoice', $dependencies));
         }
+    
+        $isDeveloper = Auth::user()?->role === 'developer';
+        $invoiceType = $invoice->shipment_no ? 'shipment' : 'order';
+    
+        return $invoiceType === 'order'
+            ? $this->updateOrderInvoice($request, $invoice, $isDeveloper)
+            : $this->updateShipmentInvoice($request, $invoice, $isDeveloper);
+    }
+    
+    /**
+     * Update an order-based invoice.
+     *
+     * Only a developer may change invoice_no, order_no, or customer_id.
+     * Every other allowed role can only edit date, articles/quantities, and
+     * carton_count.
+     */
+    protected function updateOrderInvoice(Request $request, invoice $invoice, bool $isDeveloper)
+    {
+        $rawArticles = json_decode((string) $request->input('articles_in_invoice'), true) ?: [];
 
-        $validated = $request->validate([
-            'invoice_no' => ['required', 'string', 'max:255'],
-            'order_no' => ['required', 'string', 'max:255'],
+        $request->merge([
+            'articles' => array_map(fn ($row) => [
+                'id'          => $row['invoice_article_id'] ?? null, // invoice_articles PK (existing line)
+                'article_id'  => $row['id'] ?? null,                 // JS's "id" is actually the article id
+                'description' => $row['description'] ?? null,
+                'invoice_pcs' => $row['invoice_quantity'] ?? null,
+            ], $rawArticles),
+        ]);
+
+        $rules = [
             'date' => ['required', 'date'],
             'netAmount' => ['required'],
             'carton_count' => ['nullable', 'integer', 'min:0'],
@@ -920,43 +985,175 @@ class InvoiceController extends Controller
             'articles.*.article_id' => ['required', 'integer', 'exists:articles,id'],
             'articles.*.description' => ['nullable', 'string', 'max:255'],
             'articles.*.invoice_pcs' => ['required', 'integer', 'min:1'],
-        ]);
+        ];
+    
+        if ($isDeveloper) {
+            $rules['invoice_no'] = ['required', 'string', 'max:255'];
+            $rules['order_no'] = ['required', 'string', 'max:255'];
+            $rules['customer_id'] = ['nullable', 'integer', 'exists:customers,id'];
+        }
+    
+        $validated = $request->validate($rules);
 
-        DB::transaction(function () use ($invoice, $validated) {
-            $previousOrderNo = $invoice->order_no;
+        try {
+            DB::transaction(function () use ($invoice, $validated, $isDeveloper) {
+                $previousOrderNo = $invoice->order_no;
+                $branches = app(ModuleBranchService::class);
+        
+                // Non-developers can't change which order the invoice is tied to.
+                $orderNo = $isDeveloper
+                    ? ($validated['order_no'] ?? $invoice->order_no)
+                    : $invoice->order_no;
+        
+                $orderQuery = $branches->applyRelatedScope(Order::with('articles.article'), 'orders', 'invoices');
+                $order = $this->applyDocumentNumberLookup($orderQuery, 'order_no', $orderNo)
+                    ->lockForUpdate()
+                    ->first();
+        
+                if (!$order) {
+                    throw ValidationException::withMessages([
+                        'order_no' => 'Order not found for the selected branch.',
+                    ]);
+                }
+        
+                $sync = app(OrderInvoiceSyncService::class);
+                $lines = $sync->normalizeInvoiceLines($validated['articles']);
+                $sync->validateInvoiceAgainstOrder($order, $lines, $invoice);
+                $this->validateInvoiceStock(
+                    $lines->groupBy('article_id')->map(
+                        fn ($group) => $group->sum('invoice_pcs')
+                    ),
+                    $order->id,
+                    $invoice
+                );
+        
+                $updateData = [
+                    'order_no' => $order->order_no,
+                    'shipment_no' => null,
+                    'customer_id' => $order->customer_id,
+                    'date' => $validated['date'],
+                    'netAmount' => (int) str_replace(',', '', (string) $validated['netAmount']),
+                    'carton_count' => $validated['carton_count'] ?? null,
+                    'branch_id' => $order->branch_id ?: $branches->branchIdForCreate('invoices'),
+                ];
+        
+                if ($isDeveloper) {
+                    $updateData['invoice_no'] = $validated['invoice_no'];
+        
+                    // Developer can override the customer independently of the
+                    // order's own customer, if they explicitly chose one.
+                    if (!empty($validated['customer_id'])) {
+                        $updateData['customer_id'] = $validated['customer_id'];
+                    }
+                }
+        
+                $invoice->update($updateData);
+        
+                $sync->replaceInvoiceArticles($invoice, $lines);
+                $sync->recalculateOrderDispatch($order);
+        
+                if ($previousOrderNo && $previousOrderNo !== $order->order_no) {
+                    $sync->recalculateOrderDispatch($previousOrderNo);
+                }
+            });
+        } catch (\Throwable $e) {
+            report($e);
+
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', $e->getMessage());
+        }
+    
+        return redirect()->route('invoices.index')->with('success', 'Invoice updated successfully.');
+    }
+    
+    /**
+     * Update a shipment-based invoice.
+     *
+     * Only a developer may change invoice_no, shipment_no, or customer_id.
+     * Every other allowed role can only edit date, netAmount, and carton_count
+     * (which recalculates the invoice article quantities off the shipment's
+     * per-carton rates).
+     */
+    protected function updateShipmentInvoice(Request $request, invoice $invoice, bool $isDeveloper)
+    {
+        $rules = [
+            'date' => ['required', 'date'],
+            'netAmount' => ['required'],
+            'carton_count' => ['required', 'integer', 'min:1'],
+        ];
+    
+        if ($isDeveloper) {
+            $rules['invoice_no'] = ['required', 'string', 'max:255'];
+            $rules['shipment_no'] = ['required', 'string', 'max:255'];
+            $rules['customer_id'] = ['required', 'integer', 'exists:customers,id'];
+        }
+    
+        $validated = $request->validate($rules);
+    
+        DB::transaction(function () use ($invoice, $validated, $isDeveloper) {
             $branches = app(ModuleBranchService::class);
-            $orderQuery = $branches->applyRelatedScope(Order::with('articles.article'), 'orders', 'invoices');
-            $order = $this->applyDocumentNumberLookup($orderQuery, 'order_no', $validated['order_no'])->lockForUpdate()->first();
-
-            if (!$order) {
+    
+            $shipmentNo = $isDeveloper
+                ? ($validated['shipment_no'] ?? $invoice->shipment_no)
+                : $invoice->shipment_no;
+    
+            $shipmentQuery = $branches->applyRelatedScope(Shipment::with('articles.article'), 'shipments', 'invoices');
+            $shipment = $this->applyDocumentNumberLookup($shipmentQuery, 'shipment_no', $shipmentNo)
+                ->lockForUpdate()
+                ->first();
+    
+            if (!$shipment) {
                 throw ValidationException::withMessages([
-                    'order_no' => 'Order not found for the selected branch.',
+                    'shipment_no' => 'Shipment not found for the selected branch.',
                 ]);
             }
-
-            $sync = app(OrderInvoiceSyncService::class);
-            $lines = $sync->normalizeInvoiceLines($validated['articles']);
-            $sync->validateInvoiceAgainstOrder($order, $lines, $invoice);
-            $this->validateInvoiceStock($lines->groupBy('article_id')->map(fn ($group) => $group->sum('invoice_pcs')), $order->id);
-
-            $invoice->update([
-                'invoice_no' => $validated['invoice_no'],
-                'order_no' => $order->order_no,
-                'shipment_no' => null,
-                'customer_id' => $order->customer_id,
+    
+            $cartonCount = (int) $validated['carton_count'];
+    
+            $updateData = [
+                'shipment_no' => $shipment->shipment_no,
+                'order_no' => null,
                 'date' => $validated['date'],
                 'netAmount' => (int) str_replace(',', '', (string) $validated['netAmount']),
-                'carton_count' => $validated['carton_count'] ?? null,
-                'branch_id' => $order->branch_id ?: $branches->branchIdForCreate('invoices'),
-            ]);
-
-            $sync->replaceInvoiceArticles($invoice, $lines);
-            $sync->recalculateOrderDispatch($order);
-            if ($previousOrderNo && $previousOrderNo !== $order->order_no) {
-                $sync->recalculateOrderDispatch($previousOrderNo);
+                'carton_count' => $cartonCount,
+                'branch_id' => $shipment->branch_id ?: $branches->branchIdForCreate('invoices'),
+            ];
+    
+            if ($isDeveloper) {
+                $updateData['invoice_no'] = $validated['invoice_no'];
+                $updateData['customer_id'] = $validated['customer_id'];
+            }
+    
+            $invoice->update($updateData);
+    
+            // Rebuild invoice article lines from the shipment's current article
+            // rates, scaled by the (possibly changed) carton count.
+            $invoice->invoiceArticles()->delete();
+    
+            foreach ($shipment->articles as $shipmentArticle) {
+                $articleId = $shipmentArticle->article_id ?? $shipmentArticle->article?->id;
+    
+                if (!$articleId) {
+                    continue;
+                }
+    
+                $shipmentPcs = (int) (
+                    $shipmentArticle->shipment_pcs
+                    ?? $shipmentArticle->quantity
+                    ?? 0
+                );
+    
+                InvoiceArticles::create([
+                    'invoice_id' => $invoice->id,
+                    'article_id' => $articleId,
+                    'description' => $shipmentArticle->description ?? '',
+                    'invoice_pcs' => $shipmentPcs * $cartonCount,
+                ]);
             }
         });
-
+    
         return redirect()->route('invoices.index')->with('success', 'Invoice updated successfully.');
     }
 
@@ -1093,40 +1290,95 @@ class InvoiceController extends Controller
         ]);
     }
 
-    private function validateInvoiceStock($invoiceQuantities, ?int $excludeOrderId = null): void
-    {
-        $invoiceQuantities = collect($invoiceQuantities)
-            ->filter(fn ($quantity, $articleId) => (int) $articleId > 0 && (int) $quantity > 0)
-            ->map(fn ($quantity) => (int) $quantity);
+    protected function validateInvoiceStock(
+    Collection $requestedQuantities,
+    int $orderId,
+    ?Invoice $editingInvoice = null
+): void {
+    $order = Order::with('articles')->find($orderId);
 
-        if ($invoiceQuantities->isEmpty()) {
+    if (!$order) {
+        throw ValidationException::withMessages([
+            'articles' => 'Order not found while validating invoice quantities.',
+        ]);
+    }
+
+    /*
+     * Existing invoice quantities belonging to THIS invoice.
+     *
+     * When editing an invoice, these quantities are already included
+     * in the order's dispatched quantity. We temporarily release them
+     * so the same quantity can be saved again.
+     */
+    $oldInvoiceQuantities = collect();
+
+    if ($editingInvoice) {
+        $oldInvoiceQuantities = $editingInvoice
+            ->invoiceArticles()
+            ->select('article_id', DB::raw('SUM(invoice_pcs) as total'))
+            ->groupBy('article_id')
+            ->pluck('total', 'article_id')
+            ->map(fn ($qty) => (int) $qty);
+    }
+
+    /*
+     * Build order quantities indexed by article_id.
+     */
+    $orderQuantities = $order->articles
+        ->groupBy('article_id')
+        ->map(function ($articles) {
+            return [
+                'ordered' => (int) $articles->sum('ordered_pcs'),
+                'dispatched' => (int) $articles->sum('dispatched_pcs'),
+            ];
+        });
+
+    foreach ($requestedQuantities as $articleId => $requestedQty) {
+        $articleId = (int) $articleId;
+        $requestedQty = (int) $requestedQty;
+
+        $orderArticle = $orderQuantities->get($articleId);
+
+        if (!$orderArticle) {
             throw ValidationException::withMessages([
-                'articles_in_invoice' => 'Please select at least one invoice article.',
+                'articles' => "Article {$articleId} does not belong to this order.",
             ]);
         }
 
-        $branches = app(ModuleBranchService::class);
-        $stockMap = $this->articleStockMap(
-            $invoiceQuantities->keys(),
-            $excludeOrderId,
-            $branches->shouldFilterRecords('physical_quantities') ? $branches->selectedBranchIdForModule('invoices') : null
+        $orderedQty = $orderArticle['ordered'];
+        $dispatchedQty = $orderArticle['dispatched'];
+
+        /*
+         * Release the current invoice's old quantity.
+         *
+         * Example:
+         *
+         * Ordered     = 100
+         * Dispatched  = 100
+         * Current INV = 100
+         *
+         * Real available for editing:
+         * 100 - (100 - 100) = 100
+         */
+        $oldInvoiceQty = (int) $oldInvoiceQuantities->get($articleId, 0);
+
+        $availableForThisInvoice = max(
+            0,
+            $orderedQty - max(0, $dispatchedQty - $oldInvoiceQty)
         );
-        $articlesById = Article::query()
-            ->whereIn('id', $invoiceQuantities->keys())
-            ->get(['id', 'article_no'])
-            ->keyBy('id');
 
-        foreach ($invoiceQuantities as $articleId => $invoicePcs) {
-            $availablePcs = (int) ($stockMap->get((int) $articleId)['current_stock_pcs'] ?? 0);
-
-            if ((int) $invoicePcs > $availablePcs) {
-                $articleNo = $articlesById->get((int) $articleId)?->article_no ?? $articleId;
-                throw ValidationException::withMessages([
-                    'articles_in_invoice' => "Stock is less than invoice quantity for article: {$articleNo}. Available: {$availablePcs} pcs.",
-                ]);
-            }
+        if ($requestedQty > $availableForThisInvoice) {
+            throw ValidationException::withMessages([
+                'articles' => sprintf(
+                    'Article %s has only %s quantity available. You are trying to invoice %s.',
+                    $articleId,
+                    $availableForThisInvoice,
+                    $requestedQty
+                ),
+            ]);
         }
     }
+}
 
     private function notifyCustomerAboutInvoice(int $customerId, string $invoiceNo): void
     {

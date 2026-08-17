@@ -166,6 +166,7 @@ class OrderController extends Controller
                 $article['orderable_quantity_packets'] = (float) ($stock['orderable_quantity_packets'] ?? 0);
                 $article['total_quantity'] = (int) ($stock['total_quantity_pcs'] ?? 0);
                 $article['ordered_quantity'] = (int) ($stock['ordered_quantity_pcs'] ?? 0);
+                $article['b_c_quantity'] = (int) ($stock['b_category_pcs'] ?? 0) + (int) ($stock['c_category_pcs'] ?? 0);
 
                 $article['category'] = ucfirst(str_replace('_', ' ', $article['category']));
                 $article['season'] = ucfirst(str_replace('_', ' ', $article['season']));
