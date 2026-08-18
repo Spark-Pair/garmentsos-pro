@@ -601,7 +601,8 @@ class ReportController extends Controller
                     ];
                 })
                 ->filter()
-                ->values();
+                ->values()
+                ->toBase();
 
             $invoiceOnlyData = $invoiceArticleRecords->filter(function ($invoiceArticle) use ($matchedOrderKeys, $reffStartDate, $reffEndDate, $rowKey) {
                 $invoice = $invoiceArticle->invoice;
