@@ -653,7 +653,72 @@ class CustomerPaymentController extends Controller
      */
     public function destroy(CustomerPayment $customerPayment)
     {
-        //
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($customerPayment, 'customer_payments');
+
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant'])) {
+            return $resp;
+        }
+
+        $dependencies = [];
+
+        // Already used inside a Voucher / Self-Account payment (cheque_id / slip_id linked)
+        $linkedSupplierPayment = SupplierPayment::where('cheque_id', $customerPayment->id)
+            ->orWhere('slip_id', $customerPayment->id)
+            ->first();
+
+        if ($linkedSupplierPayment) {
+            if ($linkedSupplierPayment->voucher_id) {
+                $dependencies['voucher'] = 1;
+            } elseif ($linkedSupplierPayment->self_account_id) {
+                $dependencies['self account payment'] = 1;
+            } else {
+                $dependencies['supplier payment'] = 1;
+            }
+        }
+
+        // Program payment already issued (matched to a voucher/CR on supplier side)
+        if ($customerPayment->method === 'program' && $customerPayment->hasProgramVoucher()) {
+            $dependencies['issued program voucher'] = 1;
+        }
+
+        // Has (partial or full) clearance history
+        if ($customerPayment->paymentClearRecord()->exists()) {
+            $dependencies['clearance record'] = 1;
+        }
+
+        // Linked to / part of a Debit Return
+        if ($customerPayment->d_r_id) {
+            $dependencies['debit return'] = 1;
+        } elseif ($customerPayment->is_return) {
+            $dependencies['return record'] = 1;
+        }
+
+        if (!empty($dependencies)) {
+            return redirect()->back()->with('error', $this->dependencyBlockMessage('Customer payment', $dependencies));
+        }
+
+        $programId = $customerPayment->program_id;
+
+        DB::transaction(function () use ($customerPayment, $programId) {
+            // Remove the un-issued SupplierPayment auto-created for this program payment (if any)
+            SupplierPayment::where([
+                'program_id' => $programId,
+                'method' => $customerPayment->method,
+                'transaction_id' => $customerPayment->transaction_id,
+                'bank_account_id' => $customerPayment->bank_account_id,
+            ])
+                ->whereNull('voucher_id')
+                ->whereNull('c_r_id')
+                ->delete();
+
+            $customerPayment->delete();
+
+            if ($programId) {
+                $this->syncProgramStatus((int) $programId);
+            }
+        });
+
+        return redirect()->route('customer-payments.index')->with('success', 'Payment deleted successfully.');
     }
 
     public function clear(Request $request, $id) {
