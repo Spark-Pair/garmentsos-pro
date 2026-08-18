@@ -22,18 +22,42 @@
             <div class="step1 space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <!-- supplier_name -->
-                    <x-input
-                        label="Supplier Name"
-                        value="{{ $supplier->supplier_name }}"
-                        disabled
-                    />
+                    @if ($isDeveloper)
+                        <x-input
+                            label="Supplier Name"
+                            name="supplier_name"
+                            id="supplier_name"
+                            value="{{ $supplier->supplier_name }}"
+                            placeholder="Enter supplire name"
+                            required
+                            capitalized
+                            dataValidate="required|friendly"
+                        />
 
-                    {{-- urdu title --}}
-                    <x-input
-                        label="Urdu Title"
-                        value="{{ $supplier->urdu_title }}"
-                        disabled
-                    />
+                        <!-- urdu_title -->
+                        <x-input
+                            label="Urdu Title"
+                            name="urdu_title"
+                            id="urdu_title"
+                            value="{{ $supplier->urdu_title }}"
+                            placeholder="Enter urdu title"
+                            required
+                            dataValidate="required|urdu"
+                        />
+                    @else
+                        <x-input
+                            label="Supplier Name"
+                            value="{{ $supplier->supplier_name }}"
+                            disabled
+                        />
+
+                        {{-- urdu title --}}
+                        <x-input
+                            label="Urdu Title"
+                            value="{{ $supplier->urdu_title }}"
+                            disabled
+                        />
+                    @endif
 
                     {{-- person name --}}
                     <x-input

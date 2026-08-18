@@ -8,6 +8,7 @@ use App\Models\Setup;
 use App\Models\User;
 use App\Services\Branches\ModuleBranchService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -180,9 +181,20 @@ class CustomerController extends Controller
             return $resp;
         }
 
+        $isDeveloper = Auth::user()->role == 'developer' || app_can('suppliers', 'override');
+
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($customer, 'customers');
 
-        return view('customers.edit', compact('customer'));
+        $cities_options = [];
+        $allCities = app(ModuleBranchService::class)
+            ->applyRelatedScope(Setup::where('type', 'city'), 'setups', 'customers')
+            ->get();
+
+        foreach ($allCities as $city) {
+            $cities_options[(int)$city->id] = ['text' => $city->title];
+        }
+
+        return view('customers.edit', compact('customer', 'isDeveloper', 'cities_options'));
     }
 
     /**
@@ -194,17 +206,45 @@ class CustomerController extends Controller
             return $resp;
         }
 
+        $isDeveloper = Auth::user()->role == 'developer' || app_can('suppliers', 'override');
+
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($customer, 'customers');
 
-        $validator = Validator::make($request->all(), [
+        $rules = [
             'person_name' => 'required|string|max:255',
             'urdu_title' => 'nullable|string|max:255',
             'phone_number' => self::PHONE_RULE,
             'date' => 'required|date',
             'category' => 'required|string|max:255',
+            'city' => 'required|integer|exists:setups,id',
             'address' => 'required|string|max:255',
             'image_upload' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
-        ]);
+        ];
+
+        if ($isDeveloper) {
+            $rules['customer_name'] = [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('customers', 'customer_name')
+                    ->ignore($customer->id)
+                    ->where(function ($query) use ($request) {
+                        $query->where('city_id', $request->city);
+
+                        $branches = app(ModuleBranchService::class);
+                        if ($branches->shouldFilterRecords('customers')) {
+                            $branchId = $branches->branchIdForCreate('customers');
+                            if ($branchId) {
+                                $query->where('branch_id', $branchId);
+                            }
+                        }
+
+                        return $query;
+                    }),
+            ];
+        }
+
+        $validator = Validator::make($request->all(), $rules);
 
         // Check for validation errors
         if ($validator->fails()) {
@@ -231,15 +271,22 @@ class CustomerController extends Controller
             return redirect()->back()->with('error', 'This user does not exist.')->withInput();
         }
 
-        // Update the customer
-        $customer->update([
+        $updateData = [
             'person_name' => $request->person_name,
             'urdu_title' => $request->urdu_title,
             'phone_number' => $request->phone_number,
             'date' => $request->date,
             'category' => $request->category,
+            'city_id' => $request->city,
             'address' => $request->address,
-        ]);
+        ];
+
+        if ($isDeveloper) {
+            $updateData['customer_name'] = $request->customer_name;
+        }
+
+        // Update the customer
+        $customer->update($updateData);
 
         Cache::forget('category_data:customer');
         return redirect()->route('customers.index')->with('success', 'Customer updated successfully.');

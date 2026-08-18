@@ -31,11 +31,24 @@
             <div class="step1 space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <!-- customer_name -->
-                    <x-input
-                        label="Customer Name"
-                        value="{{ $customer->customer_name }}"
-                        disabled
-                    />
+                    @if ($isDeveloper)
+                        <x-input
+                            label="Customer Name"
+                            name="customer_name"
+                            id="customer_name"
+                            value="{{ $customer->customer_name }}"
+                            placeholder="Enter supplire name"
+                            required
+                            capitalized
+                            dataValidate="required|friendly"
+                        />
+                    @else
+                        <x-input
+                            label="Customer Name"
+                            value="{{ $customer->customer_name }}"
+                            disabled
+                        />
+                    @endif
 
                     {{-- customer_person_name --}}
                     <x-input
@@ -93,6 +106,17 @@
                         showDefault
                     />
 
+                    {{-- city --}}
+                    <x-select
+                        label="City"
+                        name="city"
+                        id="city"
+                        :options="$cities_options"
+                        value="{{ $customer->city_id }}"
+                        required
+                        showDefault
+                    />
+
                     {{-- customer_address --}}
                     <x-input
                         label="Address"
@@ -100,6 +124,7 @@
                         id="address"
                         value="{{ $customer->address }}"
                         placeholder="Enter address"
+                        capitalized
                         required
                     />
                 </div>

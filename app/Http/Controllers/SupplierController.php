@@ -8,6 +8,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Services\Branches\ModuleBranchService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -229,23 +230,37 @@ class SupplierController extends Controller
             return $resp;
         }
 
-        return view('suppliers.edit', compact('supplier'));
+        $isDeveloper = Auth::user()->role == 'developer' || app_can('suppliers', 'override');
+
+        return view('suppliers.edit', compact('supplier', 'isDeveloper'));
     }
 
     /**
      * Update the specified resource in storage.
      */
     public function update(Request $request, Supplier $supplier)
-    {if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin'])) {
+    {
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin'])) {
             return $resp;
         }
 
-        $validator = Validator::make($request->all(), [
+        $isDeveloper = Auth::user()->role == 'developer' || app_can('suppliers', 'override');
+
+        $rules = [
             'person_name' => 'required|string|max:255',
             'phone_number' => self::PHONE_RULE,
             'date' => 'required|date',
             'image_upload' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
-        ]);
+        ];
+
+        if ($isDeveloper) {
+            $rules = array_merge($rules, [
+                'supplier_name' => 'required|string|max:255|unique:suppliers,supplier_name' . $supplier->id,
+                'urdu_title' => 'nullable|string|max:255',
+            ]);
+        }
+
+        $validator = Validator::make($request->all(), $rules);
 
         // Check for validation errors
         if ($validator->fails()) {
@@ -272,20 +287,25 @@ class SupplierController extends Controller
             return redirect()->back()->with('error', 'This user does not exist.')->withInput();
         }
 
-        // Update the customer
-        $supplier->update([
+        $updateData = [
             'person_name' => $request->person_name,
             'phone_number' => $request->phone_number,
             'date' => $request->date,
-        ]);
+            'joining_date' => $request->date,
+        ];
+
+        if ($isDeveloper) {
+            $updateData['supplier_name'] = $request->supplier_name;
+            $updateData['urdu_title'] = $request->urdu_title;
+        }
+
+        // Update the customer
+        $supplier->update($updateData);
 
         // Update worker's phone if exists
         $worker = $supplier->worker; // assuming hasOne relation
         if ($worker) {
-            $worker->update([
-                'phone_number' => $request->phone_number,
-                'joining_date' => $request->date,
-            ]);
+            $worker->update($updateData);
         }
 
         Cache::forget('category_data:supplier');
