@@ -63,25 +63,25 @@ class Shipment extends Model
         return $this->hasMany(Invoice::class, 'shipment_no', 'shipment_no');
     }
 
-    public function getArticles()
-    {
-        $rawArticles = $this->articles; // decode the JSON field
-        if (!is_array($rawArticles)) return [];
+    // public function getArticles()
+    // {
+    //     $rawArticles = $this->articles; // decode the JSON field
+    //     if (!is_array($rawArticles)) return [];
 
-        $articles = [];
+    //     $articles = [];
 
-        foreach ($rawArticles as $rawArticle) {
-            $article = Article::where('id', $rawArticle['id'])->first();
+    //     foreach ($rawArticles as $rawArticle) {
+    //         $article = Article::where('id', $rawArticle['id'])->first();
 
-            if ($article) {
-                $articles[] = [
-                    'shipment_quantity' => $rawArticle['shipment_quantity'],
-                    'description' => $rawArticle['description'],
-                    'article' => $article // contains all columns of the article
-                ];
-            }
-        }
+    //         if ($article) {
+    //             $articles[] = [
+    //                 'shipment_quantity' => $rawArticle['shipment_quantity'],
+    //                 'description' => $rawArticle['description'],
+    //                 'article' => $article // contains all columns of the article
+    //             ];
+    //         }
+    //     }
 
-        return $articles;
-    }
+    //     return $articles;
+    // }
 }
