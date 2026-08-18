@@ -9,22 +9,23 @@
                 class="item row relative group flex border-b border-[var(--h-bg-color)] items-center py-2 cursor-pointer hover:bg-[var(--h-secondary-bg-color)] transition-all fade-in ease-in-out text-xs"
                 data-json='${jsonAttr(data)}'>
 
-                <div class="w-[7%]">${data.article_no} | ${data.size}</div>
-                <div class="w-[7%] capitalize">${data.processed_by}</div>
+                <div class="w-[10%]">${data.article_no} | ${data.size}</div>
+                <div class="w-[8%] capitalize">${data.processed_by}</div>
                 <div class="w-[4%]">${data.unit}</div>
-                <div class="w-[8%]">${data.orderable_quantity}</div>
-                <div class="w-[8%]">${data.total_quantity}</div>
-                <div class="w-[8%]">${data.received_quantity}</div>
-                <div class="w-[8%]">${data.ordered_quantity}</div>
-                <div class="w-[8%]">${data.invoiced_quantity}</div>
-                <div class="w-[8%]">${data.return_quantity}</div>
-                <div class="w-[8%]">${data.adjustment_quantity}</div>
+                <div class="w-[6%]">${data.orderable_quantity}</div>
+                <div class="w-[6%]">${data.total_quantity}</div>
+                <div class="w-[6%]">${data.received_quantity}</div>
+                <div class="w-[6%]">${data.ordered_quantity}</div>
+                <div class="w-[6%]">${data.invoiced_quantity}</div>
+                <div class="w-[6%]">${data.shipment_invoiced_quantity}</div>
+                <div class="w-[6%]">${data.return_quantity}</div>
+                <div class="w-[6%]">${data.adjustment_quantity}</div>
                 <div class="w-[8%]">${data.current_stock}</div>
-                <div class="w-[8%]">${data.a_category}</div>
-                <div class="w-[8%]">${data.b_category}</div>
-                <div class="w-[8%]">${data.c_category}</div>
-                <div class="w-[8%]">${data.remaining_quantity}</div>
-                <div class="w-[8%]">${data.shipment}</div>
+                <div class="w-[4%]">${data.a_category}</div>
+                <div class="w-[4%]">${data.b_category}</div>
+                <div class="w-[4%]">${data.c_category}</div>
+                <div class="w-[6%]">${data.remaining_quantity}</div>
+                <div class="w-[4%]">${data.shipment}</div>
             </div>`;
         };
 

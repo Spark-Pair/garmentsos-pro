@@ -163,6 +163,7 @@ class ArticleStockService
                 'received_quantity_pcs' => $receivedPcs,
                 'ordered_quantity_pcs' => $totalOrderedPcs,
                 'invoiced_quantity_pcs' => $totalInvoicedPcs,
+                'shipment_invoiced_quantity_pcs' => $totalShipmentInvoicedPcs,
                 'return_quantity_pcs' => $totalReturnPcs,
                 'adjustment_quantity_pcs' => $totalAdjustmentPcs,
                 'current_stock_pcs' => $currentStockPcs,

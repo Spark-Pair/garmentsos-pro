@@ -243,6 +243,7 @@ class PhysicalQuantityReportService
                 $orderedPackets = (float) ($stock['ordered_quantity_packets'] ?? 0);
                 $receivedPackets = (float) ($stock['received_quantity_packets'] ?? 0);
                 $invoicedPackets = (float) ($stock['invoiced_quantity_packets'] ?? 0);
+                $shipmentinvoicedPackets= (float) ($stock['shipment_invoiced_quantity_packets'] ?? 0);
                 $returnPackets = (float) ($stock['return_quantity_packets'] ?? 0);
                 $adjustmentPackets = (float) ($stock['adjustment_quantity_packets'] ?? 0);
                 $currentStockPackets = (float) ($stock['current_stock_packets'] ?? 0);
@@ -280,6 +281,7 @@ class PhysicalQuantityReportService
                     'ordered_quantity' => $this->formatPacketQuantity($orderedPackets),
                     'received_quantity' => $this->formatPacketQuantity($receivedPackets),
                     'invoiced_quantity' => $this->formatPacketQuantity($invoicedPackets),
+                    'shipment_invoiced_quantity' => $this->formatPacketQuantity($shipmentinvoicedPackets),
                     'return_quantity' => $this->formatPacketQuantity($returnPackets),
                     'adjustment_quantity' => $this->formatPacketQuantity($adjustmentPackets),
                     'current_stock' => $this->formatPacketQuantity($currentStockPackets),
