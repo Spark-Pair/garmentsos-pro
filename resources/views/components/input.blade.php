@@ -55,6 +55,10 @@
         input#{{ $id }} { text-transform: capitalize; }
         input#{{ $id }}::placeholder { text-transform: none; }
     </style>
+    @php
+        $capitalizeCall = 'forceCapitalizeInput(this)';
+        $oninput = $oninput ? $oninput . '; ' . $capitalizeCall : $capitalizeCall;
+    @endphp
 @endif
 
 @if ($type === 'username')
@@ -143,6 +147,7 @@
                 @if ($listInput) data-list-input @endif
                 @if ($showError) aria-describedby="{{ $errorTargetName }}-error" @endif
                 @if ($hasServerError) aria-invalid="true" @endif
+                @if ($capitalized) data-force-capitalize @endif
             />
         @endif
 
@@ -214,3 +219,40 @@
         </datalist>
     @endif
 </div>
+
+@once
+    <script>
+        function forceCapitalizeInput(input) {
+            const start = input.selectionStart;
+            const end = input.selectionEnd;
+
+            input.value = input.value
+                .toLowerCase()
+                .replace(/\b\w/g, (char) => char.toUpperCase());
+
+            if (start !== null && end !== null) {
+                input.setSelectionRange(start, end);
+            }
+        }
+
+        // Delegate karo taake dynamically add hone wale inputs bhi cover hon
+        document.addEventListener('input', (e) => {
+            if (e.target.matches('input[data-force-capitalize]')) {
+                forceCapitalizeInput(e.target);
+            }
+        });
+
+        document.addEventListener('paste', (e) => {
+            if (e.target.matches('input[data-force-capitalize]')) {
+                // paste ke content DOM mein aane ke baad chalao
+                setTimeout(() => forceCapitalizeInput(e.target), 0);
+            }
+        });
+
+        document.addEventListener('blur', (e) => {
+            if (e.target.matches('input[data-force-capitalize]')) {
+                forceCapitalizeInput(e.target);
+            }
+        }, true); // capture phase, kyunki blur bubble nahi karta
+    </script>
+@endonce

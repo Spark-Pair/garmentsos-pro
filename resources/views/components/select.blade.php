@@ -144,7 +144,7 @@
             :disabled="$isDisabled"
             :value="$isDisabled ? '' : $selectedText"
             :placeholder="$placeholderText"
-            onfocus="selectClicked(this)"
+            onfocus="selectClicked(this); sortSelectOptions(this)"
             :dataClearable="$dataClearable"
             :dataValidate="$required ? 'required' : ''"
             data-error-for="{{ $name }}"
@@ -293,3 +293,32 @@
         @endif
     </div>
 </div>
+
+@once
+<script>
+    window.sortSelectOptions = function (triggerEl) {
+        var id = triggerEl?.id || triggerEl?.dataset?.for;
+        if (!id) return;
+
+        var list = document.querySelector('.optionsDropdown[data-for="' + id + '"]');
+        if (!list) return;
+
+        var items = Array.from(list.children);
+        var placeholder = items.find(function (li) { return li.dataset.value === ''; });
+        var rest = items.filter(function (li) { return li.dataset.value !== ''; });
+
+        rest.sort(function (a, b) {
+            return a.textContent.trim().localeCompare(b.textContent.trim(), undefined, {
+                sensitivity: 'base',
+                numeric: true,
+            });
+        });
+
+        var fragment = document.createDocumentFragment();
+        if (placeholder) fragment.appendChild(placeholder);
+        rest.forEach(function (li) { fragment.appendChild(li); });
+
+        list.appendChild(fragment);
+    };
+</script>
+@endonce
