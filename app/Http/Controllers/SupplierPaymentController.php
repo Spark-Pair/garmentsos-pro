@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SupplierPayment;
 use App\Models\Customer;
+use App\Models\CustomerPayment;
 use App\Models\Setup;
 use App\Services\Branches\ModuleBranchService;
 use Illuminate\Http\Request;
@@ -88,29 +89,64 @@ class SupplierPaymentController extends Controller
      * Remove the specified resource from storage.
      */
     public function destroy(SupplierPayment $supplierPayment)
-    {
-        app(ModuleBranchService::class)->assertRecordInAllowedBranch($supplierPayment, 'supplier_payments');
+{
+    app(ModuleBranchService::class)->assertRecordInAllowedBranch($supplierPayment, 'supplier_payments');
 
-        if ($resp = $this->denyIfNoRole(['developer'])) {
-            return $resp;
-        }
-
-        $dependencies = [];
-        if ($supplierPayment->voucher_id) {
-            $dependencies['voucher'] = 1;
-        }
-        if ($supplierPayment->c_r_id) {
-            $dependencies['credit return'] = 1;
-        }
-
-        if (!empty($dependencies)) {
-            return redirect()->back()->with('error', $this->dependencyBlockMessage('Supplier payment', $dependencies));
-        }
-
-        DB::transaction(function () use ($supplierPayment) {
-            $supplierPayment->delete();
-        });
-
-        return redirect()->route('supplier-payments.index')->with('success', 'Supplier payment deleted successfully.');
+    if ($resp = $this->denyIfNoRole(['developer'])) {
+        return $resp;
     }
+
+    $dependencies = [];
+    if ($supplierPayment->voucher_id) {
+        $dependencies['voucher'] = 1;
+    }
+    if ($supplierPayment->c_r_id) {
+        $dependencies['credit return'] = 1;
+    }
+
+    if (!empty($dependencies)) {
+        return redirect()->back()->with('error', $this->dependencyBlockMessage('Supplier payment', $dependencies));
+    }
+
+    DB::transaction(function () use ($supplierPayment) {
+        $method = strtolower(str_replace([' ', '_', '.'], '', (string) $supplierPayment->method));
+
+        // Real customer cheque/slip → unlink (it existed before this record, don't delete it)
+        if ($method === 'cheque' && $supplierPayment->cheque_id) {
+            CustomerPayment::where('id', $supplierPayment->cheque_id)->update([
+                'bank_account_id' => null,
+                'is_return' => false,
+            ]);
+        } elseif ($method === 'slip' && $supplierPayment->slip_id) {
+            CustomerPayment::where('id', $supplierPayment->slip_id)->update([
+                'bank_account_id' => null,
+                'is_return' => false,
+            ]);
+        }
+        // Self Cheque / ATM → linked CustomerPayment was only created for this record
+        elseif (in_array($method, ['selfcheque', 'atm']) && $supplierPayment->cheque_id) {
+            CustomerPayment::where('id', $supplierPayment->cheque_id)
+                ->where('type', 'self_account_deposit')
+                ->delete();
+        }
+        // Cash / Adjustment self deposit → find & remove the auto-created CustomerPayment
+        elseif (in_array($method, ['cash', 'adjustment']) && $supplierPayment->self_account_id) {
+            CustomerPayment::where([
+                'type' => 'self_account_deposit',
+                'method' => $supplierPayment->method,
+                'amount' => $supplierPayment->amount,
+                'bank_account_id' => $supplierPayment->self_account_id,
+            ])
+                ->whereDate('date', $supplierPayment->date)
+                ->where('remarks', $supplierPayment->remarks)
+                ->latest('id')
+                ->first()
+                ?->delete();
+        }
+
+        $supplierPayment->delete();
+    });
+
+    return redirect()->route('supplier-payments.index')->with('success', 'Supplier payment deleted successfully.');
+}
 }

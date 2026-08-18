@@ -885,6 +885,62 @@ class VoucherController extends Controller
     public function destroy(Voucher $voucher)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($voucher, 'vouchers');
+
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant'])) {
+            return $resp;
+        }
+
+        $payments = $voucher->payments()->get();
+
+        // Block if any payment under this voucher is already tied to a Credit Return
+        if ($payments->contains(fn ($payment) => (bool) $payment->c_r_id)) {
+            return redirect()->back()->with('error', $this->dependencyBlockMessage('Voucher', ['credit return' => 1]));
+        }
+
+        DB::transaction(function () use ($voucher, $payments) {
+            foreach ($payments as $payment) {
+                $method = $this->normalizeVoucherPaymentMethod($payment->method);
+
+                if ($method === 'cheque' && $payment->cheque_id) {
+                    CustomerPayment::where('id', $payment->cheque_id)->update([
+                        'bank_account_id' => null,
+                        'is_return' => false,
+                    ]);
+                } elseif ($method === 'slip' && $payment->slip_id) {
+                    CustomerPayment::where('id', $payment->slip_id)->update([
+                        'bank_account_id' => null,
+                        'is_return' => false,
+                    ]);
+                } elseif (in_array($method, ['selfcheque', 'atm']) && $payment->cheque_id) {
+                    CustomerPayment::where('id', $payment->cheque_id)
+                        ->where('type', 'self_account_deposit')
+                        ->delete();
+                } elseif (in_array($method, ['cash', 'adjustment']) && $payment->self_account_id) {
+                    CustomerPayment::where([
+                        'type' => 'self_account_deposit',
+                        'method' => $payment->method,
+                        'amount' => $payment->amount,
+                        'bank_account_id' => $payment->self_account_id,
+                    ])
+                        ->whereDate('date', $payment->date)
+                        ->where('remarks', $payment->remarks)
+                        ->latest('id')
+                        ->first()
+                        ?->delete();
+                }
+
+                // Program payments predate the voucher → just unlink, don't delete
+                if ($method === 'program') {
+                    $payment->update(['voucher_id' => null]);
+                } else {
+                    $payment->delete();
+                }
+            }
+
+            $voucher->delete();
+        });
+
+        return redirect()->route('vouchers.index')->with('success', 'Voucher deleted successfully.');
     }
 
     private function assertVoucherPaymentsAreUnique(array $paymentDetailsArray, ?Voucher $currentVoucher = null): void
