@@ -12,7 +12,7 @@ function createModal(data, animate = 'animate') {
     const companyLogoBase = (data.companyLogoBase || window.companyLogoBase || '/').replace(/\/+$/, '/') ;
     const explicitMaxWidth = (data.class || '').includes('max-w-');
     const isA5Preview = data.preview && (
-        data.preview.size == "A5" || ['invoice', 'order', 'shipment', 'cargo_list'].includes(data.preview.type)
+        data.preview.size == "A5" || ['invoice', 'order', 'shipment', 'cargo_list', 'voucher'].includes(data.preview.type)
     );
     const isMenuModal = data.menuModal || data.id === 'menuModal';
 

@@ -58,103 +58,341 @@
         return base.endsWith('/images') ? `${base}/${company.logo}` : `${base}/images/${company.logo}`;
     };
 
-    const documentTotalsHtml = (type, previewData, totalPackets, totalPcs, totalAmount, discount, discountAmount, netAmount) => {
-        if (documentDiscountDisabled(type, previewData)) {
-            const note = documentNote(previewData);
-            return `
-                ${note ? `
-                    <div class="total col-span-2 flex justify-center items-center border border-black rounded-lg py-1.5 px-2.5 w-full text-center font-semibold">
-                        ${previewText(note)}
-                    </div>
-                ` : ''}
-                <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-2.5 w-full">
-                    <div class="text-nowrap">Total Quantity</div>
-                    <div class="w-1/4 text-right grow">${formatNumbersDigitLess(totalPackets)} | ${formatNumbersDigitLess(totalPcs)}</div>
-                </div>
-                <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-2.5 w-full">
-                    <div class="text-nowrap font-semibold">Net Amount</div>
-                    <div class="w-1/4 text-right grow font-semibold">${formatNumbersWithDigits(totalAmount, 1, 1)}</div>
-                </div>
-            `;
+    const renderTotalRow = ({
+        label,
+        value,
+        borderClass = 'border-black',
+        fontWeight = '',
+        wrapperClass = '',
+    }) => `
+        <div class="total flex justify-between items-center border ${borderClass} rounded-lg py-1.5 px-2.5 w-full ${wrapperClass}">
+            <div class="text-nowrap ${fontWeight}">
+                ${label}
+            </div>
+
+            <div class="w-1/4 text-right grow ${fontWeight}">
+                ${value}
+            </div>
+        </div>
+    `;
+
+    const renderTotalQuantityRow = (totalPackets = 0, totalPcs = 0) => (
+        renderTotalRow({
+            label: 'Total Quantity',
+            value: `
+                ${formatNumbersDigitLess(totalPackets)}
+                |
+                ${formatNumbersDigitLess(totalPcs)}
+            `,
+        })
+    );
+
+    const renderVoucherTotals = (totals = {}, previewData = {}) => {
+        const {
+            previousBalance = 0,
+            totalPayment = 0,
+            currentBalance = 0,
+        } = totals;
+
+        const hasSupplier = !!previewData?.supplier;
+
+        const rows = [];
+
+        if (hasSupplier) {
+            rows.push(
+                renderTotalRow({
+                    label: 'Previous Balance - Rs',
+                    value: formatNumbersWithDigits(previousBalance, 1, 1),
+                    borderClass: 'border-gray-600',
+                })
+            );
         }
 
-        return `
-            <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-2.5 w-full">
-                <div class="text-nowrap">Total Quantity</div>
-                <div class="w-1/4 text-right grow">${formatNumbersDigitLess(totalPackets)} | ${formatNumbersDigitLess(totalPcs)}</div>
-            </div>
-            <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-2.5 w-full">
-                <div class="text-nowrap">Gross Amount</div>
-                <div class="w-1/4 text-right grow">${formatNumbersWithDigits(totalAmount, 1, 1)}</div>
-            </div>
-            <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-2.5 w-full">
-                <div class="text-nowrap">Discount ${discount}%</div>
-                <div class="w-1/4 text-right grow">${formatNumbersWithDigits(discountAmount, 1, 1)}</div>
-            </div>
-            <div class="total flex justify-between items-center border border-black rounded-lg py-1.5 px-2.5 w-full">
-                <div class="text-nowrap">Net Amount</div>
-                <div class="w-1/4 text-right grow">${formatNumbersWithDigits(netAmount, 1, 1)}</div>
-            </div>
-        `;
+        rows.push(
+            renderTotalRow({
+                label: 'Total Payment - Rs',
+                value: formatNumbersWithDigits(totalPayment, 1, 1),
+                borderClass: 'border-gray-600',
+            })
+        );
+
+        if (hasSupplier) {
+            rows.push(
+                renderTotalRow({
+                    label: 'Current Balance - Rs',
+                    value: formatNumbersWithDigits(currentBalance, 1, 1),
+                    borderClass: 'border-gray-600',
+                    fontWeight: 'font-semibold',
+                })
+            );
+        }
+
+        return rows.join('');
     };
 
+    const renderDocumentTotals = (
+        totals = {},
+        previewData = {},
+        type = ''
+    ) => {
+        const {
+            totalPackets = 0,
+            totalPcs = 0,
+            totalAmount = 0,
+            discount = 0,
+            discountAmount = 0,
+            netAmount = 0,
+        } = totals;
+
+        const rows = [];
+
+        const discountDisabled = documentDiscountDisabled(
+            type,
+            previewData
+        );
+
+        const note = documentNote(previewData);
+
+        /*
+        * Optional document note
+        */
+        if (discountDisabled && note) {
+            rows.push(`
+                <div class="total col-span-2 flex justify-center items-center border border-black rounded-lg py-1.5 px-2.5 w-full text-center font-semibold">
+                    ${previewText(note)}
+                </div>
+            `);
+        }
+
+        /*
+        * Quantity
+        */
+        rows.push(
+            renderTotalQuantityRow(
+                totalPackets,
+                totalPcs
+            )
+        );
+
+        /*
+        * Discount disabled
+        */
+        if (discountDisabled) {
+            rows.push(
+                renderTotalRow({
+                    label: 'Net Amount',
+                    value: formatNumbersWithDigits(
+                        netAmount,
+                        1,
+                        1
+                    ),
+                    fontWeight: 'font-semibold',
+                })
+            );
+
+            return rows.join('');
+        }
+
+        /*
+        * Gross Amount
+        */
+        rows.push(
+            renderTotalRow({
+                label: 'Gross Amount',
+                value: formatNumbersWithDigits(
+                    totalAmount,
+                    1,
+                    1
+                ),
+            })
+        );
+
+        /*
+        * Discount
+        */
+        rows.push(
+            renderTotalRow({
+                label: `Discount ${discount}%`,
+                value: formatNumbersWithDigits(
+                    discountAmount,
+                    1,
+                    1
+                ),
+            })
+        );
+
+        /*
+        * Net Amount
+        */
+        rows.push(
+            renderTotalRow({
+                label: 'Net Amount',
+                value: formatNumbersWithDigits(
+                    netAmount,
+                    1,
+                    1
+                ),
+                fontWeight: 'font-semibold',
+            })
+        );
+
+        return rows.join('');
+    };
+
+    const documentTotalsRenderers = {
+        voucher: renderVoucherTotals,
+        order: renderDocumentTotals,
+        invoice: renderDocumentTotals,
+        shipment: renderDocumentTotals,
+    };
+
+    const documentTotalsHtml = (
+        type,
+        previewData = {},
+        totals = {}
+    ) => {
+        const renderer =
+            documentTotalsRenderers[type] ||
+            renderDocumentTotals;
+
+        return renderer(
+            totals,
+            previewData,
+            type
+        );
+    };
 
     function render(data, options = {}) {
         const companyData = options.companyData || data.companyData || window.companyData || {};
         const companyLogoBase = (options.companyLogoBase || data.companyLogoBase || window.companyLogoBase || '/').replace(/\/+$/, '/') ;
         let clutter = '';
 
-    function chunkArray(array, size, hasTotal = false) {
-        const total = array.length;
-        const chunks = [];
+    // function chunkArray(array, size, hasTotal = false) {
+    //     const total = array.length;
+    //     const chunks = [];
 
-        if (size <= 11) {
-            for (let i = 0; i < total; i += size) {
-                chunks.push(array.slice(i, i + size));
+    //     if (size <= 11) {
+    //         for (let i = 0; i < total; i += size) {
+    //             chunks.push(array.slice(i, i + size));
+    //         }
+    //         return chunks;
+    //     }
+
+    //     if (!hasTotal || total <= 18) {
+    //         for (let i = 0; i < total; i += size) {
+    //             chunks.push(array.slice(i, i + size));
+    //         }
+    //         return chunks;
+    //     }
+
+    //     let startIndex = 0;
+
+    //     while (total - startIndex > 18) {
+    //         chunks.push(array.slice(startIndex, startIndex + size));
+    //         startIndex += size;
+    //     }
+
+    //     chunks.push(array.slice(startIndex));
+
+    //     return chunks;
+    // }
+
+    // function chunkInvoiceRows(array) {
+    //     const rows = Array.isArray(array) ? array : [];
+    //     const chunks = [];
+    //     let remaining = rows.slice();
+    //     const maxRowsWithoutTotals = 13;
+    //     const maxRowsWithTotals = 11;
+
+    //     if (remaining.length <= maxRowsWithTotals) {
+    //         return [remaining];
+    //     }
+
+    //     while (remaining.length > maxRowsWithTotals) {
+    //         const take = remaining.length <= maxRowsWithoutTotals + maxRowsWithTotals
+    //             ? Math.min(maxRowsWithoutTotals, remaining.length - 1)
+    //             : maxRowsWithoutTotals;
+    //         chunks.push(remaining.slice(0, take));
+    //         remaining = remaining.slice(take);
+    //     }
+
+    //     chunks.push(remaining);
+    //     return chunks;
+    // }
+
+    function chunkRowsForDocument(
+        rows = [],
+        {
+            normalMaxRows = 12,
+            totalMaxRows = 11,
+            hasTotals = false,
+        } = {}
+    ) {
+        const source = Array.isArray(rows) ? rows : [];
+        const totalRows = source.length;
+
+        if (!totalRows) {
+            return [[]];
+        }
+
+        // No totals: simple pagination.
+        if (!hasTotals) {
+            const pages = [];
+
+            for (let start = 0; start < totalRows; start += normalMaxRows) {
+                pages.push(
+                    source.slice(
+                        start,
+                        Math.min(start + normalMaxRows, totalRows)
+                    )
+                );
             }
-            return chunks;
+
+            return pages;
         }
 
-        if (!hasTotal || total <= 18) {
-            for (let i = 0; i < total; i += size) {
-                chunks.push(array.slice(i, i + size));
+        const pages = [];
+        let start = 0;
+
+        while (start < totalRows) {
+            const remaining = totalRows - start;
+
+            /*
+            * Agar remaining total page ki maximum capacity
+            * ke andar hai, to ye final page hai.
+            *
+            * Minimum 1 row guaranteed.
+            */
+            if (remaining <= totalMaxRows) {
+                pages.push(
+                    source.slice(start)
+                );
+
+                break;
             }
-            return chunks;
+
+            /*
+            * Normal page mein maximum rows.
+            *
+            * Lekin kam az kam 1 row final totals page ke
+            * liye reserve rehni chahiye.
+            */
+            const rowsForNormalPage = Math.min(
+                normalMaxRows,
+                remaining - 1
+            );
+
+            pages.push(
+                source.slice(
+                    start,
+                    start + rowsForNormalPage
+                )
+            );
+
+            start += rowsForNormalPage;
         }
 
-        let startIndex = 0;
-
-        while (total - startIndex > 18) {
-            chunks.push(array.slice(startIndex, startIndex + size));
-            startIndex += size;
-        }
-
-        chunks.push(array.slice(startIndex));
-
-        return chunks;
-    }
-
-    function chunkInvoiceRows(array) {
-        const rows = Array.isArray(array) ? array : [];
-        const chunks = [];
-        let remaining = rows.slice();
-        const maxRowsWithoutTotals = 13;
-        const maxRowsWithTotals = 11;
-
-        if (remaining.length <= maxRowsWithTotals) {
-            return [remaining];
-        }
-
-        while (remaining.length > maxRowsWithTotals) {
-            const take = remaining.length <= maxRowsWithoutTotals + maxRowsWithTotals
-                ? Math.min(maxRowsWithoutTotals, remaining.length - 1)
-                : maxRowsWithoutTotals;
-            chunks.push(remaining.slice(0, take));
-            remaining = remaining.slice(take);
-        }
-
-        chunks.push(remaining);
-        return chunks;
+        return pages;
     }
 
     function articleSortValue(row = {}) {
@@ -210,79 +448,102 @@
         const previewArticles = sortArticleRows(Array.isArray(rawPreviewArticles) ? rawPreviewArticles : Object.values(rawPreviewArticles || {}))
             .filter(row => row && (row.article || row.article_no || row.article_id));
         const articlePages = previewArticles.length
-            ? (['invoice', 'order', 'shipment'].includes(data.preview.type)
-                ? chunkInvoiceRows(previewArticles)
-                : chunkArray(previewArticles, 21, hasTotal))
+            ? chunkRowsForDocument(previewArticles, {
+                normalMaxRows: 13,
+                totalMaxRows: 11,
+                hasTotals: hasTotal,
+            })
             : [['__empty__']];
 
         // Preview container start
         clutter += `<div id="preview-container" class="h-auto mx-auto relative flex flex-col">`;
 
         if (data.preview.type == "voucher") {
-            invoiceTableHeader = `
-                <div class="th text-sm font-medium w-[7%]">S.No</div>
-                <div class="th text-sm font-medium w-[11%]">Method</div>
-                ${previewData.supplier ? '<div class="th text-sm font-medium w-1/5">Customer</div>' : ''}
-                <div class="th text-sm font-medium w-1/4">Account</div>
-                <div class="th text-sm font-medium w-[14%]">Date</div>
-                <div class="th text-sm font-medium w-[14%]">Reff. No.</div>
-                <div class="th text-sm font-medium w-[10%]">Amount</div>
-            `;
+            const hasSupplier = !!previewData.supplier;
 
-            invoiceTableBody = `
-                ${previewData.payments.map((payment, index) => {
-                    return `
-                    <div>
-                        ${rowDivider(index, 'border-gray-600')}
-                        <div class="tr flex justify-between w-full px-4 gap-0.5">
-                            <div class="td text-sm font-semibold w-[7%] truncate">${index + 1}.</div>
-                            <div class="td text-sm font-semibold w-[11%] truncate capitalize">${payment.method ?? '-'}</div>
-                            ${previewData.supplier ? `<div class="td text-sm font-semibold w-1/5 truncate">${payment.program?.customer?.customer_name ? payment.program?.customer?.customer_name : payment.cheque?.customer?.customer_name ? payment.cheque?.customer?.customer_name : payment.slip?.customer?.customer_name ? payment.slip?.customer?.customer_name : '-'}</div>` : ''}
-                            ${previewData.supplier ? `<div class="td text-sm font-semibold w-1/4 truncate">${(payment.bank_account?.account_title?.split('|')[0] ?? '-') + ' | ' + (payment.bank_account?.bank?.short_title ?? '-')}</div>` :
-                                `<div class="td text-sm font-semibold w-1/4 truncate">${(payment.self_account?.account_title?.split('|')[0] ?? '-') + ' | ' + (payment.self_account?.bank?.short_title ?? '-')}</div>
-                            `}
-                            <div class="td text-sm font-semibold w-[14%] truncate">${formatDate(payment.date, true) ?? '-'}</div>
-                            <div class="td text-sm font-semibold w-[14%] truncate">${payment.cheque?.cheque_no ?? payment.cheque_no ?? payment.reff_no ?? payment.slip?.slip_no ?? payment.transaction_id ?? payment.reff_no ?? '-'}</div>
-                            <div class="td text-sm font-semibold w-[10%] truncate">${formatNumbersWithDigits(payment.amount, 1, 1) ?? '-'}</div>
-                        </div>
-                    </div>
-                    `;
-                }).join('')}
-            `;
+            // Office copy hamesha, Supplier copy sirf jab supplier voucher ho
+            const voucherCopies = hasSupplier
+                ? [{ label: 'Office' }, { label: 'Supplier' }]
+                : [{ label: 'Office' }];
 
-            invoiceBottom = '';
+            const voucherRows = Array.isArray(previewData.payments) ? previewData.payments : [];
+            // 26 rows/page - lamba text (Customer/Account) accommodate karne ke liye
+            // pehle se available chunkArray helper use kar rahe hain (hasTotal=true taake
+            // aakhri page par totals ke liye jagah bachi rahe)
+            const voucherPages = voucherRows.length
+                ? chunkRowsForDocument(voucherRows, {
+                    normalMaxRows: 16,
+                    totalMaxRows: 15,
+                    hasTotals: true,
+                })
+                : [[]];
+
             const prevBalance = parseFormattedNumber(previewData.previous_balance);
             const totalPaymentVal = Number((previewData.total_payment ?? 0).toString().replace(/,/g, '')) || 0;
-            if (previewData.supplier) {
-                invoiceBottom += `
-                    <div class="total flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full">
-                        <div class="text-nowrap">Previous Balance - Rs</div>
-                        <div class="w-1/4 text-right grow">${formatNumbersWithDigits(prevBalance, 1, 1)}</div>
-                    </div>
-                `;
-            }
 
-            invoiceBottom += `
-                <div class="total flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full">
-                    <div class="text-nowrap">Total Payment - Rs</div>
-                    <div class="w-1/4 text-right grow">${formatNumbersWithDigits(totalPaymentVal, 1, 1)}</div>
-                </div>
-            `;
+            voucherCopies.forEach(copy => {
+                let voucherSerial = 1;
 
-            if (previewData.supplier) {
-                invoiceBottom += `
-                    <div class="total flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full">
-                        <div class="text-nowrap">Current Balance - Rs</div>
-                        <div class="w-1/4 text-right grow">${formatNumbersWithDigits(prevBalance - totalPaymentVal, 1, 1)}</div>
-                    </div>
-                `;
-            }
+                voucherPages.forEach((pageRows, pageIndex) => {
+                    invoiceTableHeader = `
+                        <div class="th text-sm font-medium w-[4%]">S.#</div>
+                        <div class="th text-sm font-medium w-[12%]">Method</div>
+                        ${hasSupplier ? '<div class="th text-sm font-medium w-[17%]">Customer</div>' : ''}
+                        <div class="th text-sm font-medium ${hasSupplier ? 'w-[21%]' : 'grow'}">Account</div>
+                        <div class="th text-sm font-medium w-[15%]">Date</div>
+                        <div class="th text-sm font-medium w-[11%]">Reff. No.</div>
+                        <div class="th text-sm font-medium w-[12%] text-right">Amount</div>
+                    `;
 
-            clutter += renderPreviewPage(data, previewData, cartonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, 0, 1);
+                    const cellStyle = 'white-space:normal !important;overflow:visible !important;text-overflow:clip !important;word-break:normal !important;overflow-wrap:normal !important;line-height:1.15 !important;display:block !important;';
+
+                    invoiceTableBody = pageRows.map((payment, index) => `
+                        <div>
+                            ${rowDivider(index, 'border-gray-600')}
+                            <div class="tr flex justify-between w-full px-2 gap-2" style="align-items:center !important;">
+                                <div class="td text-sm font-semibold w-[4%]" style="${cellStyle}">${voucherSerial++}.</div>
+                                <div class="td text-sm font-semibold w-[12%] capitalize" style="${cellStyle}">${payment.method ?? '-'}</div>
+                                ${hasSupplier ? `<div class="td text-sm font-semibold w-[17%] capitalize" style="${cellStyle}">${payment.program?.customer?.customer_name ?? payment.cheque?.customer?.customer_name ?? payment.slip?.customer?.customer_name ?? '-'}</div>` : ''}
+                                ${hasSupplier
+                                    ? `<div class="td text-sm font-semibold w-[21%]" style="${cellStyle}">${(payment.bank_account?.account_title?.split('|')[0] ?? '-') + ' | ' + (payment.bank_account?.bank?.short_title ?? '-')}</div>`
+                                    : `<div class="td text-sm font-semibold grow" style="${cellStyle}">${(payment.self_account?.account_title?.split('|')[0] ?? '-') + ' | ' + (payment.self_account?.bank?.short_title ?? '-')}</div>`}
+                                <div class="td text-sm font-semibold w-[15%]" style="${cellStyle}">${formatDate(payment.date, true) ?? '-'}</div>
+                                <div class="td text-sm font-semibold w-[11%]" style="${cellStyle}">${payment.cheque?.cheque_no ?? payment.cheque_no ?? payment.reff_no ?? payment.slip?.slip_no ?? payment.transaction_id ?? payment.reff_no ?? '-'}</div>
+                                <div class="td text-sm font-semibold w-[12%] text-right" style="${cellStyle}">${formatNumbersWithDigits(payment.amount, 1, 1) ?? '-'}</div>
+                            </div>
+                        </div>
+                    `).join('');
+
+                    invoiceBottom = '';
+
+                    if (pageIndex === voucherPages.length - 1) {
+                        invoiceBottom = documentTotalsHtml(
+                            data.preview.type,
+                            previewData,
+                            {
+                                previousBalance: prevBalance,
+                                totalPayment: totalPaymentVal,
+                                currentBalance: prevBalance - totalPaymentVal,
+                            }
+                        );
+                    }
+
+                    clutter += renderPreviewPage(
+                        data, previewData, cartonCount,
+                        invoiceTableHeader, invoiceTableBody, invoiceBottom,
+                        pageIndex, voucherPages.length,
+                        copy.label
+                    );
+                });
+            });
 
         } else if (data.preview.type == "cargo_list") {
             const cargoInvoices = Array.isArray(previewData.invoices) ? previewData.invoices : [];
-            const cargoPages = chunkArray(cargoInvoices, 38, false);
+            const cargoPages = chunkRowsForDocument(cargoInvoices, {
+                normalMaxRows: 38,
+                totalMaxRows: 38,
+                hasTotals: false,
+            });
             let cargoSerial = 1;
 
             cargoPages.forEach((cargoChunk, pageIndex) => {
@@ -301,13 +562,13 @@
                     <div>
                         ${rowDivider(index)}
                         <div class="tr flex justify-between w-full px-2 gap-2">
-                            <div class="td text-sm font-semibold w-[5%] truncate">${cargoSerial++}.</div>
-                            <div class="td text-sm font-semibold w-[13%] truncate">${formatDate(invoice.date)}</div>
-                            <div class="td text-sm font-semibold w-[15%] truncate">${invoice.invoice_no || '-'}</div>
-                            <div class="td text-sm font-semibold w-[15%] truncate">${invoice.shipment_no || '-'}</div>
-                            <div class="td text-sm font-semibold w-[8%] truncate">${invoice.carton_count}</div>
-                            <div class="td text-sm font-semibold grow truncate capitalize">${invoice.customer?.customer_name || '-'}</div>
-                            <div class="td text-sm font-semibold w-[16%] truncate">${invoice.customer?.city?.title || '-'}</div>
+                            <div class="td text-sm font-semibold w-[5%]">${cargoSerial++}.</div>
+                            <div class="td text-sm font-semibold w-[13%]">${formatDate(invoice.date)}</div>
+                            <div class="td text-sm font-semibold w-[15%]">${invoice.invoice_no || '-'}</div>
+                            <div class="td text-sm font-semibold w-[15%]">${invoice.shipment_no || '-'}</div>
+                            <div class="td text-sm font-semibold w-[8%]">${invoice.carton_count}</div>
+                            <div class="td text-sm font-semibold grow capitalize">${invoice.customer?.customer_name || '-'}</div>
+                            <div class="td text-sm font-semibold w-[16%]">${invoice.customer?.city?.title || '-'}</div>
                         </div>
                     </div>
                     `;
@@ -384,16 +645,16 @@
                                     <div class="invoice-item-row">
                                         ${rowDivider(index)}
                                         <div class="tr invoice-item-main grid ${rowGridClass} justify-between w-full px-4 gap-0.5">
-                                            <div class="td text-sm font-semibold truncate">${String(rowSerial++).padStart(2, '0')}</div>
+                                            <div class="td text-sm font-semibold">${String(rowSerial++).padStart(2, '0')}</div>
                                             <div class="td invoice-article-cell text-sm font-semibold">
                                                 <div class="invoice-article-code">${article?.article_no || '-'}</div>
                                             </div>
                                             <div class="td invoice-description-cell text-sm font-semibold">${detailLine}</div>
-                                            <div class="td text-sm font-semibold truncate">${article?.pcs_per_packet || '-'}</div>
-                                            <div class="td text-sm font-semibold truncate">${article?.pcs_per_packet ? Math.floor(qty / article.pcs_per_packet) : 0}</div>
-                                            <div class="td text-sm font-semibold truncate">${qty}</div>
-                                            <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(salesRate)}</div>
-                                            <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(total)}</div>
+                                            <div class="td text-sm font-semibold">${article?.pcs_per_packet || '-'}</div>
+                                            <div class="td text-sm font-semibold">${article?.pcs_per_packet ? Math.floor(qty / article.pcs_per_packet) : 0}</div>
+                                            <div class="td text-sm font-semibold">${qty}</div>
+                                            <div class="td text-sm font-semibold">${formatNumbersDigitLess(salesRate)}</div>
+                                            <div class="td text-sm font-semibold">${formatNumbersDigitLess(total)}</div>
                                             ${data.preview.type == 'order' ? `<div class="td text-sm font-semibold text-right">${dispatched}</div>` : ''}
                                         </div>
                                     </div>
@@ -404,15 +665,15 @@
                                 <div>
                                     ${rowDivider(index)}
                                     <div class="tr grid grid-cols-${data.preview.type == 'shipment' ? '8' : '9'} justify-between w-full px-4 gap-0.5">
-                                        <div class="td text-sm font-semibold truncate">${rowSerial++}.</div>
-                                        <div class="td text-sm font-semibold truncate">${article?.article_no || '-'}</div>
-                                        <div class="td text-sm font-semibold col-span-2 truncate capitalize">${orderedArticle.description}</div>
-                                        ${data.preview.type == 'invoice' ? `<div class="td text-sm font-semibold truncate">${article?.pcs_per_packet}</div>` : ''}
-                                        <div class="td text-sm font-semibold truncate">${article?.pcs_per_packet ? Math.floor(qty / article.pcs_per_packet) : 0}</div>
-                                        <div class="td text-sm font-semibold truncate">${qty}</div>
-                                        <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(salesRate)}</div>
-                                        <div class="td text-sm font-semibold truncate">${formatNumbersDigitLess(total)}</div>
-                                        ${data.preview.type == 'order' ? `<div class="td text-sm text-right font-semibold truncate">${orderedArticle.dispatched_pcs > 0 ? orderedArticle.dispatched_pcs : ''}</div>` : ''}
+                                        <div class="td text-sm font-semibold">${rowSerial++}.</div>
+                                        <div class="td text-sm font-semibold">${article?.article_no || '-'}</div>
+                                        <div class="td text-sm font-semibold col-span-2 capitalize">${orderedArticle.description}</div>
+                                        ${data.preview.type == 'invoice' ? `<div class="td text-sm font-semibold">${article?.pcs_per_packet}</div>` : ''}
+                                        <div class="td text-sm font-semibold">${article?.pcs_per_packet ? Math.floor(qty / article.pcs_per_packet) : 0}</div>
+                                        <div class="td text-sm font-semibold">${qty}</div>
+                                        <div class="td text-sm font-semibold">${formatNumbersDigitLess(salesRate)}</div>
+                                        <div class="td text-sm font-semibold">${formatNumbersDigitLess(total)}</div>
+                                        ${data.preview.type == 'order' ? `<div class="td text-sm text-right font-semibold">${orderedArticle.dispatched_pcs > 0 ? orderedArticle.dispatched_pcs : ''}</div>` : ''}
                                     </div>
                                 </div>
                             `;
@@ -420,12 +681,28 @@
                     `;
                 }
 
-                const discountAmount = discount ? (totalAmount * discount) / 100 : 0;
+                const discountAmount = discount
+                    ? (totalAmount * discount) / 100
+                    : 0;
 
-                // Totals sirf last page par
+                const calculatedNetAmount =
+                    totalAmount - discountAmount;
+
                 invoiceBottom = '';
+
                 if (pageIndex === articlePages.length - 1) {
-                    invoiceBottom = documentTotalsHtml(data.preview.type, previewData, totalPackets, totalPcs, totalAmount, discount, discountAmount, netAmount);
+                    invoiceBottom = documentTotalsHtml(
+                        data.preview.type,
+                        previewData,
+                        {
+                            totalPackets,
+                            totalPcs,
+                            totalAmount,
+                            discount,
+                            discountAmount,
+                            netAmount: calculatedNetAmount,
+                        }
+                    );
                 }
 
                 clutter += renderPreviewPage(data, previewData, cartonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, pageIndex, articlePages.length);
@@ -437,13 +714,15 @@
     }
 
     // Helper function - Preview page render karne ke liye
-    function renderPreviewPage(data, previewData, cartonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, pageIndex, totalPages = 1) {
+    function renderPreviewPage(data, previewData, cartonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, pageIndex, totalPages = 1, copyLabelOverride = null) {
         const previewCompany = previewData?.branch_branding || companyData;
         const previewCompanyLogoUrl = previewLogoUrl(previewCompany, companyLogoBase);
         const isCargoList = data.preview.type == "cargo_list";
-        const isCompactDocument = data.preview.size == "A5" || data.preview.type == "order" || data.preview.type == "invoice" || data.preview.type == "shipment";
-        const pageSizeClass = isCargoList ? "w-[210mm] h-[297mm]" : (isCompactDocument ? "w-[148mm] h-[210mm]" : "w-[208mm] h-[302mm]");
-        const pageTextClass = isCargoList ? "gos-a4-document cargo-list-a4-document" : (isCompactDocument ? `gos-a5-document ${data.preview.type == "invoice" || data.preview.type == "order" || data.preview.type == "shipment" ? "gos-a5-invoice" : ""}` : "");
+        const useCargoListLayout = isCargoList;
+
+        const isCompactDocument = data.preview.size == "A5" || data.preview.type == "order" || data.preview.type == "invoice" || data.preview.type == "shipment" || data.preview.type == "voucher";
+        const pageSizeClass = useCargoListLayout ? "w-[210mm] h-[297mm]" : (isCompactDocument ? "w-[148mm] h-[210mm]" : "w-[208mm] h-[302mm]");
+        const pageTextClass = useCargoListLayout ? "gos-a4-document cargo-list-a4-document" : (isCompactDocument ? `gos-a5-document ${data.preview.type == "invoice" || data.preview.type == "order" || data.preview.type == "shipment" || data.preview.type == "voucher" ? "gos-a5-invoice" : ""}` : "");
         const documentNo = data.preview.type == 'order'
             ? previewData.order_no
             : data.preview.type == 'invoice'
@@ -452,7 +731,9 @@
                     ? previewData.shipment_no
                     : data.preview.type == 'cargo_list'
                         ? previewData.cargo_no
-                        : '';
+                        : data.preview.type == 'voucher'
+                            ? previewData.voucher_no
+                            : '';
         const documentNoLabel = data.preview.type == 'order'
             ? 'Order No.'
             : data.preview.type == 'invoice'
@@ -461,7 +742,9 @@
                     ? 'Shipment No.'
                     : data.preview.type == 'cargo_list'
                         ? 'Cargo List No.'
-                        : '';
+                        : data.preview.type == 'voucher'
+                            ? 'Voucher No.'
+                            : '';
         const invoiceSourceNo = previewData.order_no
             ? `Order No.: ${previewData.order_no}`
             : previewData.shipment_no
@@ -471,8 +754,8 @@
         const documentTimeSuffix = documentTime ? `, ${documentTime}` : '';
 
         return `
-            <div id="preview" class="preview ${data.preview.type == 'cargo_list' ? 'cargo-list-preview ' : ''}${pageSizeClass} ${pageTextClass} overflow-hidden flex flex-col">
-                <div class="${data.preview.type == 'cargo_list' ? 'cargo-list-document ' : ''}flex flex-col h-full">
+            <div id="preview" class="preview ${useCargoListLayout ? 'cargo-list-preview ' : ''}${pageSizeClass} ${pageTextClass} overflow-hidden flex flex-col">
+                <div class="${useCargoListLayout ? 'cargo-list-document ' : ''}flex flex-col h-full">
                     <div id="banner" class="banner w-full flex justify-between items-center px-5">
                         <div class="left">
                             <div class="logo flex flex-col">
@@ -518,22 +801,20 @@
                                 ` : data.preview.type == "cargo_list" ? `
                                     <div class="cargo-name capitalize font-semibold text-sm leading-none">Cargo Name: ${previewData.cargo_name}</div>
                                     <div class="date leading-none text-sm">Date: ${formatDate(previewData.date)}${documentTimeSuffix}</div>
+                                ` :  data.preview.type == "voucher" ? `
+                                    <div class="supplier-name capitalize font-semibold text-[12px] leading-none">Supplier: ${previewData.supplier?.supplier_name ?? '-'}</div>
+                                    <div class="date leading-none text-sm">Date: ${formatDate(previewData.date)}${documentTimeSuffix}</div>
                                 ` : `
                                     <div class="date leading-none">Date: ${formatDate(previewData.date)}${documentTimeSuffix}</div>
                                     <div class="number leading-none capitalize">${data.preview.type.replace('_', ' ')} No.: ${data.preview.type == 'shipment' ? previewData.shipment_no : data.preview.type == 'voucher' ? previewData.voucher_no : data.preview.type == 'cargo_list' ? previewData.cargo_no : ''}</div>
                                 `}
                             </div>
-                            ${(data.preview.type == 'voucher' && previewData.supplier) ? `
-                                <div class="center my-auto">
-                                    <div class="supplier-name capitalize font-semibold text-md">${data.preview.type == 'cargo_list' ? 'Cargo Name' : 'Supplier Name'}: ${previewData.supplier?.supplier_name || previewData.cargo_name}</div>
-                                </div>
-                            ` : ''}
                             <div class="right ${data.preview.type == "order" || data.preview.type == "invoice" ? 'shrink-0 min-w-[38%]' : 'w-50'} my-auto text-right text-sm text-black space-y-1.5">
                                 ${data.preview.type == "order" || data.preview.type == "invoice" || data.preview.type == "shipment" ? `
                                     <div class="date leading-none">Date: ${formatDate(previewData.date)}${documentTimeSuffix}</div>
                                     ${data.preview.type == 'invoice' && invoiceSourceNo ? `<div class="number leading-none capitalize">${invoiceSourceNo}</div>` : ''}
                                 ` : ''}
-                                ${data.preview.type != 'shipment' ? `<div class="preview-copy leading-none capitalize">${data.preview.type.replace('_', ' ')} Copy: ${previewData.copy_label || data.preview.copyLabel || ((data.preview.type == 'voucher' && !previewData.supplier) ? 'Staff' : (data.preview.type == 'voucher' && previewData.supplier) ? 'Supplier' : data.preview.type == 'cargo_list' ? 'Cargo' : 'Customer')}</div>` : ''}
+                                ${data.preview.type != 'shipment' ? `<div class="preview-copy leading-none capitalize">${data.preview.type.replace('_', ' ')} Copy: ${copyLabelOverride || previewData.copy_label || data.preview.copyLabel || (data.preview.type == 'cargo_list' ? 'Cargo' : 'Customer')}</div>` : ''}
                                 ${data.preview.type == 'invoice' ? `<div class="number leading-none capitalize">Carton: ${cartonCount || '-'}</div>` : ''}
                                 ${!['invoice', 'order', 'shipment'].includes(data.preview.type) ? `<div class="copy leading-none">Document: ${data.preview.document}</div>` : ''}
                             </div>
@@ -582,7 +863,7 @@
                     <hr class="w-full my-3 border-black">
                     <div class="footer flex w-full text-sm px-5 justify-between text-black">
                         <p class="leading-none text-sm">Powered by SparkPair | +92 316 5825495</p>
-                        ${['invoice', 'order', 'shipment', 'cargo_list'].includes(data.preview.type) ? `<p class="leading-none text-sm"><span class="capitalize">${data.preview.data.creator?.name || currentUser?.name || '-'}</span> | ${printDateTime()} | ${pageIndex + 1} of ${totalPages}</p>` : ''}
+                        <p class="leading-none text-sm"><span class="capitalize">${data.preview.data.creator?.name || currentUser?.name || '-'}</span> | ${printDateTime()} | ${pageIndex + 1} of ${totalPages}</p>
                     </div>
                 </div>
             </div>

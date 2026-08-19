@@ -270,7 +270,9 @@
         padding-bottom: 0 !important;
     }
 
-    .gos-a5-document > .flex > .grid.grid-cols-2 {
+    .gos-a5-document > .flex > .grid.grid-cols-2,
+    .gos-a5-document > .flex > .grid.grid-cols-3
+    {
         gap: 7px !important;
         padding-left: 14px !important;
         padding-right: 14px !important;
@@ -385,6 +387,7 @@
     .gos-a5-invoice .header,
     .gos-a5-invoice .body,
     .gos-a5-invoice > .flex > .grid.grid-cols-2,
+    .gos-a5-invoice > .flex > .grid.grid-cols-3,
     .gos-a5-invoice .footer,
     .gos-a5-invoice .tfooter {
         padding-left: 8px !important;
@@ -685,7 +688,9 @@
         font-weight: 700;
     }
 
-    .gos-a5-invoice > .flex > .grid.grid-cols-2 {
+    .gos-a5-invoice > .flex > .grid.grid-cols-2,
+    .gos-a5-invoice > .flex > .grid.grid-cols-3
+    {
         gap: 6px !important;
     }
 </style>
