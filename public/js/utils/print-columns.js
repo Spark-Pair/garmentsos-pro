@@ -513,7 +513,7 @@
                     <div class="w-[6%] flex items-center justify-center">
                         <input ${col.selected ? 'checked' : ''} type="checkbox" class="row-checkbox shrink-0 w-3.5 h-3.5 appearance-none border border-gray-400 rounded-sm checked:bg-[var(--primary-color)] checked:border-transparent focus:outline-none transition duration-150 cursor-pointer" />
                     </div>
-                    <div class="grow font-medium truncate">${col.text}</div>
+                    <div class="grow font-medium">${col.text}</div>
                     <div class="w-[15%] flex items-center gap-2">
                         <select class="merge-select text-xs px-2 py-1.5 rounded-lg bg-[var(--h-bg-color)] border border-gray-600 w-full" data-display-index="${displayIndex}">
                             <option value="">No Merge</option>
