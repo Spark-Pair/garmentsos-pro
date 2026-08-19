@@ -101,7 +101,7 @@
         if (hasSupplier) {
             rows.push(
                 renderTotalRow({
-                    label: 'Previous Balance - Rs',
+                    label: 'P. Balance',
                     value: formatNumbersWithDigits(previousBalance, 1, 1),
                     borderClass: 'border-gray-600',
                 })
@@ -110,7 +110,7 @@
 
         rows.push(
             renderTotalRow({
-                label: 'Total Payment - Rs',
+                label: 'T. Payment',
                 value: formatNumbersWithDigits(totalPayment, 1, 1),
                 borderClass: 'border-gray-600',
             })
@@ -119,7 +119,7 @@
         if (hasSupplier) {
             rows.push(
                 renderTotalRow({
-                    label: 'Current Balance - Rs',
+                    label: 'C. Balance',
                     value: formatNumbersWithDigits(currentBalance, 1, 1),
                     borderClass: 'border-gray-600',
                     fontWeight: 'font-semibold',
