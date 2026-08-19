@@ -83,118 +83,148 @@ class SalesReturnController extends Controller
             return redirect()->back()->with('error', 'Please select at least one article to return.')->withInput();
         }
 
-        $totalAmount = 0;
+        try {
+            DB::transaction(function () use ($data, $returnLines) {
+                $branches = app(ModuleBranchService::class);
+                $hasPhysicalQuantityBranch = Schema::hasColumn('physical_quantities', 'branch_id');
+                $hasCustomerPaymentBranch = Schema::hasColumn('customer_payments', 'branch_id');
+                $physicalQuantityLinksSalesReturn = Schema::hasColumn('physical_quantities', 'sales_return_id');
+                $fallbackBranchId = $branches->branchIdForCreate('sales_returns');
 
-        DB::transaction(function () use ($data, $returnLines, &$totalAmount) {
-            $branches = app(ModuleBranchService::class);
-            $branchId = $branches->branchIdForCreate('sales_returns');
-            $createdReturnIds = [];
-            $physicalQuantityLinksSalesReturn = Schema::hasColumn('physical_quantities', 'sales_return_id');
+                $totalsByBranch = [];        // branchId => total amount
+                $firstReturnIdByBranch = [];  // branchId => first SalesReturn id in this batch
 
-            foreach ($returnLines as $line) {
-                $invoiceId = (int) ($line['invoice_id'] ?? 0);
-                $articleId = (int) ($line['article_id'] ?? 0);
-                $quantity = (int) ($line['quantity'] ?? 0);
+                foreach ($returnLines as $line) {
+                    $invoiceId = (int) ($line['invoice_id'] ?? 0);
+                    $articleId = (int) ($line['article_id'] ?? 0);
+                    $quantity = (int) ($line['quantity'] ?? 0);
 
-                if ($invoiceId <= 0 || $articleId <= 0 || $quantity <= 0) {
+                    if ($invoiceId <= 0 || $articleId <= 0 || $quantity <= 0) {
+                        throw ValidationException::withMessages([
+                            'returns_data' => 'Invalid sales return line.',
+                        ]);
+                    }
+
+                    // lock the row so a concurrent submission for the same
+                    // invoice+article can't read a stale "already returned" total
+                    $invoiceArticle = InvoiceArticles::with(['article', 'invoice.order', 'invoice.shipment'])
+                        ->where('invoice_id', $invoiceId)
+                        ->where('article_id', $articleId)
+                        ->whereHas('invoice', function ($query) use ($data) {
+                            $query->where('customer_id', $data['customer_id']);
+                        })
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (!$invoiceArticle) {
+                        throw ValidationException::withMessages([
+                            'returns_data' => 'Selected invoice article was not found.',
+                        ]);
+                    }
+
+                    $alreadyReturned = SalesReturn::where('invoice_id', $invoiceId)
+                        ->where('article_id', $articleId)
+                        ->lockForUpdate()
+                        ->sum('quantity');
+                    $remainingQuantity = max(0, (int) ($invoiceArticle->invoice_pcs ?? 0) - (int) $alreadyReturned);
+
+                    if ($quantity > $remainingQuantity) {
+                        throw ValidationException::withMessages([
+                            'returns_data' => "Return quantity cannot exceed remaining invoice quantity for {$invoiceArticle->article?->article_no}.",
+                        ]);
+                    }
+
+                    $discount = optional($invoiceArticle->invoice?->order)->discount
+                        ?? optional($invoiceArticle->invoice?->shipment)->discount
+                        ?? 0;
+                    $salesRate = (float) ($invoiceArticle->article?->sales_rate ?? 0);
+                    $amount = (int) round($quantity * $salesRate * (1 - ((float) $discount / 100)));
+                    $pcsPerPacket = (float) ($invoiceArticle->article?->pcs_per_packet ?? 0);
+
+                    if ($pcsPerPacket <= 0) {
+                        throw ValidationException::withMessages([
+                            'returns_data' => "Master unit is missing for {$invoiceArticle->article?->article_no}.",
+                        ]);
+                    }
+
+                    // 🔑 branch hamesha article ki apni branch se, user ke
+                    // active branch context se nahi. Fallback sirf tab jab
+                    // article ki apni branch set na ho.
+                    $lineBranchId = $invoiceArticle->article?->branch_id ?? $fallbackBranchId;
+
+                    $salesReturn = SalesReturn::create([
+                        'article_id' => $articleId,
+                        'invoice_id' => $invoiceId,
+                        'type' => $data['type'],
+                        'date' => $data['date'],
+                        'quantity' => $quantity,
+                        'amount' => $amount,
+                        'branch_id' => $lineBranchId,
+                    ]);
+
+                    $totalsByBranch[$lineBranchId] = ($totalsByBranch[$lineBranchId] ?? 0) + $amount;
+                    $firstReturnIdByBranch[$lineBranchId] ??= $salesReturn->id;
+
+                    $physicalQuantityData = [
+                        'date' => $data['date'],
+                        'article_id' => $articleId,
+                        'packets' => $quantity / $pcsPerPacket,
+                        'category' => $data['type'] === 'adjustment' ? 'adjustment' : 'sales_return',
+                    ];
+
+                    if ($physicalQuantityLinksSalesReturn) {
+                        $physicalQuantityData['sales_return_id'] = $salesReturn->id;
+                    }
+                    if ($hasPhysicalQuantityBranch) {
+                        $physicalQuantityData['branch_id'] = $lineBranchId;
+                    }
+
+                    PhysicalQuantity::create($physicalQuantityData);
+
+                    if ($data['type'] === 'adjustment' && $invoiceArticle->invoice?->order) {
+                        $this->reduceOrderDispatch(
+                            $invoiceArticle->invoice->order,
+                            $articleId,
+                            $quantity
+                        );
+                    }
+                }
+
+                if (empty($totalsByBranch)) {
                     throw ValidationException::withMessages([
-                        'returns_data' => 'Invalid sales return line.',
+                        'returns_data' => 'Sales return amount must be greater than zero.',
                     ]);
                 }
 
-                $invoiceArticle = InvoiceArticles::with(['article', 'invoice.order', 'invoice.shipment'])
-                    ->where('invoice_id', $invoiceId)
-                    ->where('article_id', $articleId)
-                    ->whereHas('invoice', function ($query) use ($data) {
-                        $query->where('customer_id', $data['customer_id']);
-                    })
-                    ->first();
+                // ek submission mai agar alag branches ke articles mix ho jayen
+                // to har branch ka alag CustomerPayment banega — is tarah paisa
+                // kabhi galat branch ke books mai nahi jayega.
+                foreach ($totalsByBranch as $branchId => $branchTotal) {
+                    if ($branchTotal <= 0) {
+                        continue;
+                    }
 
-                if (!$invoiceArticle) {
-                    throw ValidationException::withMessages([
-                        'returns_data' => 'Selected invoice article was not found.',
-                    ]);
+                    $paymentData = [
+                        'customer_id' => $data['customer_id'],
+                        'date' => $data['date'],
+                        'type' => 'sales_return',
+                        'method' => 'return',
+                        'amount' => $branchTotal,
+                        'reff_no' => ($data['type'] === 'adjustment' ? 'ADJ-' : 'SR-')
+                        . ($firstReturnIdByBranch[$branchId] ?? $salesReturn->id),
+                        'remarks' => $data['type'] === 'adjustment' ? 'Sales adjustment' : 'Sales return',
+                    ];
+
+                    if ($hasCustomerPaymentBranch) {
+                        $paymentData['branch_id'] = $branchId;
+                    }
+
+                    CustomerPayment::create($paymentData);
                 }
-
-                $alreadyReturned = SalesReturn::where('invoice_id', $invoiceId)
-                    ->where('article_id', $articleId)
-                    ->sum('quantity');
-                $remainingQuantity = max(0, (int) ($invoiceArticle->invoice_pcs ?? 0) - (int) $alreadyReturned);
-
-                if ($quantity > $remainingQuantity) {
-                    throw ValidationException::withMessages([
-                        'returns_data' => "Return quantity cannot exceed remaining invoice quantity for {$invoiceArticle->article?->article_no}.",
-                    ]);
-                }
-
-                $discount = optional($invoiceArticle->invoice?->order)->discount
-                    ?? optional($invoiceArticle->invoice?->shipment)->discount
-                    ?? 0;
-                $salesRate = (float) ($invoiceArticle->article?->sales_rate ?? 0);
-                $amount = (int) round($quantity * $salesRate * (1 - ((float) $discount / 100)));
-                $pcsPerPacket = (float) ($invoiceArticle->article?->pcs_per_packet ?? 0);
-
-                if ($pcsPerPacket <= 0) {
-                    throw ValidationException::withMessages([
-                        'returns_data' => "Master unit is missing for {$invoiceArticle->article?->article_no}.",
-                    ]);
-                }
-
-                $salesReturn = SalesReturn::create([
-                    'article_id' => $articleId,
-                    'invoice_id' => $invoiceId,
-                    'type' => $data['type'],
-                    'date' => $data['date'],
-                    'quantity' => $quantity,
-                    'amount' => $amount,
-                    'branch_id' => $branchId,
-                ]);
-                $createdReturnIds[] = $salesReturn->id;
-
-                $physicalQuantityData = [
-                    'date' => $data['date'],
-                    'article_id' => $articleId,
-                    'packets' => $quantity / $pcsPerPacket,
-                    'category' => $data['type'] === 'adjustment' ? 'adjustment' : 'sales_return',
-                ];
-
-                if ($physicalQuantityLinksSalesReturn) {
-                    $physicalQuantityData['sales_return_id'] = $salesReturn->id;
-                }
-                if (Schema::hasColumn('physical_quantities', 'branch_id')) {
-                    $physicalQuantityData['branch_id'] = app(ModuleBranchService::class)->branchIdForCreate('physical_quantities');
-                }
-
-                PhysicalQuantity::create($physicalQuantityData);
-
-                if ($data['type'] === 'adjustment' && $invoiceArticle->invoice?->order) {
-                    $this->reduceOrderDispatch(
-                        $invoiceArticle->invoice->order,
-                        $articleId,
-                        $quantity
-                    );
-                }
-
-                $totalAmount += $amount;
-            }
-
-            if ($totalAmount <= 0) {
-                throw ValidationException::withMessages([
-                    'returns_data' => 'Sales return amount must be greater than zero.',
-                ]);
-            }
-
-            CustomerPayment::create([
-                'customer_id' => $data['customer_id'],
-                'date' => $data['date'],
-                'type' => 'sales_return',
-                'method' => 'return',
-                'amount' => $totalAmount,
-                'reff_no' => ($data['type'] === 'adjustment' ? 'ADJ-' : 'SR-') . ($createdReturnIds[0] ?? now()->format('YmdHis')),
-                'remarks' => $data['type'] === 'adjustment' ? 'Sales adjustment' : 'Sales return',
-                'branch_id' => app(ModuleBranchService::class)->branchIdForCreate('customer_payments'),
-            ]);
-        });
+            });
+        } catch (ValidationException $e) {
+            return redirect()->back()->withErrors($e->validator)->withInput();
+        }
 
         return redirect()->back()->with('success', 'Sales return saved successfully.');
     }
@@ -244,6 +274,8 @@ class SalesReturnController extends Controller
 
     public function getDetails(Request $request)
     {
+        $branches = app(ModuleBranchService::class);
+
         if ($request->customer_id && $request->getReturnLines) {
             $customer = Customer::find($request->customer_id);
 
@@ -251,7 +283,7 @@ class SalesReturnController extends Controller
                 return response()->json([]);
             }
 
-            return $this->returnableSalesReturnLines($customer);
+            return $this->returnableSalesReturnLines($customer, $branches);
         }
 
         if ($request->customer_id && $request->getArticles) {
@@ -261,8 +293,13 @@ class SalesReturnController extends Controller
                 return response()->json([]);
             }
 
-            return $customer->invoices()
-                ->with('invoiceArticles.article')
+            $invoicesQuery = $branches->applyRelatedScope(
+                $customer->invoices()->with('invoiceArticles.article')->getQuery(),
+                'invoices',
+                'sales_returns'
+            );
+
+            return $invoicesQuery
                 ->get()
                 ->flatMap(fn($invoice) => $invoice->invoiceArticles)
                 ->filter(fn($invoiceArticle) => (int) ($invoiceArticle->invoice_pcs ?? 0) > 0 && $invoiceArticle->article)
@@ -286,9 +323,13 @@ class SalesReturnController extends Controller
                 return response()->json([]);
             }
 
-            $invoices = $customer->invoices()
-                ->with(['order', 'shipment', 'invoiceArticles'])
-                ->get();
+            $invoicesQuery = $branches->applyRelatedScope(
+                $customer->invoices()->with(['order', 'shipment', 'invoiceArticles'])->getQuery(),
+                'invoices',
+                'sales_returns'
+            );
+
+            $invoices = $invoicesQuery->get();
 
             $articleId = (int) $request->article_id;
             $article = Article::find($articleId);
@@ -332,10 +373,19 @@ class SalesReturnController extends Controller
         return response()->json([]);
     }
 
-    private function returnableSalesReturnLines(Customer $customer)
+    private function returnableSalesReturnLines(Customer $customer, ?ModuleBranchService $branches = null)
     {
-        return $customer->invoices()
-            ->with(['order', 'shipment', 'invoiceArticles.article', 'salesReturns'])
+        $branches = $branches ?? app(ModuleBranchService::class);
+
+        $invoicesQuery = $branches->applyRelatedScope(
+            $customer->invoices()
+                ->with(['order', 'shipment', 'invoiceArticles.article', 'salesReturns'])
+                ->getQuery(),
+            'invoices',
+            'sales_returns'
+        );
+
+        return $invoicesQuery
             ->orderByDesc('date')
             ->get()
             ->flatMap(function ($invoice) {

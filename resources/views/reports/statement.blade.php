@@ -404,7 +404,7 @@
                                                 </div>
 
                                                 {{-- Table Body --}}
-                                                <div id="tbody" class="tbody w-full mt-1 pb-1">
+                                                <div id="tbody" class="tbody w-full mt-1.5 pb-1">
                                                     @foreach ($chunk as $statement)
                                                         @php
                                                             $isOpeningBalanceRow = ($statement['type'] ?? null) === 'opening_balance';

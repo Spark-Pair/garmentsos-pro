@@ -107,8 +107,19 @@ class Customer extends Model
     public function calculateBalance($fromDate = null, $toDate = null, $formatted = false, $includeGivenDate = true, ?array $branchIds = null, bool $includeNullBranchRecords = false)
     {
         $invoicesQuery = $this->invoices();
-        $paymentsQuery = $this->payments()->where('type', '!=', 'DR');
+
+        // Sales returns are authoritative for return credits. Their
+        // customer_payment rows are excluded here to prevent double counting.
+        $paymentsQuery = $this->payments()
+            ->where('type', '!=', 'DR')
+            ->where('type', '!=', 'sales_return');
+
+        $salesReturnsQuery = SalesReturn::whereHas('invoice', function ($query) {
+            $query->where('customer_id', $this->id);
+        });
+
         $adjustmentsQuery = $this->statementAdjustments();
+
         $branchIds = collect($branchIds ?? [])
             ->filter(fn ($id) => is_numeric($id))
             ->map(fn ($id) => (int) $id)
@@ -116,6 +127,7 @@ class Customer extends Model
             ->unique()
             ->values()
             ->all();
+
         $hasBranchScope = count($branchIds) > 0;
 
         if ($hasBranchScope && Schema::hasColumn('invoices', 'branch_id')) {
@@ -136,6 +148,15 @@ class Customer extends Model
             });
         }
 
+        if ($hasBranchScope && Schema::hasColumn('sales_returns', 'branch_id')) {
+            $salesReturnsQuery->where(function ($query) use ($branchIds, $includeNullBranchRecords) {
+                $query->whereIn('branch_id', $branchIds);
+                if ($includeNullBranchRecords) {
+                    $query->orWhereNull('branch_id');
+                }
+            });
+        }
+
         if ($hasBranchScope && Schema::hasColumn('statement_adjustments', 'branch_id')) {
             $adjustmentsQuery->where(function ($nested) use ($branchIds, $includeNullBranchRecords) {
                 $nested->whereIn('branch_id', $branchIds);
@@ -147,17 +168,22 @@ class Customer extends Model
 
         DateRange::apply($invoicesQuery, 'date', $fromDate, $toDate, $includeGivenDate);
         DateRange::apply($paymentsQuery, 'date', $fromDate, $toDate, $includeGivenDate);
+        DateRange::apply($salesReturnsQuery, 'date', $fromDate, $toDate, $includeGivenDate);
         DateRange::apply($adjustmentsQuery, 'date', $fromDate, $toDate, $includeGivenDate);
 
-        // Calculate totals
         $totalInvoices = $invoicesQuery->sum('netAmount') ?? 0;
-        $totalPayments = $paymentsQuery->sum('amount') ?? 0;
-        $adjustmentsNet = (float) $adjustmentsQuery->get()->sum(fn($adjustment) => (float) $adjustment->net_amount);
+        $totalPayments = ($paymentsQuery->sum('amount') ?? 0)
+            + ($salesReturnsQuery->sum('amount') ?? 0);
+
+        $adjustmentsNet = (float) $adjustmentsQuery
+            ->get()
+            ->sum(fn ($adjustment) => (float) $adjustment->net_amount);
 
         $balance = ($totalInvoices - $totalPayments) + $adjustmentsNet;
 
         return $formatted ? \App\Support\Money::format($balance) : $balance;
     }
+
     public function getStatement($fromDate, $toDate, $type = 'general', ?array $branchIds = null, bool $includeNullBranchRecords = false)
     {
         $type = $type ?: 'general';
@@ -189,8 +215,12 @@ class Customer extends Model
             }))
             ->get();
 
+        // Sales-return payments are rendered from sales_returns directly.
+        // This keeps old returns visible even if their CustomerPayment row
+        // is missing or has a stale/wrong branch_id.
         $payments = $this->payments()
             ->where('type', '!=', 'DR')
+            ->where('type', '!=', 'sales_return')
             ->whereBetween(\Illuminate\Support\Facades\DB::raw('DATE(date)'), [$from->toDateString(), $to->toDateString()])
             ->when($hasBranchScope && Schema::hasColumn('customer_payments', 'branch_id'), fn ($query) => $query->where(function ($nested) use ($branchIds, $includeNullBranchRecords) {
                 $nested->whereIn('branch_id', $branchIds);
@@ -199,6 +229,22 @@ class Customer extends Model
                 }
             }))
             ->get();
+
+        $salesReturns = SalesReturn::with(['article', 'invoice'])
+            ->whereHas('invoice', function ($query) {
+                $query->where('customer_id', $this->id);
+            })
+            ->whereBetween(\Illuminate\Support\Facades\DB::raw('DATE(date)'), [$from->toDateString(), $to->toDateString()])
+            ->when($hasBranchScope && Schema::hasColumn('sales_returns', 'branch_id'), function ($query) use ($branchIds, $includeNullBranchRecords) {
+                $query->where(function ($nested) use ($branchIds, $includeNullBranchRecords) {
+                    $nested->whereIn('branch_id', $branchIds);
+                    if ($includeNullBranchRecords) {
+                        $nested->orWhereNull('branch_id');
+                    }
+                });
+            })
+            ->get();
+
         $adjustments = $this->statementAdjustments()
             ->whereBetween(\Illuminate\Support\Facades\DB::raw('DATE(date)'), [$from->toDateString(), $to->toDateString()])
             ->when($hasBranchScope && Schema::hasColumn('statement_adjustments', 'branch_id'), function ($query) use ($branchIds, $includeNullBranchRecords) {
@@ -250,6 +296,25 @@ class Customer extends Model
                     : null);
         };
 
+        $salesReturnRow = function ($r) {
+            $prefix = $r->type === 'adjustment' ? 'ADJ-' : 'SR-';
+
+            return [
+                'date' => $r->date,
+                'reff_no' => $prefix . $r->id,
+                'type' => 'payment',
+                'method' => 'return',
+                'payment' => (float) $r->amount,
+                'bill' => 0,
+                'description' => $r->type === 'adjustment' ? 'Sales adjustment' : 'Sales return',
+                'created_at' => $r->created_at,
+                'source' => [
+                    'type' => 'sales_return',
+                    'id' => $r->id,
+                ],
+            ];
+        };
+
         $invoiceDescription = function ($i) {
             $biltyNo = $i->bilty? $i->bilty->bilty_no : '-';
             $cargoName = $i->cargo? $i->cargo->cargo_name : '-';
@@ -261,14 +326,21 @@ class Customer extends Model
             $invoiceGrouped = $invoices->groupBy(fn($i) => Carbon::parse($i->date)->toDateString());
             // 🔹 Group payments by date
             $paymentGrouped = $payments->groupBy(fn($p) => Carbon::parse($p->date)->toDateString());
+            $salesReturnGrouped = $salesReturns->groupBy(fn($r) => Carbon::parse($r->date)->toDateString());
             $adjustmentGrouped = $adjustments->groupBy(fn($a) => Carbon::parse($a->date)->toDateString());
 
             // 🔹 Get all unique dates
-            $allDates = $invoiceGrouped->keys()->merge($paymentGrouped->keys())->merge($adjustmentGrouped->keys())->unique()->sort();
+            $allDates = $invoiceGrouped->keys()
+                ->merge($paymentGrouped->keys())
+                ->merge($salesReturnGrouped->keys())
+                ->merge($adjustmentGrouped->keys())
+                ->unique()
+                ->sort();
 
             foreach ($allDates as $date) {
                 $bill = isset($invoiceGrouped[$date]) ? $invoiceGrouped[$date]->sum(fn($i) => (float) $i->netAmount) : 0;
                 $payment = isset($paymentGrouped[$date]) ? $paymentGrouped[$date]->sum(fn($p) => (float) $p->amount) : 0;
+                $payment += isset($salesReturnGrouped[$date]) ? $salesReturnGrouped[$date]->sum(fn($r) => (float) $r->amount) : 0;
                 $dayAdjustments = $adjustments->filter(fn($adjustment) => Carbon::parse($adjustment->date)->toDateString() === $date);
                 $adjustmentBill = $dayAdjustments->where('direction', 'plus')->sum('amount');
                 $adjustmentPayment = $dayAdjustments->where('direction', 'minus')->sum('amount');
@@ -345,6 +417,10 @@ class Customer extends Model
                 ]);
             }
 
+            foreach ($salesReturns as $salesReturn) {
+                $statement->push($salesReturnRow($salesReturn));
+            }
+
             foreach ($adjustments as $adjustment) {
                 $statement->push($formatAdjustment($adjustment));
             }
@@ -387,6 +463,10 @@ class Customer extends Model
                         'id' => $p->id,
                     ],
                 ]);
+            }
+
+            foreach ($salesReturns as $salesReturn) {
+                $statement->push($salesReturnRow($salesReturn));
             }
 
             foreach ($adjustments as $adjustment) {

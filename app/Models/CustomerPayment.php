@@ -39,6 +39,7 @@ class CustomerPayment extends Model
         "bank_account_id",
         "is_return",
         "d_r_id",
+        "creator_id",
     ];
 
     protected $casts = [
