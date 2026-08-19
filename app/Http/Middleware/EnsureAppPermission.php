@@ -4,8 +4,6 @@ namespace App\Http\Middleware;
 
 use App\Services\Access\AppPermissionService;
 use App\Services\Branches\ModuleBranchService;
-use App\Services\Settings\ModuleAvailabilityService;
-use App\Services\Settings\ModuleSettingsService;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -37,27 +35,19 @@ class EnsureAppPermission
         }
 
         $branchModules = app(ModuleBranchService::class);
-        $branchConfig = $moduleKey ? $branchModules->runtimeModuleConfig($moduleKey) : [];
-        $requiresBranchEnabled = (bool) (
-            ($branchConfig['branchable'] ?? false)
-            || ($branchConfig['supports_branch_selector'] ?? false)
-            || ($branchConfig['supports_multi_branch_selector'] ?? false)
-            || ($branchConfig['can_filter_records'] ?? false)
-        );
 
         if (
             $moduleKey
             && !$request->routeIs('home')
-            && (
-                (array_key_exists($moduleKey, app(ModuleSettingsService::class)->registry())
-                    && !app(ModuleAvailabilityService::class)->isEffectivelyEnabled($moduleKey))
-                || ($requiresBranchEnabled && !$branchModules->isEnabled($moduleKey))
-            )
+            && !$branchModules->isClientModuleEnabled($moduleKey)
         ) {
             $message = 'This module is currently disabled.';
 
             if ($request->expectsJson()) {
-                return response()->json(['message' => $message], 403);
+                return response()->json([
+                    'status' => 'module_disabled',
+                    'message' => $message,
+                ], 403);
             }
 
             return redirect()->route('home')->with('error', $message);

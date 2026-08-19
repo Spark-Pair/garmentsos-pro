@@ -468,6 +468,14 @@ class Controller extends BaseController
             return response()->json(["error" => $validator->errors()->first()]);
         }
 
+        $requiredModule = $request->invoice_type === 'shipment' ? 'shipments' : 'orders';
+        if (!app(\App\Services\Branches\ModuleBranchService::class)->isClientModuleEnabled($requiredModule)) {
+            return response()->json([
+                'status' => 'module_disabled',
+                'message' => ucfirst($request->invoice_type) . ' invoices are currently disabled.',
+            ], 403);
+        }
+
         $user = Auth::user();
         $user->invoice_type = $request->invoice_type;
         $user->save();

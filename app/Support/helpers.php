@@ -1,7 +1,6 @@
 <?php
 
 use App\Services\Settings\LabelSettingsService;
-use App\Services\Settings\ModuleAvailabilityService;
 use App\Services\Access\AppPermissionService;
 use App\Services\Branches\ModuleBranchService;
 
@@ -41,17 +40,7 @@ if (!function_exists('module_enabled')) {
                 return true;
             }
 
-            $branchModules = app(ModuleBranchService::class);
-            $branchConfig = $branchModules->runtimeModuleConfig($key);
-            $requiresBranchEnabled = (bool) (
-                ($branchConfig['branchable'] ?? false)
-                || ($branchConfig['supports_branch_selector'] ?? false)
-                || ($branchConfig['supports_multi_branch_selector'] ?? false)
-                || ($branchConfig['can_filter_records'] ?? false)
-            );
-
-            return app(ModuleAvailabilityService::class)->isEffectivelyVisibleInSidebar($key)
-                && (!$requiresBranchEnabled || $branchModules->isEnabled($key))
+            return app(ModuleBranchService::class)->isClientModuleVisible($key)
                 && app(AppPermissionService::class)->canCurrent($key, 'view');
         } catch (Throwable) {
             return true;
@@ -94,22 +83,8 @@ if (!function_exists('app_menu_can')) {
             $registry = $branches->moduleRegistry();
             $canonical = $branches->canonicalModuleKey($moduleKey);
 
-            if (array_key_exists($canonical, app(\App\Services\Settings\ModuleSettingsService::class)->registry())) {
-                if (!module_enabled($canonical)) {
-                    return false;
-                }
-            } elseif (array_key_exists($canonical, $registry)) {
-                $config = $branches->runtimeModuleConfig($canonical);
-                $requiresBranchEnabled = (bool) (
-                    ($config['branchable'] ?? false)
-                    || ($config['supports_branch_selector'] ?? false)
-                    || ($config['supports_multi_branch_selector'] ?? false)
-                    || ($config['can_filter_records'] ?? false)
-                );
-
-                if ($requiresBranchEnabled && !$branches->isEnabled($canonical)) {
-                    return false;
-                }
+            if (array_key_exists($canonical, $registry) && !module_enabled($canonical)) {
+                return false;
             }
 
             if (app_has_permission_rule($canonical)) {

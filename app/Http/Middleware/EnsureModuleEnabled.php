@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Services\Settings\ModuleAvailabilityService;
+use App\Services\Branches\ModuleBranchService;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -11,9 +11,7 @@ class EnsureModuleEnabled
 {
     public function handle(Request $request, Closure $next, string $moduleKey): Response
     {
-        $state = app(ModuleAvailabilityService::class)->effectiveState($moduleKey);
-
-        if ($state['available']) {
+        if (app(ModuleBranchService::class)->isClientModuleEnabled($moduleKey)) {
             return $next($request);
         }
 

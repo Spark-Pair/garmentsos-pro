@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Middleware\CheckActiveSession;
 use App\Http\Middleware\SubscriptionExpiry;
 use App\Http\Middleware\VerifyCsrfToken;
+use App\Models\BranchModuleSetting;
 use App\Models\FeatureFlag;
 use App\Models\ModuleSetting;
 use App\Models\User;
@@ -69,6 +70,63 @@ class ModuleFeatureEnforcementTest extends TestCase
                 'status' => 'module_disabled',
                 'message' => 'This module is currently disabled.',
             ]);
+    }
+
+    public function test_branch_module_disabled_business_route_is_blocked(): void
+    {
+        BranchModuleSetting::updateOrCreate(
+            ['branch_id' => null, 'module_key' => 'orders'],
+            [
+                'branch_enabled' => false,
+                'allow_user_switching' => false,
+                'status' => 'inactive',
+                'metadata' => ['client_disabled' => true],
+            ],
+        );
+
+        $this->actingAs($this->user('developer'))
+            ->get(route('orders.index'))
+            ->assertRedirect(route('home'))
+            ->assertSessionHas('error', 'This module is currently disabled.');
+    }
+
+    public function test_branch_module_disabled_json_utility_route_is_blocked(): void
+    {
+        BranchModuleSetting::updateOrCreate(
+            ['branch_id' => null, 'module_key' => 'vouchers'],
+            [
+                'branch_enabled' => false,
+                'allow_user_switching' => false,
+                'status' => 'inactive',
+                'metadata' => ['client_disabled' => true],
+            ],
+        );
+
+        $this->actingAs($this->user('developer'))
+            ->postJson(route('get-voucher-details'), [])
+            ->assertForbidden()
+            ->assertJson([
+                'status' => 'module_disabled',
+                'message' => 'This module is currently disabled.',
+            ]);
+    }
+
+    public function test_branch_module_disabled_hides_sidebar_links(): void
+    {
+        BranchModuleSetting::updateOrCreate(
+            ['branch_id' => null, 'module_key' => 'orders'],
+            [
+                'branch_enabled' => false,
+                'allow_user_switching' => false,
+                'status' => 'inactive',
+                'metadata' => ['client_disabled' => true],
+            ],
+        );
+
+        $this->actingAs($this->user('developer'))
+            ->view('components.sidebar')
+            ->assertDontSee('Show Orders')
+            ->assertDontSee('Add Order');
     }
 
     public function test_disabled_articles_hides_sidebar_links(): void

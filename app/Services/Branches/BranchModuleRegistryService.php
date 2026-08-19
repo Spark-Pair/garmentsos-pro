@@ -96,6 +96,11 @@ class BranchModuleRegistryService
         $uri = trim((string) $route->uri(), '/');
         $name = method_exists($route, 'getName') ? $route->getName() : null;
 
+        $namedModule = $this->moduleKeyForRouteName((string) $name);
+        if ($namedModule && $this->configFor($namedModule)) {
+            return $this->canonicalKey($namedModule);
+        }
+
         if ($this->isIgnoredRoute($uri, $name)) {
             return null;
         }
@@ -144,6 +149,12 @@ class BranchModuleRegistryService
     {
         $uri = trim($uri, '/');
         $name = (string) $name;
+
+        $namedModule = $this->moduleKeyForRouteName($name);
+        if ($namedModule) {
+            return $this->canonicalKey($namedModule);
+        }
+
         $first = $uri === '' ? 'home' : explode('/', $uri)[0];
 
         if ($uri === '' || $first === 'home') {
@@ -190,6 +201,42 @@ class BranchModuleRegistryService
         }
 
         return $this->canonicalKey($first);
+    }
+
+    private function moduleKeyForRouteName(string $name): ?string
+    {
+        if ($name === '') {
+            return null;
+        }
+
+        $map = [
+            'add-rate' => 'articles',
+            'update-image' => 'articles',
+            'update-supplier-category' => 'suppliers',
+            'update-bank-account-status' => 'bank_accounts',
+            'update-employee-status' => 'employees',
+            'users.reset-password' => 'users',
+            'get-order-details' => 'orders',
+            'get-program-details' => 'payment_programs',
+            'payment-programs.update-program' => 'payment_programs',
+            'get-shipment-details' => 'shipments',
+            'get-voucher-details' => 'vouchers',
+            'set-voucher-type' => 'vouchers',
+            'set-invoice-type' => 'invoices',
+            'print-invoices' => 'invoices',
+            'set-production-type' => 'productions',
+            'get-payments-by-method' => 'vouchers',
+            'get-employees-by-category' => 'employees',
+            'set-daily-ledger-type' => 'daily_ledger',
+            'get-utility-accounts' => 'utility_accounts',
+            'set-cr-type' => 'cr',
+            'set-statement-type' => 'reports_statement',
+            'set-physical-quantity-report-type' => 'reports_physical_quantity',
+            'set-fabric-report-type' => 'reports_fabric',
+            'reports.statement.get-names' => 'reports_statement',
+        ];
+
+        return $map[$name] ?? null;
     }
 
     private function isIgnoredRoute(string $uri, ?string $name): bool

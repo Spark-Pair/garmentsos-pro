@@ -1437,6 +1437,73 @@ class ModuleBranchService
         return $branchId ? $this->isBranchEnabled($moduleKey, $branchId) : $this->isEnabled($moduleKey);
     }
 
+    public function isClientModuleEnabled(string $moduleKey): bool
+    {
+        $moduleKey = $this->canonicalModuleKey($moduleKey);
+
+        if (in_array($moduleKey, [
+            'auth',
+            'auth_login',
+            'setup',
+            'first_run_setup',
+            'subscription_expired',
+            'branch_logo_delivery',
+            'home',
+            'dashboard',
+            'developer_settings',
+            'developer_branches',
+            'developer_backups',
+            'developer_updater',
+            'developer_license',
+            'developer_audit_logs',
+        ], true)) {
+            return true;
+        }
+
+        if ($this->schemaHasTable('branch_module_settings') && $this->isRegisteredModule($moduleKey)) {
+            $setting = $this->setting($moduleKey);
+            $metadata = is_array($setting?->metadata) ? $setting->metadata : [];
+
+            if ((bool) ($metadata['client_disabled'] ?? false)) {
+                return false;
+            }
+
+            if ($setting && $setting->status === 'inactive') {
+                return false;
+            }
+        }
+
+        if (array_key_exists($moduleKey, app(\App\Services\Settings\ModuleSettingsService::class)->registry())) {
+            return app(\App\Services\Settings\ModuleAvailabilityService::class)->isEffectivelyEnabled($moduleKey);
+        }
+
+        return $this->isRegisteredModule($moduleKey);
+    }
+
+    public function isClientModuleVisible(string $moduleKey): bool
+    {
+        $moduleKey = $this->canonicalModuleKey($moduleKey);
+
+        if (!$this->isClientModuleEnabled($moduleKey)) {
+            return false;
+        }
+
+        if (array_key_exists($moduleKey, app(\App\Services\Settings\ModuleSettingsService::class)->registry())) {
+            return app(\App\Services\Settings\ModuleAvailabilityService::class)->isEffectivelyVisibleInSidebar($moduleKey);
+        }
+
+        return true;
+    }
+
+    public function enabledWorkflowTypes(array $typeModuleMap): array
+    {
+        return collect($typeModuleMap)
+            ->filter(fn (string $moduleKey) => $this->isClientModuleEnabled($moduleKey))
+            ->keys()
+            ->values()
+            ->all();
+    }
+
     public function shouldFilterRecords(string $moduleKey, ?User $user = null): bool
     {
         $moduleKey = $this->canonicalModuleKey($moduleKey);
