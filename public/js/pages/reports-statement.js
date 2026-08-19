@@ -648,7 +648,7 @@
                 style: `
                     @page {
                         size: A4;
-                        margin: 3mm;
+                        margin: 2mm;
                     }
 
                     body {

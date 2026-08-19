@@ -173,23 +173,22 @@
                         : $data['date'];
                     $balance = $data['opening_balance'];
 
-                    // Pehle page ke liye 29 rows lo
-                    $firstPage = $statementRows->take(29);
+                    // Pehle page ke liye 30 rows lo
+                    $firstPage = $statementRows->take(30);
 
-                    $otherPages = $statementRows->skip(29)->chunk(32);
+                    $otherPages = $statementRows->skip(30)->chunk(33);
                 @endphp
 
-                {{-- First Page (29 rows) --}}
+                {{-- First Page (30 rows) --}}
                 <div class="statement-preview-toolbar sticky top-0 z-20 mb-2 hidden justify-end gap-2 bg-white/95 p-2 text-black shadow-sm md:hidden">
                     <button type="button" class="statement-zoom-btn rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold" data-statement-zoom="out">-</button>
                     <button type="button" class="statement-zoom-btn rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold" data-statement-zoom="reset">100%</button>
                     <button type="button" class="statement-zoom-btn rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold" data-statement-zoom="in">+</button>
                 </div>
                 <div id="preview-container" class="statement-preview-container h-full relative">
-                    <div class="preview-page w-[210mm] h-[297mm] mx-auto overflow-hidden relative bg-white p-[0.19in] rounded-md">
+                    <div class="preview-page w-[210mm] h-[297mm] mx-auto overflow-hidden relative bg-white rounded-md p-2">
                         <div id="preview" class="preview flex flex-col h-full">
-                            <div id="preview-document" class="preview-document flex flex-col h-full px-2">
-
+                            <div id="preview-document" class="preview-document flex flex-col h-full">
                                 {{-- Company Logo + Banner --}}
                                 <div id="preview-banner" class="preview-banner w-full flex justify-between items-center pl-5 pr-8">
                                     <div class="flex items-center gap-3">
@@ -216,32 +215,32 @@
                                     </div>
                                 </div>
 
-                                <hr class="w-full my-3 border-gray-700">
+                                <hr class="w-full my-2 border-gray-700">
 
                                 {{-- Header Info --}}
                                 <div id="preview-header" class="preview-header w-full px-5 text-black font-medium">
-                                    <div class="flex h-[3.25rem] items-center justify-between gap-3 overflow-hidden text-[11px] leading-[1.15]">
+                                    <div class="flex h-[3.25rem] items-center justify-between gap-3 overflow-hidden text-[12px] leading-[1.15]">
                                         <div class="w-[29%] shrink-0 space-y-1 overflow-hidden">
                                             <div class="flex gap-1 min-w-0">
                                                 <span class="font-semibold shrink-0">Date:</span>
-                                                <span class="truncate">{{ $statementDateLabel }}</span>
+                                                <span class="">{{ $statementDateLabel }}</span>
                                             </div>
                                             <div class="flex gap-1 min-w-0">
                                                 <span class="font-semibold shrink-0">Branches:</span>
-                                                <span class="truncate">{{ $data['branch_scope_label'] ?? implode(', ', $selectedBranchLabels) }}</span>
+                                                <span class="">{{ $data['branch_scope_label'] ?? implode(', ', $selectedBranchLabels) }}</span>
                                             </div>
                                             <div class="flex gap-1 min-w-0">
                                                 <span class="font-semibold shrink-0">{{ $topSummaryLabel }}:</span>
-                                                <span class="truncate">{{ \App\Support\Money::format($topSummaryValue) }}</span>
+                                                <span class="">{{ \App\Support\Money::format($topSummaryValue) }}</span>
                                             </div>
                                         </div>
 
                                         <div class="min-w-0 flex-1 text-center overflow-hidden">
                                             @if (($data['category'] ?? null) === 'customer')
-                                                <div class="name capitalize font-semibold text-[12px] leading-none truncate">{{ $data['name'] }} | {{ $statementPartyCity ?: '-' }}</div>
+                                                <div class="name capitalize font-semibold text-[12px] leading-none ">{{ $data['name'] }} | {{ $statementPartyCity ?: '-' }}</div>
                                                 <div class="mx-auto mt-1 max-w-full text-[10px] font-semibold leading-[1.05] line-clamp-2" title="{{ $statementPartyAddress ?: '-' }}">{{ $statementPartyAddress ?: '-' }}</div>
                                             @else
-                                                <div class="name capitalize font-semibold text-[12px] leading-none truncate">{{ $data['name'] }}</div>
+                                                <div class="name capitalize font-semibold text-[12px] leading-none ">{{ $data['name'] }}</div>
                                             @endif
                                         </div>
 
@@ -262,7 +261,7 @@
                                     </div>
                                 </div>
 
-                                <hr class="w-full my-3 border-gray-700">
+                                <hr class="w-full my-2 border-gray-700">
 
                                 {{-- Table --}}
                                 <div id="preview-body" class="preview-body w-[97%] grow mx-auto">
@@ -305,7 +304,7 @@
                                                     @endphp
                                                     <div>
                                                         @unless($loop->first)
-                                                            <hr class="w-full my-2 border-gray-700">
+                                                            <hr class="w-full my-2 border-gray-700 border-dashed">
                                                         @endunless
                                                         <div
                                                             class="tr flex justify-between w-full px-2.5 text-center gap-1 {{ $isStatementClickable ? 'statement-record-trigger cursor-pointer rounded-md transition-colors hover:bg-slate-100/80' : '' }}"
@@ -320,7 +319,7 @@
                                                             @if(in_array($statementType, ['detailed', 'general']))
                                                                 <div class="td font-medium w-[10%]">{{ $statement['reff_no'] }}</div>
                                                                 <div class="td font-medium w-[10%] capitalize">{{ $isOpeningBalanceEntryRow ? 'Opening Entry' : ($statement['method'] ?? "-") }}</div>
-                                                                <div class="td font-medium w-[33%] text-nowrap truncate {{ $isOpeningBalanceRow ? 'text-left font-semibold' : '' }}">{{ $isOpeningBalanceEntryRow ? 'Opening Balance Entry' : ($statement['description'] ?? "-") }}</div>
+                                                                <div class="td font-medium w-[33%] text-nowrap  {{ $isOpeningBalanceRow ? 'text-left font-semibold' : '' }}">{{ $isOpeningBalanceEntryRow ? 'Opening Balance Entry' : ($statement['description'] ?? "-") }}</div>
                                                             @endif
                                                             <div class="td font-medium w-[10%]">{{ \App\Support\Money::format($statement['bill'] ?? 0) }}</div>
                                                             <div class="td font-medium w-[10%]">{{ \App\Support\Money::format($statement['payment'] ?? 0) }}</div>
@@ -334,7 +333,7 @@
                                 </div>
 
                                 {{-- Footer --}}
-                                <hr class="w-full my-3 border-gray-700">
+                                <hr class="w-full my-2 border-gray-700">
                                 <div class="tfooter flex w-full text-sm px-4 justify-between text-gray-800 leading-none text-xs">
                                     <p>Powered by SparkPair &copy; {{ now()->year }} SparkPair | +92 316 5825495</p>
                                     <p>Page 1 of {{ 1 + $otherPages->count() }}</p>
@@ -344,13 +343,12 @@
                         </div>
                     </div>
 
-                    {{-- Other Pages (32 rows each) --}}
+                    {{-- Other Pages (33 rows each) --}}
                     @foreach ($otherPages as $pageIndex => $chunk)
-                        <hr class="w-full my-3 border-gray-500">
-                        <div class="preview-page w-[210mm] h-[297mm] mx-auto overflow-hidden relative bg-white p-[0.19in] rounded-md">
+                        <hr class="w-full my-2 border-gray-500">
+                        <div class="preview-page w-[210mm] h-[297mm] mx-auto overflow-hidden relative bg-white rounded-md p-2">
                             <div id="preview" class="preview flex flex-col h-full">
-                                <div id="preview-document" class="preview-document flex flex-col h-full px-2">
-
+                                <div id="preview-document" class="preview-document flex flex-col h-full">
                                     {{-- Banner --}}
                                     <div id="preview-banner" class="preview-banner w-full flex justify-between items-center pl-5 pr-8">
                                         <div class="flex items-center gap-3">
@@ -375,13 +373,13 @@
                                                 <div class='text-xs'>{{ $data['name'] }}</div>
                                                 @if (($data['category'] ?? null) === 'customer')
                                                     <div class="text-[10px] leading-tight text-gray-800">{{ $statementPartyCity ?: '-' }}</div>
-                                                    <div class="text-[10px] leading-tight text-gray-800 truncate max-w-[12rem]">{{ $statementPartyAddress ?: '-' }}</div>
+                                                    <div class="text-[10px] leading-tight text-gray-800  max-w-[12rem]">{{ $statementPartyAddress ?: '-' }}</div>
                                                 @endif
                                             </div>
                                         </div>
                                     </div>
 
-                                    <hr class="w-full my-3 border-gray-700">
+                                    <hr class="w-full my-2 border-gray-700">
 
                                     {{-- Table --}}
                                     <div id="preview-body" class="preview-body w-[97%] grow mx-auto">
@@ -424,7 +422,7 @@
                                                         @endphp
                                                         <div>
                                                             @unless($loop->first)
-                                                                <hr class="w-full my-2 border-gray-700">
+                                                                <hr class="w-full my-2 border-gray-700 border-dashed">
                                                             @endunless
                                                             <div
                                                                 class="tr flex justify-between w-full px-2.5 gap-1 text-center {{ $isStatementClickable ? 'statement-record-trigger cursor-pointer rounded-md transition-colors hover:bg-slate-100/80' : '' }}"
@@ -434,7 +432,7 @@
                                                                     tabindex="0"
                                                                 @endif
                                                             >
-                                                                <div class="td font-semibold w-[2.5%]">{{ $loop->iteration + 29 + ($pageIndex * 32) }}.</div>
+                                                                <div class="td font-semibold w-[2.5%]">{{ $loop->iteration + 30 + ($pageIndex * 33) }}.</div>
                                                                 <div class="td font-medium w-[11.5%]">{{ $isOpeningBalanceRow ? ($statementType === 'summarized' ? 'Opening Balance' : '-') : $statement['date']->format('d-M-Y') }}</div>
                                                                 @if(in_array($statementType, ['detailed', 'general']))
                                                                     <div class="td font-medium w-[10%]">{{ $statement['reff_no'] }}</div>
@@ -453,7 +451,7 @@
                                     </div>
 
                                     {{-- Footer --}}
-                                    <hr class="w-full my-3 border-gray-700">
+                                    <hr class="w-full my-2 border-gray-700">
                                     <div class="tfooter flex w-full text-sm px-4 justify-between text-gray-800 leading-none text-xs">
                                         <p>Powered by SparkPair &copy; {{ now()->year }} SparkPair | +92 316 5825495</p>
                                         <p>Page {{ $pageIndex + 2 }} of {{ 1 + $otherPages->count() }}</p>
