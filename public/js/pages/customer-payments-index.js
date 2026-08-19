@@ -62,7 +62,7 @@ function initCustomerPaymentsIndex() {
                     name: 'clear_date',
                     label: 'Clear Date',
                     type: 'date',
-                    min: (data.cheque_date || data.slip_date)?.split('T')[0],
+                    min: (data.date)?.split('T')[0],
                     max: localDateString(),
                     required: true,
                 },
@@ -129,14 +129,8 @@ function initCustomerPaymentsIndex() {
             ],
         };
 
-        if (
-            (data.data.method === 'cheque' || data.data.method === 'slip') &&
-            (
-                (data.data.method === 'cheque' && new Date(data.data.cheque_date) <= new Date()) ||
-                (data.data.method === 'slip' && new Date(data.data.slip_date) <= new Date())
-            )
-        ) {
-            if (data.clear_date == null && data.issued == 'Issued') {
+        if ((data.data.method === 'cheque' || data.data.method === 'slip') && new Date(data.data.date) <= new Date()) {
+            if ((data.clear_date == null || data.clear_date == 'pending' || data.clear_date == 'Pending') && data.issued == 'Issued') {
                 contextMenuData.actions.push(
                     {id: 'clear', text: 'Clear', onclick: `generateClearModal(${JSON.stringify(data)})`},
                 );
@@ -221,14 +215,8 @@ function initCustomerPaymentsIndex() {
             ],
         }
 
-        if (
-            (data.data.method === 'cheque' || data.data.method === 'slip') &&
-            (
-                (data.data.method === 'cheque' && new Date(data.data.cheque_date) <= new Date()) ||
-                (data.data.method === 'slip' && new Date(data.data.slip_date) <= new Date())
-            )
-        ) {
-            if (data.clear_date == 'Pending' && data.issued == 'Issued') {
+        if ((data.data.method === 'cheque' || data.data.method === 'slip') && new Date(data.data.date) <= new Date()) {
+            if ((data.clear_date == null || data.clear_date == 'pending' || data.clear_date == 'Pending') && data.issued == 'Issued') {
                 modalData.bottomActions.push(
                     {id: 'clear', text: 'Clear', onclick: `generateClearModal(${JSON.stringify(data)})`},
                 );
