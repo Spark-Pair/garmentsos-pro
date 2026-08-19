@@ -335,8 +335,8 @@
         });
     });
 
-    window.formatPcsAndPackets = function formatPcsAndPackets(quantity, pcsPerPacket, packets = getPacketsFromPcs(quantity, pcsPerPacket)) {
-        return `${quantity} pcs | ${packets} pkts`;
+    window.formatPcsAndPackets = function formatPcsAndPackets(quantity, pcsPerPacket, divider = '|', packets = getPacketsFromPcs(quantity, pcsPerPacket)) {
+        return `${quantity} pcs ${divider} ${packets} pkts`;
     }
 
     window.getPacketsFromPcs = function getPacketsFromPcs(quantity, pcsPerPacket) {
