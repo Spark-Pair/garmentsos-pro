@@ -115,6 +115,10 @@
                 : document.querySelector("#shipmentBtn");
         moveHighlight(initialBtn, invoiceType === "order" ? "order" : "shipment");
 
+        if (invoiceType === "manual") {
+            return;
+        }
+
         let articlesInInvoice = [];
         let totalQuantityPcs = 0;
         let totalAmount = 0;
@@ -892,7 +896,7 @@
             }
 
             addListenerToPrintAndSaveBtn();
-        } else {
+        } else if (invoiceType === "order") {
             let orderedArticles = [];
             let customerData;
             let orderDeliverTo = '';

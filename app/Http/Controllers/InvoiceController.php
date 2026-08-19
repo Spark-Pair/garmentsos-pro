@@ -85,8 +85,17 @@ class InvoiceController extends Controller
 
         $user = Auth::user();
         $orderNumber = session('orderNumber');
+        $branches = app(ModuleBranchService::class);
+        $invoiceTypeAvailability = [
+            'order' => $branches->isClientModuleEnabled('orders'),
+            'shipment' => $branches->isClientModuleEnabled('shipments'),
+        ];
+        $enabledInvoiceTypes = $branches->enabledWorkflowTypes([
+            'order' => 'orders',
+            'shipment' => 'shipments',
+        ]);
 
-        if ($orderNumber) {
+        if ($orderNumber && $invoiceTypeAvailability['order']) {
             $user->invoice_type = 'order';
             $user->save();
         }
@@ -94,6 +103,15 @@ class InvoiceController extends Controller
         $invoiceType = in_array($user?->invoice_type, ['order', 'shipment'], true)
             ? $user->invoice_type
             : 'order';
+        if (!$invoiceTypeAvailability[$invoiceType]) {
+            $invoiceType = $enabledInvoiceTypes[0] ?? 'manual';
+
+            if ($invoiceType !== 'manual' && $user) {
+                $user->invoice_type = $invoiceType;
+                $user->save();
+            }
+        }
+        $showInvoiceTypeSwitcher = collect($invoiceTypeAvailability)->filter()->count() > 1;
 
         $last_Invoice = Invoice::orderBy('id', 'desc')->first();
 
@@ -107,28 +125,37 @@ class InvoiceController extends Controller
         }
         $nextInvoiceNo = app(BranchSerialService::class)->next('invoices', Invoice::class, 'invoice_no', 'INV');
 
-        $branches = app(ModuleBranchService::class);
-        $customers = $branches->applyRelatedScope(Customer::with('user'), 'customers', 'invoices')
+        $customers = $branches->applyRelatedScope(Customer::with(['user', 'city']), 'customers', 'invoices')
             ->whereIn('category', ['regular', 'site'])->whereHas('user', function ($query) {
             $query->where('status', 'active');
         })->get();
 
-        $ordersOptions = $branches->applyRelatedScope(Order::query(), 'orders', 'invoices')
-            ->where('status', '!=', 'invoiced')
-            ->orderByDesc('id')
-            ->pluck('order_no', 'order_no')
-            ->map(fn ($orderNo) => ['text' => $orderNo])
+        $customerOptions = $customers
+            ->mapWithKeys(fn (Customer $customer) => [
+                $customer->id => ['text' => trim($customer->customer_name . ' | ' . ($customer->city?->title ?? '-'))],
+            ])
             ->toArray();
 
-        $shipmentsOptions = $branches->applyRelatedScope(Shipment::query(), 'shipments', 'invoices')
-            ->orderByDesc('id')
-            ->pluck('shipment_no', 'shipment_no')
-            ->map(fn ($shipmentNo) => ['text' => $shipmentNo])
-            ->toArray();
+        $ordersOptions = $invoiceTypeAvailability['order']
+            ? $branches->applyRelatedScope(Order::query(), 'orders', 'invoices')
+                ->where('status', '!=', 'invoiced')
+                ->orderByDesc('id')
+                ->pluck('order_no', 'order_no')
+                ->map(fn ($orderNo) => ['text' => $orderNo])
+                ->toArray()
+            : [];
+
+        $shipmentsOptions = $invoiceTypeAvailability['shipment']
+            ? $branches->applyRelatedScope(Shipment::query(), 'shipments', 'invoices')
+                ->orderByDesc('id')
+                ->pluck('shipment_no', 'shipment_no')
+                ->map(fn ($shipmentNo) => ['text' => $shipmentNo])
+                ->toArray()
+            : [];
 
         $branchBranding = app(ModuleBranchService::class)->documentBranding('invoices');
 
-        return view("invoices.generate", compact("last_Invoice", 'customers', 'orderNumber', 'branchBranding', 'nextInvoiceNo', 'ordersOptions', 'shipmentsOptions', 'invoiceType'));
+        return view("invoices.generate", compact("last_Invoice", 'customers', 'customerOptions', 'orderNumber', 'branchBranding', 'nextInvoiceNo', 'ordersOptions', 'shipmentsOptions', 'invoiceType', 'invoiceTypeAvailability', 'showInvoiceTypeSwitcher'));
     }
 
     /**
@@ -356,6 +383,7 @@ class InvoiceController extends Controller
         }
 
         $invoiceNumbers = [];
+        $branches = app(ModuleBranchService::class);
 
         /*
         |--------------------------------------------------------------------------
@@ -363,6 +391,12 @@ class InvoiceController extends Controller
         |--------------------------------------------------------------------------
         */
         if ($request->filled('order_no')) {
+            if (!$branches->isClientModuleEnabled('orders')) {
+                return redirect()
+                    ->back()
+                    ->withInput()
+                    ->with('error', 'Order invoices are disabled because Orders module is disabled.');
+            }
 
             $validator = Validator::make($request->all(), [
                 'invoice_no' => 'required|string',
@@ -501,6 +535,12 @@ class InvoiceController extends Controller
         |--------------------------------------------------------------------------
         */
         if ($request->filled('shipment_no')) {
+            if (!$branches->isClientModuleEnabled('shipments')) {
+                return redirect()
+                    ->back()
+                    ->withInput()
+                    ->with('error', 'Shipment invoices are disabled because Shipments module is disabled.');
+            }
 
             $validator = Validator::make($request->all(), [
                 'shipment_no' => 'required|string',
@@ -787,6 +827,47 @@ class InvoiceController extends Controller
                     count($createdInvoices) .
                     ' shipment invoice(s) generated successfully.'
                 );
+        }
+
+        if (!$branches->isClientModuleEnabled('orders') && !$branches->isClientModuleEnabled('shipments')) {
+            $validator = Validator::make($request->all(), [
+                'invoice_no' => 'required|string',
+                'customer_id' => 'required|integer|exists:customers,id',
+                'date' => 'required|date',
+                'netAmount' => 'required|string',
+            ]);
+
+            if ($validator->fails()) {
+                return redirect()
+                    ->back()
+                    ->withErrors($validator)
+                    ->withInput()
+                    ->with('error', $validator->errors()->first());
+            }
+
+            $invoice = Invoice::create([
+                'invoice_no' => $branches->shouldFilterRecords('invoices')
+                    ? app(BranchSerialService::class)->next('invoices', Invoice::class, 'invoice_no', 'INV')
+                    : $request->invoice_no,
+                'order_no' => null,
+                'shipment_no' => null,
+                'date' => $request->date,
+                'netAmount' => (int) str_replace(',', '', $request->netAmount),
+                'customer_id' => (int) $request->customer_id,
+                'branch_id' => $branches->branchIdForCreate('invoices'),
+            ]);
+
+            $this->notifyCustomerAboutInvoice((int) $request->customer_id, $invoice->invoice_no);
+
+            if ($request->boolean('printAfterSave')) {
+                session()->put('invoiceNumbers', [$invoice->invoice_no]);
+
+                return redirect()->route('invoices.print');
+            }
+
+            return redirect()
+                ->route('invoices.create')
+                ->with('success', 'Manual invoice generated successfully.');
         }
 
         /*

@@ -64,6 +64,7 @@
         $errorAlertTemplate = view('components.alert', ['type' => 'error', 'messages' => '__MESSAGE__'])->render();
     @endphp
 
+    @if ($showInvoiceTypeSwitcher)
     <div class="switch-btn-container absolute top-3 md:top-17 left-3 md:left-5 z-[100]">
         <div class="switch-btn relative flex border-3 border-[var(--secondary-bg-color)] bg-[var(--secondary-bg-color)] rounded-2xl overflow-hidden">
             <!-- Highlight rectangle -->
@@ -90,6 +91,7 @@
             </button>
         </div>
     </div>
+    @endif
 
     <!-- Main Content -->
     <!-- Progress Bar -->
@@ -112,12 +114,19 @@
                         <div class="grow">
                             <x-select label="Shipment Number" name="shipment_no" id="shipment_no" :options="$shipmentsOptions" required showDefault withButton btnId="selectCustomersBtn" btnText="Select Customers" />
                         </div>
-                    @else
+                    @elseif ($invoiceType === 'order')
                         <div class="grow">
                             <x-select label="Order Number" name="order_no" id="order_no" :options="$ordersOptions" :value="$orderNumber ?? ''" required showDefault withButton btnId="generateInvoiceBtn" btnText="Generate Invoice" />
                         </div>
+                    @else
+                        <div class="grow grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <x-input label="Invoice No" name="invoice_no" id="invoice_no" :value="$nextInvoiceNo ?? $last_Invoice?->invoice_no" required />
+                            <x-select label="Customer" name="customer_id" id="customer_id" :options="$customerOptions" required showDefault />
+                            <x-input label="Net Amount" name="netAmount" id="manual_net_amount" type="number" min="0" value="0" required />
+                        </div>
                     @endif
                 </div>
+                @if ($invoiceType !== 'manual')
                 {{-- rate showing --}}
                 <div id="article-table" class="w-full text-left text-sm">
                     <div class="flex justify-between items-center bg-[var(--h-bg-color)] rounded-lg py-2 px-4 mb-4">
@@ -138,7 +147,9 @@
 
                 <input type="hidden" id="customers_array" name="customers_array">
                 <input type="hidden" name="articles_in_invoice" id="articles_in_invoice" value="">
+                @endif
 
+                @if ($invoiceType !== 'manual')
                 <div class="flex w-full grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-nowrap">
                     <div class="total-qty flex justify-between items-center border border-gray-600 cursor-not-allowed rounded-lg py-2 px-4 w-full">
                         <div class="grow">Total Quantity - Pcs</div>
@@ -158,6 +169,12 @@
                             class="text-right bg-transparent outline-none w-1/2 border-none" />
                     </div>
                 </div>
+                @endif
+                @if ($invoiceType === 'manual')
+                    <div class="flex justify-end">
+                        <button type="submit" class="px-4 py-2 bg-[var(--primary-color)] text-white font-medium rounded-lg hover:bg-[var(--h-primary-color)] hover:scale-95 transition-all duration-300 ease-in-out cursor-pointer">Save Invoice</button>
+                    </div>
+                @endif
             </div>
 
         <!-- Step 2: view order -->
