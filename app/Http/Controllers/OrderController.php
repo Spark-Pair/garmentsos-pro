@@ -659,4 +659,55 @@ class OrderController extends Controller
 
         return $supports ??= Schema::hasColumn('orders', 'deliver_to');
     }
+
+    public function customerArticleHistory(Request $request)
+    {
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant', 'customer'])) {
+            return $resp;
+        }
+
+        $customerId = (int) $request->customer_id;
+
+        if ($this->isCustomerRole()) {
+            $customer = $this->currentCustomer();
+            if (!$customer || (int) $customer->id !== $customerId) {
+                return response()->json(['status' => 'error', 'message' => 'Customer account not linked with this user.'], 403);
+            }
+        }
+
+        if (!$customerId) {
+            return response()->json(['status' => 'success', 'history' => []]);
+        }
+
+        $excludeOrderId = $request->filled('exclude_order_id') ? (int) $request->exclude_order_id : null;
+
+        $ordersQuery = app(ModuleBranchService::class)
+            ->applyScope(Order::query(), 'orders')
+            ->where('customer_id', $customerId)
+            ->with('articles:id,order_id,article_id');
+
+        if ($excludeOrderId) {
+            $ordersQuery->where('id', '!=', $excludeOrderId);
+        }
+
+        $orders = $ordersQuery->get(['id', 'order_no', 'customer_id']);
+
+        $history = [];
+        foreach ($orders as $order) {
+            foreach ($order->articles as $orderArticle) {
+                $articleId = (int) $orderArticle->article_id;
+                $history[$articleId] ??= [];
+                if (!in_array($order->order_no, $history[$articleId], true)) {
+                    $history[$articleId][] = $order->order_no;
+                }
+            }
+        }
+
+        $history = collect($history)->map(fn ($orderNos) => [
+            'count' => count($orderNos),
+            'order_nos' => $orderNos,
+        ]);
+
+        return response()->json(['status' => 'success', 'history' => $history]);
+    }
 }

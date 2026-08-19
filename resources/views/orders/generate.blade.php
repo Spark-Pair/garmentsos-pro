@@ -102,6 +102,7 @@
             defaultOrderDiscountPercent: @json($defaultOrderDiscount ?? 0),
             companyData: @json($branchBranding ?? $client_company),
             ordersCreateUrl: '{{ route("orders.create") }}',
+            customerArticleHistoryUrl: '{{ route("orders.customer-article-history") }}',
             companyLogoBase: '{{ asset("images") }}',
             isCustomerRole: @json($isCustomerPortalOrder),
             maxArticlesAlertHtml: @json('<div class="bg-[var(--danger-color)]/10 border border-[var(--danger-color)] text-[var(--danger-color)] text-xs px-3 py-2 rounded-lg">You have reached the maximum allowed number of 500 articles.</div>'),

@@ -172,6 +172,7 @@ Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensur
     Route::post('update-image', [ArticleController::class, 'updateImage'])->middleware('moduleEnabled:articles')->name('update-image');
     Route::post('add-rate', [ArticleController::class, 'addRate'])->middleware('moduleEnabled:articles')->name('add-rate');
 
+    Route::get('orders/customer-article-history', [OrderController::class, 'customerArticleHistory'])->name('orders.customer-article-history');
     Route::resource('orders', OrderController::class);
 
     Route::resource('shipments', ShipmentController::class);

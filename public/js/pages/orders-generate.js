@@ -18,6 +18,55 @@
     let totalQuantityDOM;
     let totalAmountDOM;
 
+    let customerArticleHistory = {};
+
+    function fetchCustomerArticleHistory(customerId) {
+        console.log(customerId);
+        
+        customerArticleHistory = {};
+        if (!customerId) return;
+
+        $.ajax({
+            url: window.__ordersGenerate?.customerArticleHistoryUrl || '',
+            method: 'GET',
+            data: { customer_id: customerId },
+            success: function (response) {
+                console.log(response);
+                
+                customerArticleHistory = response.history || {};
+                applyHistoryLabels();
+            },
+        });
+    }
+
+    function articleHistoryBadgeText(history) {
+        if (!history || !history.count) return '';
+        return history.count === 1 ? `Prev #${history.order_nos[0]}` : `Prev x${history.count}`;
+    }
+
+    function articleHistoryTitle(history) {
+        if (!history || !history.count) return '';
+        return history.count === 1
+            ? `Already ordered in Order #${history.order_nos[0]}`
+            : `Already ordered in ${history.count} previous orders: ${history.order_nos.join(', ')}`;
+    }
+
+    function applyHistoryLabels() {
+        document.querySelectorAll('#modalForm .card .history-label').forEach(el => el.remove());
+
+        Object.keys(customerArticleHistory).forEach(articleId => {
+            const history = customerArticleHistory[articleId];
+            const card = document.getElementById(articleId);
+            if (!card || !history?.count) return;
+
+            card.innerHTML += `
+                <div class="history-label absolute text-xs text-[var(--border-warning)] top-2 right-2 min-h-[1rem] rounded-md bg-[var(--secondary-bg-color)]/90 px-1.5 py-0.5" title="${articleHistoryTitle(history)}">
+                    ${articleHistoryBadgeText(history)}
+                </div>
+            `;
+        });
+    }
+
     function isArticleAlreadySelected(articleId) {
         return selectedArticles.some(a => a.id == articleId);
     }
@@ -50,6 +99,7 @@
                 ?.getAttribute('data-option');
 
             customerData = JSON.parse(customerDataDom || '{}');
+            fetchCustomerArticleHistory(customerData?.id || elem.value);
             selectedArticles = [];
             totalOrderedQuantity = 0;
             totalOrderAmount = 0;
@@ -72,6 +122,7 @@
             cards: { data: cardData.filter(item => item.name.toLowerCase().includes(searchValue.toLowerCase())) },
         };
         renderCardsInModal(modalData);
+        applyHistoryLabels();
     };
 
     if (generateOrderBtn) {
@@ -187,6 +238,8 @@
             previousQuantityLabel.remove();
         });
 
+        applyHistoryLabels();
+
         if (selectedArticles.length > 0) {
             selectedArticles.forEach(selectedArticle => {
                 const card = document.getElementById(selectedArticle.id);
@@ -194,7 +247,7 @@
                 if (card && !quantityLabelDom) {
                     card.innerHTML += `
                             <div
-                                class="quantity-label absolute text-xs text-[var(--border-success)] top-1 right-2 h-[1rem]">
+                                class="quantity-label absolute text-xs text-[var(--border-success)] top-2 right-2 min-h-[1rem] rounded-md bg-[var(--secondary-bg-color)]/90 px-1.5 py-0.5">
                                 ${selectedArticle.orderedQuantity} Pcs
                             </div>
                         `;
@@ -217,6 +270,12 @@
     window.generateQuantityModal = function generateQuantityModal(elem) {
         const data = JSON.parse(elem.dataset.json).data;
         const alreadySelected = isArticleAlreadySelected(data.id);
+        const history = customerArticleHistory[data.id];
+        const historyText = history?.count
+            ? (history.count === 1
+                ? `Already ordered before in Order #${history.order_nos[0]}`
+                : `Already ordered before in ${history.count} orders: ${history.order_nos.join(', ')}`)
+            : 'No previous order of this article for this customer';
 
         if (limitOfArticles > 0 || alreadySelected) {
             const modalData = {
@@ -229,6 +288,13 @@
                         value: `${data.article_no} | ${data.season} | ${data.size} | ${data.category} | ${data.fabric_type} | ${data.quantity} | ${formatMoney(data.sales_rate)} - Rs.`,
                         disabled: true,
                         full: true,
+                    },
+                    { 
+                        category: 'input',
+                        label: 'Order History',
+                        value: historyText,
+                        disabled: true,
+                        full: true
                     },
                     {
                         category: 'input',
@@ -251,7 +317,7 @@
                     {
                         category: 'input',
                         label: 'B. C.',
-                        value: `${formatPcsAndPackets(data.b_c_quantity, data.pcs_per_packet)}`,
+                        value: `${formatPcsAndPackets(data.b_c_quantity, data.pcs_per_packet, '-')}`,
                         disabled: true,
                     },
                     {
@@ -284,8 +350,8 @@
                                 ? Math.floor(Number(data.orderable_quantity || 0) / Number(data.pcs_per_packet || 0))
                                 : 0}) {
                                 this.value = ${Number(data.pcs_per_packet || 0)
-                                    ? Math.floor(Number(data.orderable_quantity || 0) / Number(data.pcs_per_packet || 0))
-                                    : 0};
+                                ? Math.floor(Number(data.orderable_quantity || 0) / Number(data.pcs_per_packet || 0))
+                                : 0};
                             }
                             syncArticleQuantityPair('packets', ${Number(data.pcs_per_packet || 0)}, ${Number(data.orderable_quantity || 0)});
                         `,
@@ -343,7 +409,7 @@
                     quantityLabel.textContent = `${quantity} Pcs`;
                 } else {
                     targetCard.innerHTML += `
-                            <div class="quantity-label absolute text-xs text-[var(--border-success)] top-1 right-2 h-[1rem]">
+                            <div class="quantity-label absolute text-xs text-[var(--border-success)] top-2 right-2 min-h-[1rem] rounded-md bg-[var(--secondary-bg-color)]/90 px-1.5 py-0.5">
                                 ${quantity} Pcs
                             </div>
                         `;
@@ -524,7 +590,7 @@
     let orderDate;
     const previewContainer = document.getElementById('preview-container');
 
-function generateOrderNo() {
+    function generateOrderNo() {
         return safeDocumentNumberPreview(
             window.__ordersGenerate?.nextOrderNo || incrementDocumentNumber(lastOrder?.order_no, 1)
         );
@@ -663,7 +729,7 @@ function generateOrderNo() {
                 const selectedCard = selectedArticles.find(item => item.id === cardData.id);
 
                 card.innerHTML += `
-                        <div class="quantity-label absolute text-xs text-[var(--border-success)] top-1 right-2 h-[1rem]">
+                        <div class="quantity-label absolute text-xs text-[var(--border-success)] top-2 right-2 min-h-[1rem] rounded-md bg-[var(--secondary-bg-color)]/90 px-1.5 py-0.5">
                             ${selectedCard.orderedQuantity} Pcs
                         </div>
                     `;

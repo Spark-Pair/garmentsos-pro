@@ -135,6 +135,7 @@
             order: @json($orderPayload),
             companyData: @json($branchBranding ?? $client_company),
             ordersCreateUrl: '{{ route("orders.create") }}',
+            customerArticleHistoryUrl: '{{ route("orders.customer-article-history") }}',
             companyLogoBase: '{{ asset("images") }}',
             isDeveloper: @json($isDeveloper),
             canChangeCustomer: @json($canChangeCustomer),

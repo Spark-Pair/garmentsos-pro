@@ -15,6 +15,54 @@
     let totalQuantityDOM;
     let totalAmountDOM;
 
+    let customerArticleHistory = {};
+
+    function fetchCustomerArticleHistory(customerId) {
+        customerArticleHistory = {};
+        if (!customerId) return;
+
+        $.ajax({
+            url: window.__ordersEdit?.customerArticleHistoryUrl || '',
+            method: 'GET',
+            data: {
+                customer_id: customerId,
+                exclude_order_id: order?.id,   // <-- current order skip
+            },
+            success: function (response) {
+                customerArticleHistory = response.history || {};
+                applyHistoryLabels();
+            },
+        });
+    }
+
+    function articleHistoryBadgeText(history) {
+        if (!history || !history.count) return '';
+        return history.count === 1 ? `Prev #${history.order_nos[0]}` : `Prev x${history.count}`;
+    }
+
+    function articleHistoryTitle(history) {
+        if (!history || !history.count) return '';
+        return history.count === 1
+            ? `Already ordered in Order #${history.order_nos[0]}`
+            : `Already ordered in ${history.count} previous orders: ${history.order_nos.join(', ')}`;
+    }
+
+    function applyHistoryLabels() {
+        document.querySelectorAll('#modalForm .card .history-label').forEach(el => el.remove());
+
+        Object.keys(customerArticleHistory).forEach(articleId => {
+            const history = customerArticleHistory[articleId];
+            const card = document.getElementById(articleId);
+            if (!card || !history?.count) return;
+
+            card.innerHTML += `
+                <div class="history-label absolute text-xs text-[var(--border-warning)] top-2 right-2 min-h-[1rem] rounded-md bg-[var(--secondary-bg-color)]/90 px-1.5 py-0.5" title="${articleHistoryTitle(history)}">
+                    ${articleHistoryBadgeText(history)}
+                </div>
+            `;
+        });
+    }
+
     function isArticleAlreadySelected(articleId) {
         return selectedArticles.some(a => a.id == articleId);
     }
@@ -224,6 +272,7 @@
 
             try {
                 customerData = JSON.parse(customerDataDom || '{}') || order.customer;
+                fetchCustomerArticleHistory(customerData?.id || elem.value);
             } catch (_) {
                 customerData = order?.customer || null;
             }
@@ -245,6 +294,7 @@
         };
         renderCardsInModal(modalData);
         applySelectedArticleLabels();
+        applyHistoryLabels();
     };
 
     if (generateOrderBtn) {
@@ -299,6 +349,7 @@
         totalAmountDOM = document.querySelector('#modalForm #totalOrderAmount');
 
         applySelectedArticleLabels();
+        applyHistoryLabels();
 
         calculateTotalOrderedQuantity();
         calculateTotalOrderAmount();
@@ -322,7 +373,7 @@
             const invoicedPcs = Number(selectedArticle.dispatched_pcs || 0);
             const invoicedText = invoicedPcs > 0 ? ` | Inv ${formatNumbersDigitLess(invoicedPcs)}` : '';
             card.innerHTML += `
-                <div class="quantity-label absolute text-xs text-[var(--border-success)] top-1 right-2 min-h-[1rem] rounded-md bg-[var(--secondary-bg-color)]/90 px-1.5 py-0.5">
+                <div class="quantity-label absolute text-xs text-[var(--border-success)] top-2 right-2 min-h-[1rem] rounded-md bg-[var(--secondary-bg-color)]/90 px-1.5 py-0.5">
                     ${formatNumbersDigitLess(selectedArticle.ordered_pcs)} Pcs${invoicedText}
                 </div>
             `;
@@ -368,7 +419,7 @@
                     {
                         category: 'input',
                         label: 'B. C.',
-                        value: `${formatPcsAndPackets(data.b_c_quantity, data.pcs_per_packet)}`,
+                        value: `${formatPcsAndPackets(data.b_c_quantity, data.pcs_per_packet, '-')}`,
                         disabled: true,
                     },
                     {
@@ -790,6 +841,7 @@
         order = data?.order || null;
         companyData = data?.companyData || null;
         customerData = order?.customer || null;
+        fetchCustomerArticleHistory(order?.customer?.id);
 
         if (order?.articles?.length) {
             selectedArticles = order.articles.map(item => ({
