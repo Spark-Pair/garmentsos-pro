@@ -378,59 +378,6 @@ class Customer extends Model
                 ['created_at', 'asc'],
             ])->values();
         } elseif ($type === 'general') {
-            // 🔹 Detailed invoices + voucher-wise payments
-            foreach ($invoices as $i) {
-                $statement->push([
-                    'date' => $i->date,
-                    'reff_no' => $i->invoice_no,
-                    'type' => 'invoice',
-                    'method' => 'Invoice',
-                    'bill' => (float) $i->netAmount,
-                    'payment' => 0,
-                    'created_at' => $i->created_at,
-                    'source' => [
-                        'type' => 'invoice',
-                        'id' => $i->id,
-                    ],
-                ]);
-            }
-
-            $paymentGroups = $payments->groupBy(function ($p) {
-                return $p->cheque_no ?? $p->slip_no ?? $p->transaction_id ?? $p->reff_no ?? $p->id;
-            });
-
-            foreach ($paymentGroups as $voucherNo => $group) {
-                $first = $group->sortBy('created_at')->first();
-                $statement->push([
-                    'date' => $first->date,
-                    'reff_no' => $voucherNo,
-                    'type' => 'payment',
-                    'method' => $first->method,
-                    'payment' => (float) $group->sum('amount'),
-                    'bill' => 0,
-                    'description' => $paymentDescription($first),
-                    'created_at' => $first->created_at,
-                    'source' => [
-                        'type' => 'customer_payment',
-                        'id' => $first->id,
-                    ],
-                ]);
-            }
-
-            foreach ($salesReturns as $salesReturn) {
-                $statement->push($salesReturnRow($salesReturn));
-            }
-
-            foreach ($adjustments as $adjustment) {
-                $statement->push($formatAdjustment($adjustment));
-            }
-
-            $statement = $statement->sortBy([
-                ['date', 'asc'],
-                ['created_at', 'asc'],
-            ])->values();
-        } else {
-            // 🔹 Detailed mode
             foreach ($invoices as $i) {
                 $statement->push([
                     'date' => $i->date,
@@ -465,6 +412,86 @@ class Customer extends Model
                 ]);
             }
 
+            $salesReturnGroups = $salesReturns->groupBy(
+                fn($r) => Carbon::parse($r->date)->toDateString() . '|' . $r->type
+            );
+
+            foreach ($salesReturnGroups as $key => $group) {
+                $first = $group->sortBy('created_at')->first();
+                $last = $group->sortBy('created_at')->last();
+                $statement->push([
+                    'date' => $first->date,
+                    'reff_no' => $first->id . '-' . $last->id,
+                    'type' => 'payment',
+                    'method' => 'return',
+                    'payment' => (float) $group->sum('amount'),
+                    'bill' => 0,
+                    'description' => ($first->type === 'adjustment' ? 'Sales adjustment' : 'Sales return') . ' | ' . $first->id . '-' . $last->id,
+                    'created_at' => $first->created_at,
+                    'source' => [
+                        'type' => 'sales_return',
+                        'id' => $first->id,
+                        'ids' => $group->pluck('id')->all(),
+                    ],
+                ]);
+            }
+
+            foreach ($adjustments as $adjustment) {
+                $statement->push($formatAdjustment($adjustment));
+            }
+
+            // Sort by date then created_at
+            $statement = $statement->sortBy([
+                ['date', 'asc'],
+                ['created_at', 'asc'],
+            ])->values();
+        } else {
+            foreach ($invoices as $i) {
+                foreach ($i->invoiceArticles as $article) {
+                    $rawArticle = $article->article;
+                    $salesRate = (float) ($rawArticle->sales_rate ?? 0);
+                    $discountPercent = (float) ($i->shipment?->discount ?? $i->order?->discount ?? 0);
+
+                    $grossAmount = (float) $article->invoice_pcs * $salesRate;
+                    $netAmount = $grossAmount - ($grossAmount * $discountPercent / 100);
+
+                    $statement->push([
+                        'date' => $i->date,
+                        'reff_no' => $rawArticle->article_no,
+                        'type' => 'invoice',
+                        'method' => 'Invoice',
+                        'bill' => (float) $netAmount,
+                        'payment' => 0,
+                        'description' => $i->invoice_no
+                            . ' | ' . \App\Support\Money::format($grossAmount)
+                            . ' | ' . rtrim(rtrim(number_format($discountPercent, 2), '0'), '.') . '%',
+                        'created_at' => $i->created_at,
+                        'source' => [
+                            'type' => 'invoice_article',
+                            'id' => $article->id,
+                            'invoice_id' => $i->id,
+                        ],
+                    ]);
+                }
+            }
+
+            foreach ($payments as $p) {
+                $statement->push([
+                    'date' => $p->date,
+                    'reff_no' => $p->cheque_no ?? $p->slip_no ?? $p->transaction_id ?? $p->reff_no,
+                    'type' => 'payment',
+                    'method' => $p->method,
+                    'payment' => (float) $p->amount,
+                    'bill' => 0,
+                    'description' => $paymentDescription($p),
+                    'created_at' => $p->created_at,
+                    'source' => [
+                        'type' => 'customer_payment',
+                        'id' => $p->id,
+                    ],
+                ]);
+            }
+
             foreach ($salesReturns as $salesReturn) {
                 $statement->push($salesReturnRow($salesReturn));
             }
@@ -473,7 +500,6 @@ class Customer extends Model
                 $statement->push($formatAdjustment($adjustment));
             }
 
-            // Sort by date then created_at
             $statement = $statement->sortBy([
                 ['date', 'asc'],
                 ['created_at', 'asc'],

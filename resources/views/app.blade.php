@@ -239,7 +239,7 @@
         .gos-overlay-scrollbar-thumb {
             position: fixed;
             z-index: 10050;
-            width: 6px;
+            width: 8px;
             min-height: 32px;
             border-radius: 999px;
             background: linear-gradient(
@@ -247,7 +247,6 @@
                 var(--primary-color),
                 var(--h-primary-color)
             );
-            box-shadow: 0 0 0 1px var(--glass-border-color);
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.18s ease, background 0.18s ease;
