@@ -327,6 +327,21 @@
                                                         </div>
                                                     </div>
                                                 @endforeach
+                                                @if ($otherPages->isEmpty())
+                                                    <hr class="w-full my-2 border-gray-700 border-dashed">
+                                                    <div class="tr flex justify-between w-full px-2.5 gap-1 text-center font-bold rounded-md">
+                                                        <div class="td w-[2.5%]"></div>
+                                                        <div class="td w-[12.5%] text-left">Total</div>
+                                                        @if(in_array($statementType, ['detailed', 'general']))
+                                                            <div class="td w-[10%]"></div>
+                                                            <div class="td w-[10%]"></div>
+                                                            <div class="td w-[33%]"></div>
+                                                        @endif
+                                                        <div class="td w-[10%]">{{ \App\Support\Money::format($data['totals']['bill']) }}</div>
+                                                        <div class="td w-[10%]">{{ \App\Support\Money::format($data['totals']['payment']) }}</div>
+                                                        <div class="td w-[10%]">{{ \App\Support\Money::format($data['closing_balance']) }}</div>
+                                                    </div>
+                                                @endif
                                             </div>
                                         </div>
                                     </div>
@@ -445,6 +460,21 @@
                                                             </div>
                                                         </div>
                                                     @endforeach
+                                                    @if ($loop->last)
+                                                        <hr class="w-full my-2 border-gray-700 border-dashed">
+                                                        <div class="tr flex justify-between w-full px-2.5 gap-1 text-center font-bold rounded-md">
+                                                            <div class="td w-[2.5%]"></div>
+                                                            <div class="td w-[12.5%] text-left">Total</div>
+                                                            @if(in_array($statementType, ['detailed', 'general']))
+                                                                <div class="td w-[10%]"></div>
+                                                                <div class="td w-[10%]"></div>
+                                                                <div class="td w-[33%]"></div>
+                                                            @endif
+                                                            <div class="td w-[10%]">{{ \App\Support\Money::format($data['totals']['bill']) }}</div>
+                                                            <div class="td w-[10%]">{{ \App\Support\Money::format($data['totals']['payment']) }}</div>
+                                                            <div class="td w-[10%]">{{ \App\Support\Money::format($data['closing_balance']) }}</div>
+                                                        </div>
+                                                    @endif
                                                 </div>
                                             </div>
                                         </div>
