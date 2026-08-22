@@ -49,7 +49,9 @@ class CargoController extends Controller
                 'date' => 'required|date',
                 'cargo_id' => 'nullable|integer|exists:cargos,id',
             ]);
-            $cargo = isset($validated['cargo_id']) ? Cargo::find($validated['cargo_id']) : null;
+
+            $cargo = !empty($validated['cargo_id']) ? Cargo::find($validated['cargo_id']) : null;
+
             if ($cargo) {
                 app(ModuleBranchService::class)->assertRecordInAllowedBranch($cargo, 'cargo');
             }
@@ -60,11 +62,15 @@ class CargoController extends Controller
         }
 
         $invoices = collect();
+        $cargo = null;
+        $selectedInvoices = collect();
 
         $last_cargo = new Cargo();
         $last_cargo->cargo_no = app(BranchSerialService::class)->next('cargo', Cargo::class, 'cargo_no', null, 4);
 
-        return view('cargos.generate', compact('invoices', 'last_cargo'));
+        $branchBranding = app(ModuleBranchService::class)->documentBranding('cargos');
+
+        return view('cargos.generate', compact('cargo', 'invoices', 'selectedInvoices', 'last_cargo', 'branchBranding'));
     }
 
     private function availableInvoiceOptions(?Cargo $cargo = null, ?string $date = null)
@@ -78,14 +84,19 @@ class CargoController extends Controller
 
         return $branches->applyRelatedScope(Invoice::with('customer.city'), 'invoices', 'cargo')
             ->whereNotNull('shipment_no')
-            ->when($date, fn ($query) => $query->whereDate('date', '<=', $date))
-            ->where(function ($query) use ($selectedInvoiceIds) {
-                $query->whereNull('cargo_name')
-                    ->orWhere('cargo_name', '');
-
+            ->where(function ($query) use ($selectedInvoiceIds, $date) {
+                // already-selected invoices: always include, regardless of date
                 if ($selectedInvoiceIds->isNotEmpty()) {
-                    $query->orWhereIn('id', $selectedInvoiceIds);
+                    $query->whereIn('id', $selectedInvoiceIds);
                 }
+
+                // otherwise: unassigned invoices within the date cutoff
+                $query->orWhere(function ($q) use ($date) {
+                    $q->where(function ($q2) {
+                        $q2->whereNull('cargo_name')->orWhere('cargo_name', '');
+                    })
+                    ->when($date, fn ($q2) => $q2->whereDate('date', '<=', $date));
+                });
             })
             ->get()
             ->map(fn ($invoice) => $this->formatInvoiceOptionPayload($invoice))
@@ -189,7 +200,9 @@ class CargoController extends Controller
             ->values();
         $last_cargo = $cargo;
 
-        return view('cargos.generate', compact('cargo', 'invoices', 'selectedInvoices', 'last_cargo'));
+        $branchBranding = app(ModuleBranchService::class)->documentBranding('cargos');
+
+        return view('cargos.generate', compact('cargo', 'invoices', 'selectedInvoices', 'last_cargo', 'branchBranding'));
     }
 
     /**

@@ -90,7 +90,7 @@
             isEdit: @json($isEdit),
             lastCargo: @json($last_cargo),
             cargo: @json($cargo ?? null),
-            companyData: @json($client_company),
+            companyData: @json(!empty($branchBranding) ? $branchBranding : $client_company),
             invoices: @json($invoices),
             invoicesUrl: @json(route('cargos.create')),
             selectedInvoices: @json($selectedInvoices ?? []),
