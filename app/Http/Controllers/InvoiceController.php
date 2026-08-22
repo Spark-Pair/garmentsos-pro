@@ -893,6 +893,159 @@ class InvoiceController extends Controller
     }
 
     /**
+     * Everything else in the system that references this invoice, with enough
+     * detail to show the user exactly what's linked and why an edit might be
+     * restricted.
+     */
+    protected function relatedRecordsSummary(Invoice $invoice): array
+    {
+        $invoice->loadMissing(['bilty', 'salesReturns.article']);
+
+        $bilty = $invoice->bilty ? [
+            'id' => $invoice->bilty->id,
+            'bilty_no' => $invoice->bilty->bilty_no,
+            'date' => optional($invoice->bilty->date)->format('Y-m-d'),
+        ] : null;
+
+        $salesReturns = $invoice->salesReturns->map(fn ($sr) => [
+            'id' => $sr->id,
+            'article_id' => (int) $sr->article_id,
+            'article_no' => $sr->article?->article_no,
+            'type' => $sr->type,
+            'quantity' => (int) $sr->quantity,
+            'amount' => $sr->amount,
+            'date' => optional($sr->date)->format('Y-m-d'),
+        ])->values()->all();
+
+        $cargoRows = DB::table('cargos')
+            ->where('invoices_array', 'like', '%"id":' . $invoice->id . '%')
+            ->orWhere('invoices_array', 'like', '%"id":"' . $invoice->id . '"%')
+            ->get(['id', 'cargo_no', 'cargo_name', 'date']);
+
+        $cargoLists = $cargoRows->map(fn ($row) => [
+            'id' => $row->id,
+            'cargo_no' => $row->cargo_no,
+            'cargo_name' => $row->cargo_name,
+            'date' => $row->date,
+        ])->values()->all();
+
+        $returnedQtyByArticle = collect($salesReturns)
+            ->groupBy('article_id')
+            ->map(fn ($rows) => collect($rows)->sum('quantity'));
+
+        return [
+            'bilty' => $bilty,
+            'sales_returns' => $salesReturns,
+            'cargo_lists' => $cargoLists,
+            'returned_quantities_by_article' => $returnedQtyByArticle,
+            'has_bilty' => $bilty !== null,
+            'has_sales_returns' => count($salesReturns) > 0,
+            'has_cargo' => count($cargoLists) > 0,
+        ];
+    }
+
+    /**
+     * Keep the cargo lists' cached invoice snapshot in sync after an invoice is
+     * saved. Cargo only stores display data (invoice_no, date, carton_count,
+     * customer) — no financial ledger — so this is safe to auto-update instead
+     * of blocking the edit.
+     */
+    protected function syncCargoSnapshotsForInvoice(Invoice $invoice): void
+    {
+        $invoice->loadMissing('customer.city');
+
+        $rows = DB::table('cargos')
+            ->where('invoices_array', 'like', '%"id":' . $invoice->id . '%')
+            ->orWhere('invoices_array', 'like', '%"id":"' . $invoice->id . '"%')
+            ->get(['id', 'invoices_array']);
+
+        foreach ($rows as $row) {
+            $invoicesArray = json_decode($row->invoices_array, true);
+
+            if (!is_array($invoicesArray)) {
+                continue;
+            }
+
+            $changed = false;
+
+            foreach ($invoicesArray as &$entry) {
+                if ((int) ($entry['id'] ?? 0) !== (int) $invoice->id) {
+                    continue;
+                }
+
+                $entry['invoice_no'] = $invoice->invoice_no;
+                $entry['date'] = optional($invoice->date)->format('Y-m-d');
+                $entry['carton_count'] = $invoice->carton_count;
+                $entry['cargo_name'] = $invoice->cargo_name;
+                $entry['shipment_no'] = $invoice->shipment_no;
+                $entry['customer'] = $invoice->customer ? [
+                    'id' => $invoice->customer->id,
+                    'customer_name' => $invoice->customer->customer_name,
+                    'city' => [
+                        'id' => $invoice->customer->city?->id,
+                        'title' => $invoice->customer->city?->title,
+                        'short_title' => $invoice->customer->city?->short_title,
+                    ],
+                ] : null;
+
+                $changed = true;
+            }
+            unset($entry);
+
+            if ($changed) {
+                DB::table('cargos')->where('id', $row->id)->update([
+                    'invoices_array' => json_encode($invoicesArray),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Block field changes that would corrupt a bilty (goods already physically
+     * dispatched against this invoice's current articles/quantities/customer).
+     * Only 'date' remains editable once a bilty exists.
+     */
+    protected function guardAgainstBiltyMismatch(Invoice $invoice, array $relatedRecords, bool $customerChanged, bool $articlesOrCartonChanged, bool $orderOrShipmentChanged): void
+    {
+        if (!$relatedRecords['has_bilty']) {
+            return;
+        }
+
+        if ($customerChanged || $articlesOrCartonChanged || $orderOrShipmentChanged) {
+            $bilty = $relatedRecords['bilty'];
+
+            throw ValidationException::withMessages([
+                'articles' => "Cannot change articles, quantities, order/shipment, or customer — Bilty #{$bilty['bilty_no']} (dated {$bilty['date']}) was issued against this invoice. Only the date can be edited.",
+            ]);
+        }
+    }
+
+    /**
+     * Block reducing (or removing) an article's quantity below what's already
+     * been returned against it — the sales return ledger can never exceed the
+     * invoice quantity it was returned from.
+     */
+    protected function guardAgainstSalesReturnMismatch(array $relatedRecords, Collection $submittedQtyByArticle): void
+    {
+        if (!$relatedRecords['has_sales_returns']) {
+            return;
+        }
+
+        foreach ($relatedRecords['returned_quantities_by_article'] as $articleId => $returnedQty) {
+            $submittedQty = (int) $submittedQtyByArticle->get((int) $articleId, 0);
+
+            if ($submittedQty < $returnedQty) {
+                $articleNo = collect($relatedRecords['sales_returns'])
+                    ->firstWhere('article_id', (int) $articleId)['article_no'] ?? $articleId;
+
+                throw ValidationException::withMessages([
+                    'articles' => "Article {$articleNo} already has {$returnedQty} pcs returned against this invoice — invoice quantity for it can't go below that (currently trying to set {$submittedQty}).",
+                ]);
+            }
+        }
+    }
+
+    /**
      * Show the form for editing the specified resource.
      */
     public function edit(invoice $invoice)
@@ -985,6 +1138,8 @@ class InvoiceController extends Controller
                 ->map(fn ($shipmentNo) => ['text' => $shipmentNo])
                 ->toArray();
         }
+
+        $relatedRecords = $this->relatedRecordsSummary($invoice);
     
         $branchBranding = $branches->documentBranding('invoices');
     
@@ -996,7 +1151,8 @@ class InvoiceController extends Controller
             'ordersOptions',
             'shipmentsOptions',
             'invoiceType',
-            'isDeveloper'
+            'isDeveloper',
+            'relatedRecords'
         ));
     }
     
@@ -1010,34 +1166,23 @@ class InvoiceController extends Controller
     public function update(Request $request, invoice $invoice)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($invoice, 'invoices');
-    
+
         if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant'])) {
             return $resp;
         }
-    
-        $dependencies = $this->dependencyCounts([
-            'bilty' => ['bilties', 'invoice_id', $invoice->id],
-            'sales returns' => ['sales_returns', 'invoice_id', $invoice->id],
-            'cargo lists' => function () use ($invoice) {
-                return DB::table('cargos')
-                    ->where('invoices_array', 'like', '%"id":' . $invoice->id . '%')
-                    ->orWhere('invoices_array', 'like', '%"id":"' . $invoice->id . '"%')
-                    ->count();
-            },
-        ]);
-    
-        if (!empty($dependencies)) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', $this->dependencyBlockMessage('Invoice', $dependencies));
-        }
-    
+
+        // Cargo dependency no longer blocks — it auto-syncs after save.
+        // Bilty / sales-return dependencies are checked field-by-field inside
+        // updateOrderInvoice() / updateShipmentInvoice() so a date-only edit
+        // (or an unaffected article) still goes through.
+        $relatedRecords = $this->relatedRecordsSummary($invoice);
+
         $isDeveloper = Auth::user()?->role === 'developer' || app_can('invoices', 'override');;
         $invoiceType = $invoice->shipment_no ? 'shipment' : 'order';
-    
+
         return $invoiceType === 'order'
-            ? $this->updateOrderInvoice($request, $invoice, $isDeveloper)
-            : $this->updateShipmentInvoice($request, $invoice, $isDeveloper);
+            ? $this->updateOrderInvoice($request, $invoice, $isDeveloper, $relatedRecords)
+            : $this->updateShipmentInvoice($request, $invoice, $isDeveloper, $relatedRecords);
     }
     
     /**
@@ -1047,14 +1192,16 @@ class InvoiceController extends Controller
      * Every other allowed role can only edit date, articles/quantities, and
      * carton_count.
      */
-    protected function updateOrderInvoice(Request $request, invoice $invoice, bool $isDeveloper)
+    protected function updateOrderInvoice(Request $request, invoice $invoice, bool $isDeveloper, array $relatedRecords = [])
     {
+        $relatedRecords = $relatedRecords ?: $this->relatedRecordsSummary($invoice);
+
         $rawArticles = json_decode((string) $request->input('articles_in_invoice'), true) ?: [];
 
         $request->merge([
             'articles' => array_map(fn ($row) => [
-                'id'          => $row['invoice_article_id'] ?? null, // invoice_articles PK (existing line)
-                'article_id'  => $row['id'] ?? null,                 // JS's "id" is actually the article id
+                'id'          => $row['invoice_article_id'] ?? null,
+                'article_id'  => $row['id'] ?? null,
                 'description' => $row['description'] ?? null,
                 'invoice_pcs' => $row['invoice_quantity'] ?? null,
             ], $rawArticles),
@@ -1070,36 +1217,65 @@ class InvoiceController extends Controller
             'articles.*.description' => ['nullable', 'string', 'max:255'],
             'articles.*.invoice_pcs' => ['required', 'integer', 'min:1'],
         ];
-    
+
         if ($isDeveloper) {
             $rules['invoice_no'] = ['required', 'string', 'max:255'];
             $rules['order_no'] = ['required', 'string', 'max:255'];
             $rules['customer_id'] = ['nullable', 'integer', 'exists:customers,id'];
         }
-    
+
         $validated = $request->validate($rules);
 
         try {
-            DB::transaction(function () use ($invoice, $validated, $isDeveloper) {
+            DB::transaction(function () use ($invoice, $validated, $isDeveloper, $relatedRecords) {
                 $previousOrderNo = $invoice->order_no;
                 $branches = app(ModuleBranchService::class);
-        
-                // Non-developers can't change which order the invoice is tied to.
+
                 $orderNo = $isDeveloper
                     ? ($validated['order_no'] ?? $invoice->order_no)
                     : $invoice->order_no;
-        
+
+                $orderOrShipmentChanged = $orderNo !== $invoice->order_no;
+                $customerChanged = $isDeveloper
+                    && !empty($validated['customer_id'])
+                    && (int) $validated['customer_id'] !== (int) $invoice->customer_id;
+
+                $submittedQtyByArticle = collect($validated['articles'])
+                    ->groupBy('article_id')
+                    ->map(fn ($group) => (int) $group->sum('invoice_pcs'));
+
+                $existingQtyByArticle = $invoice->invoiceArticles()
+                    ->select('article_id', DB::raw('SUM(invoice_pcs) as total'))
+                    ->groupBy('article_id')
+                    ->pluck('total', 'article_id')
+                    ->map(fn ($qty) => (int) $qty);
+
+                $articlesOrCartonChanged = $submittedQtyByArticle->toArray() !== $existingQtyByArticle->toArray()
+                    || (int) ($validated['carton_count'] ?? 0) !== (int) ($invoice->carton_count ?? 0);
+
+                // ── Bilty guard: nothing structural can change once goods are dispatched ──
+                $this->guardAgainstBiltyMismatch(
+                    $invoice,
+                    $relatedRecords,
+                    $customerChanged,
+                    $articlesOrCartonChanged,
+                    $orderOrShipmentChanged
+                );
+
+                // ── Sales return guard: can't invoice less than already returned ──
+                $this->guardAgainstSalesReturnMismatch($relatedRecords, $submittedQtyByArticle);
+
                 $orderQuery = $branches->applyRelatedScope(Order::with('articles.article'), 'orders', 'invoices');
                 $order = $this->applyDocumentNumberLookup($orderQuery, 'order_no', $orderNo)
                     ->lockForUpdate()
                     ->first();
-        
+
                 if (!$order) {
                     throw ValidationException::withMessages([
                         'order_no' => 'Order not found for the selected branch.',
                     ]);
                 }
-        
+
                 $sync = app(OrderInvoiceSyncService::class);
                 $lines = $sync->normalizeInvoiceLines($validated['articles']);
                 $sync->validateInvoiceAgainstOrder($order, $lines, $invoice);
@@ -1110,7 +1286,7 @@ class InvoiceController extends Controller
                     $order->id,
                     $invoice
                 );
-        
+
                 $updateData = [
                     'order_no' => $order->order_no,
                     'shipment_no' => null,
@@ -1120,26 +1296,28 @@ class InvoiceController extends Controller
                     'carton_count' => $validated['carton_count'] ?? null,
                     'branch_id' => $order->branch_id ?: $branches->branchIdForCreate('invoices'),
                 ];
-        
+
                 if ($isDeveloper) {
                     $updateData['invoice_no'] = $validated['invoice_no'];
-        
-                    // Developer can override the customer independently of the
-                    // order's own customer, if they explicitly chose one.
+
                     if (!empty($validated['customer_id'])) {
                         $updateData['customer_id'] = $validated['customer_id'];
                     }
                 }
-        
+
                 $invoice->update($updateData);
-        
+
                 $sync->replaceInvoiceArticles($invoice, $lines);
                 $sync->recalculateOrderDispatch($order);
-        
+
                 if ($previousOrderNo && $previousOrderNo !== $order->order_no) {
                     $sync->recalculateOrderDispatch($previousOrderNo);
                 }
             });
+
+            // Cargo is just a display cache — sync it after a successful save
+            // instead of blocking the edit for it.
+            $this->syncCargoSnapshotsForInvoice($invoice->fresh());
         } catch (\Throwable $e) {
             report($e);
 
@@ -1148,7 +1326,7 @@ class InvoiceController extends Controller
                 ->withInput()
                 ->with('error', $e->getMessage());
         }
-    
+
         return redirect()->route('invoices.index')->with('success', 'Invoice updated successfully.');
     }
     
@@ -1160,84 +1338,126 @@ class InvoiceController extends Controller
      * (which recalculates the invoice article quantities off the shipment's
      * per-carton rates).
      */
-    protected function updateShipmentInvoice(Request $request, invoice $invoice, bool $isDeveloper)
+    protected function updateShipmentInvoice(Request $request, invoice $invoice, bool $isDeveloper, array $relatedRecords = [])
     {
+        $relatedRecords = $relatedRecords ?: $this->relatedRecordsSummary($invoice);
+
         $rules = [
             'date' => ['required', 'date'],
             'netAmount' => ['required'],
             'carton_count' => ['required', 'integer', 'min:1'],
         ];
-    
+
         if ($isDeveloper) {
             $rules['invoice_no'] = ['required', 'string', 'max:255'];
             $rules['shipment_no'] = ['required', 'string', 'max:255'];
             $rules['customer_id'] = ['required', 'integer', 'exists:customers,id'];
         }
-    
+
         $validated = $request->validate($rules);
-    
-        DB::transaction(function () use ($invoice, $validated, $isDeveloper) {
-            $branches = app(ModuleBranchService::class);
-    
-            $shipmentNo = $isDeveloper
-                ? ($validated['shipment_no'] ?? $invoice->shipment_no)
-                : $invoice->shipment_no;
-    
-            $shipmentQuery = $branches->applyRelatedScope(Shipment::with('articles.article'), 'shipments', 'invoices');
-            $shipment = $this->applyDocumentNumberLookup($shipmentQuery, 'shipment_no', $shipmentNo)
-                ->lockForUpdate()
-                ->first();
-    
-            if (!$shipment) {
-                throw ValidationException::withMessages([
-                    'shipment_no' => 'Shipment not found for the selected branch.',
-                ]);
-            }
-    
-            $cartonCount = (int) $validated['carton_count'];
-    
-            $updateData = [
-                'shipment_no' => $shipment->shipment_no,
-                'order_no' => null,
-                'date' => $validated['date'],
-                'netAmount' => (int) str_replace(',', '', (string) $validated['netAmount']),
-                'carton_count' => $cartonCount,
-                'branch_id' => $shipment->branch_id ?: $branches->branchIdForCreate('invoices'),
-            ];
-    
-            if ($isDeveloper) {
-                $updateData['invoice_no'] = $validated['invoice_no'];
-                $updateData['customer_id'] = $validated['customer_id'];
-            }
-    
-            $invoice->update($updateData);
-    
-            // Rebuild invoice article lines from the shipment's current article
-            // rates, scaled by the (possibly changed) carton count.
-            $invoice->invoiceArticles()->delete();
-    
-            foreach ($shipment->articles as $shipmentArticle) {
-                $articleId = $shipmentArticle->article_id ?? $shipmentArticle->article?->id;
-    
-                if (!$articleId) {
-                    continue;
-                }
-    
-                $shipmentPcs = (int) (
-                    $shipmentArticle->shipment_pcs
-                    ?? $shipmentArticle->quantity
-                    ?? 0
+
+        try {
+            DB::transaction(function () use ($invoice, $validated, $isDeveloper, $relatedRecords) {
+                $branches = app(ModuleBranchService::class);
+
+                $shipmentNo = $isDeveloper
+                    ? ($validated['shipment_no'] ?? $invoice->shipment_no)
+                    : $invoice->shipment_no;
+
+                $orderOrShipmentChanged = $shipmentNo !== $invoice->shipment_no;
+                $customerChanged = $isDeveloper
+                    && (int) $validated['customer_id'] !== (int) $invoice->customer_id;
+                $cartonChanged = (int) $validated['carton_count'] !== (int) ($invoice->carton_count ?? 0);
+
+                // ── Bilty guard ──
+                $this->guardAgainstBiltyMismatch(
+                    $invoice,
+                    $relatedRecords,
+                    $customerChanged,
+                    $cartonChanged,
+                    $orderOrShipmentChanged
                 );
-    
-                InvoiceArticles::create([
-                    'invoice_id' => $invoice->id,
-                    'article_id' => $articleId,
-                    'description' => $shipmentArticle->description ?? '',
-                    'invoice_pcs' => $shipmentPcs * $cartonCount,
-                ]);
-            }
-        });
-    
+
+                $shipmentQuery = $branches->applyRelatedScope(Shipment::with('articles.article'), 'shipments', 'invoices');
+                $shipment = $this->applyDocumentNumberLookup($shipmentQuery, 'shipment_no', $shipmentNo)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$shipment) {
+                    throw ValidationException::withMessages([
+                        'shipment_no' => 'Shipment not found for the selected branch.',
+                    ]);
+                }
+
+                $cartonCount = (int) $validated['carton_count'];
+
+                // ── Sales return guard: recompute what the new carton count would
+                // produce per article, compare against already-returned quantities ──
+                if ($relatedRecords['has_sales_returns']) {
+                    $projectedQtyByArticle = collect();
+
+                    foreach ($shipment->articles as $shipmentArticle) {
+                        $articleId = $shipmentArticle->article_id ?? $shipmentArticle->article?->id;
+                        if (!$articleId) {
+                            continue;
+                        }
+                        $shipmentPcs = (int) ($shipmentArticle->shipment_pcs ?? $shipmentArticle->quantity ?? 0);
+                        $projectedQtyByArticle->put($articleId, $shipmentPcs * $cartonCount);
+                    }
+
+                    $this->guardAgainstSalesReturnMismatch($relatedRecords, $projectedQtyByArticle);
+                }
+
+                $updateData = [
+                    'shipment_no' => $shipment->shipment_no,
+                    'order_no' => null,
+                    'date' => $validated['date'],
+                    'netAmount' => (int) str_replace(',', '', (string) $validated['netAmount']),
+                    'carton_count' => $cartonCount,
+                    'branch_id' => $shipment->branch_id ?: $branches->branchIdForCreate('invoices'),
+                ];
+
+                if ($isDeveloper) {
+                    $updateData['invoice_no'] = $validated['invoice_no'];
+                    $updateData['customer_id'] = $validated['customer_id'];
+                }
+
+                $invoice->update($updateData);
+
+                $invoice->invoiceArticles()->delete();
+
+                foreach ($shipment->articles as $shipmentArticle) {
+                    $articleId = $shipmentArticle->article_id ?? $shipmentArticle->article?->id;
+
+                    if (!$articleId) {
+                        continue;
+                    }
+
+                    $shipmentPcs = (int) (
+                        $shipmentArticle->shipment_pcs
+                        ?? $shipmentArticle->quantity
+                        ?? 0
+                    );
+
+                    InvoiceArticles::create([
+                        'invoice_id' => $invoice->id,
+                        'article_id' => $articleId,
+                        'description' => $shipmentArticle->description ?? '',
+                        'invoice_pcs' => $shipmentPcs * $cartonCount,
+                    ]);
+                }
+            });
+
+            $this->syncCargoSnapshotsForInvoice($invoice->fresh());
+        } catch (\Throwable $e) {
+            report($e);
+
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', $e->getMessage());
+        }
+
         return redirect()->route('invoices.index')->with('success', 'Invoice updated successfully.');
     }
 
@@ -1252,22 +1472,40 @@ class InvoiceController extends Controller
             return $resp;
         }
 
-        $dependencies = $this->dependencyCounts([
-            'bilty' => ['bilties', 'invoice_id', $invoice->id],
-            'sales returns' => ['sales_returns', 'invoice_id', $invoice->id],
-            'cargo lists' => function () use ($invoice) {
-                return DB::table('cargos')
-                    ->where('invoices_array', 'like', '%"id":' . $invoice->id . '%')
-                    ->orWhere('invoices_array', 'like', '%"id":"' . $invoice->id . '"%')
-                    ->count();
-            },
-        ]);
+        $relatedRecords = $this->relatedRecordsSummary($invoice);
 
-        if (!empty($dependencies)) {
+        // Bilty / sales returns are real financial/physical facts that can't be
+        // safely cascaded — block delete and tell the user exactly what's linked.
+        if ($relatedRecords['has_bilty'] || $relatedRecords['has_sales_returns']) {
+            $dependencies = [];
+
+            if ($relatedRecords['has_bilty']) {
+                $dependencies['bilty'] = 1;
+            }
+            if ($relatedRecords['has_sales_returns']) {
+                $dependencies['sales returns'] = count($relatedRecords['sales_returns']);
+            }
+
             return redirect()->back()->with('error', $this->dependencyBlockMessage('Invoice', $dependencies));
         }
 
-        DB::transaction(function () use ($invoice) {
+        DB::transaction(function () use ($invoice, $relatedRecords) {
+            // Cargo is just a display cache — remove this invoice from any cargo
+            // list's snapshot instead of blocking the delete.
+            foreach ($relatedRecords['cargo_lists'] as $cargoRow) {
+                $cargo = DB::table('cargos')->where('id', $cargoRow['id'])->first();
+                $invoicesArray = json_decode($cargo->invoices_array, true) ?: [];
+
+                $invoicesArray = array_values(array_filter(
+                    $invoicesArray,
+                    fn ($entry) => (int) ($entry['id'] ?? 0) !== (int) $invoice->id
+                ));
+
+                DB::table('cargos')->where('id', $cargoRow['id'])->update([
+                    'invoices_array' => json_encode($invoicesArray),
+                ]);
+            }
+
             $orderNo = $invoice->order_no;
             $invoice->invoiceArticles()->delete();
             $invoice->delete();

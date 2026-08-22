@@ -68,6 +68,39 @@
         @method('PUT')
         <x-form-title-bar title="Edit Invoice" />
 
+        @if ($relatedRecords['has_bilty'] || $relatedRecords['has_sales_returns'] || $relatedRecords['has_cargo'])
+            <div class="mb-4 rounded-lg border border-[var(--warning-color,#c9a227)] bg-[var(--warning-color,#c9a227)]/10 px-4 py-3 text-sm space-y-2">
+                <div class="font-medium">Ye records is invoice se linked hain:</div>
+
+                @if ($relatedRecords['has_bilty'])
+                    <div>
+                        Bilty #{{ $relatedRecords['bilty']['bilty_no'] }} ({{ $relatedRecords['bilty']['date'] }})
+                        — articles, order/shipment, aur customer lock hain, sirf date editable hai.
+                    </div>
+                @endif
+
+                @if ($relatedRecords['has_sales_returns'])
+                    <div>
+                        Sales Returns:
+                        @foreach ($relatedRecords['sales_returns'] as $sr)
+                            {{ $sr['article_no'] }} ({{ $sr['quantity'] }} pcs, {{ $sr['date'] }}){{ !$loop->last ? ',' : '' }}
+                        @endforeach
+                        — in articles ki quantity already-returned se kam nahi ki ja sakti.
+                    </div>
+                @endif
+
+                @if ($relatedRecords['has_cargo'])
+                    <div>
+                        Cargo Lists:
+                        @foreach ($relatedRecords['cargo_lists'] as $cargo)
+                            {{ $cargo['cargo_name'] ?? $cargo['cargo_no'] }}{{ !$loop->last ? ',' : '' }}
+                        @endforeach
+                        — save karne par in lists ka snapshot khud update ho jayega.
+                    </div>
+                @endif
+            </div>
+        @endif
+
         @if (session('error'))
             <div class="mb-4 rounded-lg border border-[var(--border-error)] bg-[var(--border-error)]/10 px-4 py-3 text-[var(--border-error)]">
                 {{ session('error') }}
