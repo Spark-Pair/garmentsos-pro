@@ -539,6 +539,11 @@
 
         } else if (data.preview.type == "cargo_list") {
             const cargoInvoices = Array.isArray(previewData.invoices) ? previewData.invoices : [];
+            const totalCartonCount = cargoInvoices.reduce(
+                (sum, invoice) => sum + Number(invoice.carton_count || 0),
+                0
+            );
+
             const cargoPages = chunkRowsForDocument(cargoInvoices, {
                 normalMaxRows: 38,
                 totalMaxRows: 38,
@@ -575,7 +580,7 @@
                 }).join('');
 
                 invoiceBottom = '';
-                clutter += renderPreviewPage(data, previewData, cartonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, pageIndex, cargoPages.length);
+                clutter += renderPreviewPage(data, previewData, cartonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, pageIndex, cargoPages.length, null, totalCartonCount);
             });
 
         } else if (data.preview.type == "form") {
@@ -714,7 +719,7 @@
     }
 
     // Helper function - Preview page render karne ke liye
-    function renderPreviewPage(data, previewData, cartonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, pageIndex, totalPages = 1, copyLabelOverride = null) {
+    function renderPreviewPage(data, previewData, cartonCount, invoiceTableHeader, invoiceTableBody, invoiceBottom, pageIndex, totalPages = 1, copyLabelOverride = null, totalCartonCount = 0) {
         const previewCompany = previewData?.branch_branding || companyData;
         const previewCompanyLogoUrl = previewLogoUrl(previewCompany, companyLogoBase);
         const isCargoList = data.preview.type == "cargo_list";
@@ -816,7 +821,8 @@
                                 ` : ''}
                                 ${data.preview.type != 'shipment' ? `<div class="preview-copy leading-none capitalize">${data.preview.type.replace('_', ' ')} Copy: ${copyLabelOverride || previewData.copy_label || data.preview.copyLabel || (data.preview.type == 'cargo_list' ? 'Cargo' : 'Customer')}</div>` : ''}
                                 ${data.preview.type == 'invoice' ? `<div class="number leading-none capitalize">Carton: ${cartonCount || '-'}</div>` : ''}
-                                ${!['invoice', 'order', 'shipment'].includes(data.preview.type) ? `<div class="copy leading-none">Document: ${data.preview.document}</div>` : ''}
+                                ${data.preview.type == 'cargo_list' ? `<div class="number leading-none capitalize">Total Cartons: ${totalCartonCount || '-'}</div>` : ''}
+                                ${!['invoice', 'order', 'shipment', 'cargo_list'].includes(data.preview.type) ? `<div class="copy leading-none">Document: ${data.preview.document}</div>` : ''}
                             </div>
                         </div>
                         <hr class="w-full my-3 border-black">
