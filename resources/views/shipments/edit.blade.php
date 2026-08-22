@@ -95,7 +95,7 @@
 <script>
         window.__shipmentsEdit = {
             shipment: @json($shipmentPayload),
-            companyData: @json($client_company),
+            companyData: @json(!empty($branchBranding) ? $branchBranding : $client_company),
             shipmentsCreateUrl: '{{ route("shipments.create") }}',
             companyLogoBase: '{{ asset("images") }}',
             maxArticlesAlertHtml: @json('<div class="bg-[var(--danger-color)]/10 border border-[var(--danger-color)] text-[var(--danger-color)] text-xs px-3 py-2 rounded-lg">You have reached the maximum allowed number of 18 articles.</div>'),
