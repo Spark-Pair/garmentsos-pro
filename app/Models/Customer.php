@@ -316,9 +316,10 @@ class Customer extends Model
         };
 
         $invoiceDescription = function ($i) {
-            $biltyNo = $i->bilty? $i->bilty->bilty_no : '-';
-            $cargoName = $i->cargo? $i->cargo->cargo_name : '-';
-            return "$biltyNo | $cargoName";
+            $biltyNo = $i->bilty ? $i->bilty->bilty_no : '-';
+            $cargoName = $i->cargo_name ?? '-';
+            $cartonCount = $i->carton_count ?? '-';
+            return "$biltyNo | $cargoName | $cartonCount";
         };
 
         if ($type === 'summarized') {
