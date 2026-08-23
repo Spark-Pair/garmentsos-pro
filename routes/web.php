@@ -237,6 +237,7 @@ Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensur
     Route::get('dr/get-payments', [DRController::class, 'getPayments']);
     Route::resource('dr', DRController::class);
 
+    Route::get('daily-ledger/summary', [DailyLedgerController::class, 'summary'])->name('daily-ledger.summary');
     Route::resource('daily-ledger', DailyLedgerController::class);
 
     Route::resource('sales-returns', SalesReturnController::class);

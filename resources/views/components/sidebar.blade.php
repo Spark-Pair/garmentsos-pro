@@ -890,6 +890,7 @@
                 subMenu: [
                     {name: 'Show Ledger', href: "/daily-ledger"},
                     {name: 'Deposit | Use', href: "/daily-ledger/create"},
+                    {name: 'Summary', href: "/daily-ledger/summary"},
                 ]
             },
         @endif

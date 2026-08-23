@@ -168,6 +168,284 @@ class DailyLedgerController extends Controller
         return view('daily-ledger.index', compact('authLayout'));
     }
 
+    public function summary(Request $request)
+    {
+        $authLayout = $this->getAuthLayout($request->route()->getName(), 'table');
+        $branches = app(ModuleBranchService::class);
+
+        if ($request->ajax()) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Get filtered deposits
+            |--------------------------------------------------------------------------
+            */
+            $filteredDeposits = $branches
+                ->applyScope(
+                    DailyLedgerDeposit::orderByDesc('date'),
+                    'daily_ledger'
+                )
+                ->orderByDesc('created_at')
+                ->applyFilters($request, false, true)
+                ->get()
+                ->map(function ($item) {
+                    $row = $item->toFormattedArray();
+
+                    return [
+                        'date' => $row['date'],
+                        'date_raw' => $row['date_raw'],
+                        'created_at' => $row['created_at'],
+                        'deposit' => floatval($row['deposit'] ?? 0),
+                        'use' => 0,
+                    ];
+                });
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Get filtered uses
+            |--------------------------------------------------------------------------
+            */
+            $filteredUses = $branches
+                ->applyScope(
+                    DailyLedgerUse::orderByDesc('date'),
+                    'daily_ledger'
+                )
+                ->orderByDesc('created_at')
+                ->applyFilters($request, false, true)
+                ->get()
+                ->map(function ($item) {
+                    $row = $item->toFormattedArray();
+
+                    return [
+                        'date' => $row['date'],
+                        'date_raw' => $row['date_raw'],
+                        'created_at' => $row['created_at'],
+                        'deposit' => 0,
+                        'use' => floatval($row['use'] ?? 0),
+                    ];
+                });
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Merge deposits + uses and group by date
+            |--------------------------------------------------------------------------
+            |
+            | Example:
+            |
+            | 20-Aug | Deposit | 10,000
+            | 20-Aug | Deposit |  5,000
+            | 20-Aug | Use     |  2,000
+            | 20-Aug | Use     |  1,000
+            |
+            | Becomes:
+            |
+            | 20-Aug | Deposit 15,000 | Use 3,000
+            |
+            |--------------------------------------------------------------------------
+            */
+            $filteredLedgers = collect($filteredDeposits)
+                ->concat($filteredUses)
+                ->groupBy('date_raw')
+                ->map(function ($entries, $date) {
+
+                    // Get the first entry just to preserve the formatted date
+                    $firstEntry = $entries
+                        ->sortBy('created_at')
+                        ->first();
+
+                    return [
+                        'date' => $firstEntry['date'],
+                        'date_raw' => $date,
+                        'created_at' => $firstEntry['created_at'],
+
+                        // Total deposits for this date
+                        'deposit' => $entries->sum('deposit'),
+
+                        // Total uses for this date
+                        'use' => $entries->sum('use'),
+                    ];
+                })
+                ->sortBy('date_raw')
+                ->values();
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Scoped queries
+            |--------------------------------------------------------------------------
+            */
+            $scopedDeposits = fn () =>
+                $branches->applyScope(
+                    DailyLedgerDeposit::query(),
+                    'daily_ledger'
+                );
+
+            $scopedUses = fn () =>
+                $branches->applyScope(
+                    DailyLedgerUse::query(),
+                    'daily_ledger'
+                );
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Calculate opening balance
+            |--------------------------------------------------------------------------
+            |
+            | Opening balance = all deposits before first visible date
+            |                 - all uses before first visible date
+            |--------------------------------------------------------------------------
+            */
+            $openingBalance = 0;
+
+            if ($filteredLedgers->isNotEmpty()) {
+
+                $firstVisibleDate = $filteredLedgers
+                    ->first()['date_raw'] ?? null;
+
+                if ($firstVisibleDate) {
+
+                    $beforeDeposits = $scopedDeposits()
+                        ->whereDate('date', '<', $firstVisibleDate)
+                        ->sum('amount');
+
+                    $beforeUses = $scopedUses()
+                        ->whereDate('date', '<', $firstVisibleDate)
+                        ->sum('amount');
+
+                    $openingBalance = $beforeDeposits - $beforeUses;
+                }
+
+            } else {
+
+                /*
+                |--------------------------------------------------------------------------
+                | No filtered records
+                |--------------------------------------------------------------------------
+                */
+                $openingBalance =
+                    $scopedDeposits()->sum('amount') -
+                    $scopedUses()->sum('amount');
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Sort newest date first
+            |--------------------------------------------------------------------------
+            */
+            $finalData = $filteredLedgers
+                ->sortByDesc('date_raw')
+                ->values();
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Calculate running balance
+            |--------------------------------------------------------------------------
+            |
+            | We calculate from oldest date -> newest date,
+            | then reverse the result for display.
+            |--------------------------------------------------------------------------
+            */
+            $runningBalance = $openingBalance;
+
+            $ledgersWithBalance = $finalData
+                ->reverse()
+                ->map(function ($row) use (&$runningBalance) {
+
+                    $runningBalance += floatval($row['deposit']);
+                    $runningBalance -= floatval($row['use']);
+
+                    $row['balance'] = $runningBalance;
+
+                    return $row;
+                });
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Reverse back to newest first
+            |--------------------------------------------------------------------------
+            */
+            $finalData = $ledgersWithBalance
+                ->reverse()
+                ->values();
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Calculations
+            |--------------------------------------------------------------------------
+            */
+            $totalDeposit = $finalData->sum('deposit');
+            $totalUse = $finalData->sum('use');
+
+            $netChange = $totalDeposit - $totalUse;
+
+            $closingBalance = $openingBalance + $netChange;
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Total actual records
+            |--------------------------------------------------------------------------
+            */
+            $totalRecordsCount =
+                $scopedDeposits()->count() +
+                $scopedUses()->count();
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Return JSON
+            |--------------------------------------------------------------------------
+            */
+            return response()->json([
+                'data' => $finalData,
+
+                'authLayout' => $authLayout,
+
+                'calculations' => [
+                    'opening_balance' => round($openingBalance, 2),
+
+                    'total_deposit' => round(
+                        $totalDeposit,
+                        2
+                    ),
+
+                    'total_use' => round(
+                        $totalUse,
+                        2
+                    ),
+
+                    'balance' => round(
+                        $netChange,
+                        2
+                    ),
+
+                    'closing_balance' => round(
+                        $closingBalance,
+                        2
+                    ),
+
+                    // Number of DATE rows being displayed
+                    'showing_count' => $finalData->count(),
+
+                    // Number of actual deposit/use records
+                    'total_count' => $totalRecordsCount,
+                ],
+            ]);
+        }
+
+        return view(
+            'daily-ledger.summary',
+            compact('authLayout')
+        );
+    }
+
     /**
      * Show the form for creating a new resource.
      */
