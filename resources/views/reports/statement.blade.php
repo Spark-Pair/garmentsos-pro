@@ -275,11 +275,11 @@
                                                     @if(in_array($statementType, ['detailed', 'general']))
                                                         <div class="th font-medium w-[10%]">Reff. No.</div>
                                                         <div class="th font-medium w-[10%]">Method</div>
-                                                        <div class="th font-medium w-[33%]">Description</div>
+                                                        <div class="th font-medium w-[30%]">Description</div>
                                                     @endif
-                                                    <div class="th font-medium w-[10%]">Bill</div>
-                                                    <div class="th font-medium w-[10%]">Payment</div>
-                                                    <div class="th font-medium w-[10%]">Balance</div>
+                                                    <div class="th font-medium w-[11%]">Bill</div>
+                                                    <div class="th font-medium w-[11%]">Payment</div>
+                                                    <div class="th font-medium w-[11%]">Balance</div>
                                                 </div>
                                             </div>
 
@@ -304,7 +304,7 @@
                                                     @endphp
                                                     <div>
                                                         @unless($loop->first)
-                                                            <hr class="w-full my-2 border-gray-700 border-dashed">
+                                                            <hr class="w-full my-1.5 border-gray-700 border-dashed">
                                                         @endunless
                                                         <div
                                                             class="tr flex justify-between w-full px-2.5 text-center gap-1 {{ $isStatementClickable ? 'statement-record-trigger cursor-pointer rounded-md transition-colors hover:bg-slate-100/80' : '' }}"
@@ -319,27 +319,27 @@
                                                             @if(in_array($statementType, ['detailed', 'general']))
                                                                 <div class="td font-medium w-[10%]">{{ $statement['reff_no'] }}</div>
                                                                 <div class="td font-medium w-[10%] capitalize">{{ $isOpeningBalanceEntryRow ? 'Opening Entry' : ($statement['method'] ?? "-") }}</div>
-                                                                <div class="td font-medium w-[33%] text-nowrap  {{ $isOpeningBalanceRow ? 'text-left font-semibold' : '' }}">{{ $isOpeningBalanceEntryRow ? 'Opening Balance Entry' : ($statement['description'] ?? "-") }}</div>
+                                                                <div class="td font-medium w-[30%] text-nowrap  {{ $isOpeningBalanceRow ? 'text-left font-semibold' : '' }}">{{ $isOpeningBalanceEntryRow ? 'Opening Balance Entry' : ($statement['description'] ?? "-") }}</div>
                                                             @endif
-                                                            <div class="td font-medium w-[10%]">{{ \App\Support\Money::format($statement['bill'] ?? 0) }}</div>
-                                                            <div class="td font-medium w-[10%]">{{ \App\Support\Money::format($statement['payment'] ?? 0) }}</div>
-                                                            <div class="td font-medium w-[10%]">{{ \App\Support\Money::format($balance) }}</div>
+                                                            <div class="td font-medium w-[11%]">{{ \App\Support\Money::format($statement['bill'] ?? 0) }}</div>
+                                                            <div class="td font-medium w-[11%]">{{ \App\Support\Money::format($statement['payment'] ?? 0) }}</div>
+                                                            <div class="td font-medium w-[11%]">{{ \App\Support\Money::format($balance) }}</div>
                                                         </div>
                                                     </div>
                                                 @endforeach
                                                 @if ($otherPages->isEmpty())
-                                                    <hr class="w-full my-2 border-gray-700 border-dashed">
-                                                    <div class="tr flex justify-between w-full px-2.5 gap-1 text-center font-bold rounded-md">
+                                                    <hr class="w-full my-1.5 border-gray-700 border-dashed">
+                                                    <div class="tr flex justify-between w-full px-2.5 gap-1 text-center font-bold">
                                                         <div class="td w-[2.5%]"></div>
-                                                        <div class="td w-[12.5%] text-left">Total</div>
+                                                        <div class="td w-[11.5%] text-left">Total</div>
                                                         @if(in_array($statementType, ['detailed', 'general']))
                                                             <div class="td w-[10%]"></div>
                                                             <div class="td w-[10%]"></div>
-                                                            <div class="td w-[33%]"></div>
+                                                            <div class="td w-[30%]"></div>
                                                         @endif
-                                                        <div class="td w-[10%]">{{ \App\Support\Money::format($data['totals']['bill']) }}</div>
-                                                        <div class="td w-[10%]">{{ \App\Support\Money::format($data['totals']['payment']) }}</div>
-                                                        <div class="td w-[10%]">{{ \App\Support\Money::format($data['closing_balance']) }}</div>
+                                                        <div class="td w-[11%]">{{ \App\Support\Money::format($data['totals']['bill']) }}</div>
+                                                        <div class="td w-[11%]">{{ \App\Support\Money::format($data['totals']['payment']) }}</div>
+                                                        <div class="td w-[11%]">{{ \App\Support\Money::format($data['closing_balance']) }}</div>
                                                     </div>
                                                 @endif
                                             </div>
@@ -408,11 +408,11 @@
                                                         @if(in_array($statementType, ['detailed', 'general']))
                                                             <div class="th font-medium w-[10%]">Reff. No.</div>
                                                             <div class="th font-medium w-[10%]">Method</div>
-                                                            <div class="th font-medium w-[33%]">Description</div>
+                                                            <div class="th font-medium w-[30%]">Description</div>
                                                         @endif
-                                                        <div class="th font-medium w-[10%]">Bill</div>
-                                                        <div class="th font-medium w-[10%]">Payment</div>
-                                                        <div class="th font-medium w-[10%]">Balance</div>
+                                                        <div class="th font-medium w-[11%]">Bill</div>
+                                                        <div class="th font-medium w-[11%]">Payment</div>
+                                                        <div class="th font-medium w-[11%]">Balance</div>
                                                     </div>
                                                 </div>
 
@@ -437,7 +437,7 @@
                                                         @endphp
                                                         <div>
                                                             @unless($loop->first)
-                                                                <hr class="w-full my-2 border-gray-700 border-dashed">
+                                                                <hr class="w-full my-1.5 border-gray-700 border-dashed">
                                                             @endunless
                                                             <div
                                                                 class="tr flex justify-between w-full px-2.5 gap-1 text-center {{ $isStatementClickable ? 'statement-record-trigger cursor-pointer rounded-md transition-colors hover:bg-slate-100/80' : '' }}"
@@ -452,27 +452,27 @@
                                                                 @if(in_array($statementType, ['detailed', 'general']))
                                                                     <div class="td font-medium w-[10%]">{{ $statement['reff_no'] }}</div>
                                                                     <div class="td font-medium w-[10%] capitalize">{{ $isOpeningBalanceEntryRow ? 'Opening Entry' : ($statement['method'] ?? "-") }}</div>
-                                                                    <div class="td font-medium w-[33%] text-nowrap overflow-hidden {{ $isOpeningBalanceRow ? 'text-left font-semibold' : '' }}">{{ $isOpeningBalanceEntryRow ? 'Opening Balance Entry' : ($statement['description'] ?? "-") }}</div>
+                                                                    <div class="td font-medium w-[30%] text-nowrap overflow-hidden {{ $isOpeningBalanceRow ? 'text-left font-semibold' : '' }}">{{ $isOpeningBalanceEntryRow ? 'Opening Balance Entry' : ($statement['description'] ?? "-") }}</div>
                                                                 @endif
-                                                                <div class="td font-medium w-[10%]">{{ \App\Support\Money::format($statement['bill'] ?? 0) }}</div>
-                                                                <div class="td font-medium w-[10%]">{{ \App\Support\Money::format($statement['payment'] ?? 0) }}</div>
-                                                                <div class="td font-medium w-[10%]">{{ \App\Support\Money::format($balance) }}</div>
+                                                                <div class="td font-medium w-[11%]">{{ \App\Support\Money::format($statement['bill'] ?? 0) }}</div>
+                                                                <div class="td font-medium w-[11%]">{{ \App\Support\Money::format($statement['payment'] ?? 0) }}</div>
+                                                                <div class="td font-medium w-[11%]">{{ \App\Support\Money::format($balance) }}</div>
                                                             </div>
                                                         </div>
                                                     @endforeach
                                                     @if ($loop->last)
-                                                        <hr class="w-full my-2 border-gray-700 border-dashed">
-                                                        <div class="tr flex justify-between w-full px-2.5 gap-1 text-center font-bold rounded-md">
+                                                        <hr class="w-full my-1.5 border-gray-700 border-dashed">
+                                                        <div class="tr flex justify-between w-full px-2.5 gap-1 text-center font-bold">
                                                             <div class="td w-[2.5%]"></div>
-                                                            <div class="td w-[12.5%] text-left">Total</div>
+                                                            <div class="td w-[11.5%] text-left">Total</div>
                                                             @if(in_array($statementType, ['detailed', 'general']))
                                                                 <div class="td w-[10%]"></div>
                                                                 <div class="td w-[10%]"></div>
-                                                                <div class="td w-[33%]"></div>
+                                                                <div class="td w-[30%]"></div>
                                                             @endif
-                                                            <div class="td w-[10%]">{{ \App\Support\Money::format($data['totals']['bill']) }}</div>
-                                                            <div class="td w-[10%]">{{ \App\Support\Money::format($data['totals']['payment']) }}</div>
-                                                            <div class="td w-[10%]">{{ \App\Support\Money::format($data['closing_balance']) }}</div>
+                                                            <div class="td w-[11%]">{{ \App\Support\Money::format($data['totals']['bill']) }}</div>
+                                                            <div class="td w-[11%]">{{ \App\Support\Money::format($data['totals']['payment']) }}</div>
+                                                            <div class="td w-[11%]">{{ \App\Support\Money::format($data['closing_balance']) }}</div>
                                                         </div>
                                                     @endif
                                                 </div>

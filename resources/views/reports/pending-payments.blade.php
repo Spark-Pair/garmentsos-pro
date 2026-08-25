@@ -73,7 +73,7 @@
                                             <div class="table w-full">
                                                 {{-- Table Header --}}
                                                 <div class="thead w-full">
-                                                    <div class="tr flex items-center w-full px-4 py-1.5 bg-[var(--primary-color)] text-white text-center rounded-md">
+                                                    <div class="tr flex items-center w-full px-4 py-2 bg-[var(--primary-color)] text-white text-center rounded-md">
                                                         <div class="th w-[10%] font-medium">S.No</div>
                                                         <div class="th w-1/6 font-medium">Date</div>
                                                         <div class="th w-1/6 font-medium">Method</div>
@@ -85,13 +85,13 @@
                                                 </div>
 
                                                 {{-- Table Body --}}
-                                                <div id="tbody" class="tbody w-full mt-1.5 pb-1">
+                                                <div id="tbody" class="tbody w-full">
                                                     @foreach ($item['payments'] as $payment)
-                                                        <div class="w-full px-4 py-1.5 text-center border-b border-gray-700 last:border-0">
+                                                        <div class="w-full px-4 py-1.5 text-center border-b border-gray-700 border-dashed last:border-0">
                                                             <div class="tr flex items-center">
                                                                 <div class="td w-[10%]">{{ $loop->iteration }}</div>
                                                                 <div class="td w-1/6">{{ \Carbon\Carbon::parse($payment['date'])->format('d-M-Y, D') }}</div>
-                                                                <div class="td w-1/6">{{ $payment['method'] }}</div>
+                                                                <div class="td w-1/6 capitalize">{{ $payment['method'] }}</div>
                                                                 <div class="td w-1/6">{{ $payment['reff_no'] }}</div>
                                                                 <div class="td w-1/6">{{ \App\Support\Money::format($payment['amount']) }}</div>
                                                                 <div class="td w-1/6">{{ \App\Support\Money::format($payment['received_amount']) }}</div>

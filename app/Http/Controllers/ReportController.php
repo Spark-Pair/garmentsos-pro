@@ -1250,7 +1250,7 @@ class ReportController extends Controller
     private function inventoryTransactionStatementPayload(int $id): ?array
     {
         $inventory = app(ModuleBranchService::class)
-            ->applyScope(InventoryTransaction::with(['supplier:id,supplier_name', 'item'])->where('direction', 'in'), 'inventory_transactions')
+            ->applyScope(InventoryTransaction::with(['supplier:id,supplier_name', 'item']), 'inventory_transactions')
             ->find($id);
         if (!$inventory) return null;
 
