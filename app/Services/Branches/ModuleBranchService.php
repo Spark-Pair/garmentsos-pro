@@ -1657,9 +1657,16 @@ class ModuleBranchService
             ->intersect($availableIds)
             ->values();
 
-        return $this->selectedBranchIdsCache[$cacheKey] = $storedIds->isNotEmpty()
-            ? $storedIds->all()
-            : $availableIds->all();
+        if ($storedIds->isNotEmpty()) {
+            return $this->selectedBranchIdsCache[$cacheKey] = $storedIds->all();
+        }
+
+        $mainBranchId = (int) ($this->mainBranch()?->id ?? 0);
+        $defaultIds = $mainBranchId > 0 && $availableIds->contains($mainBranchId)
+            ? [$mainBranchId]
+            : array_values(array_filter([(int) ($this->selectedBranchIdForModule($moduleKey, $user) ?? 0)]));
+
+        return $this->selectedBranchIdsCache[$cacheKey] = $defaultIds;
     }
 
     public function selectedBranchNamesForModule(string $moduleKey, ?User $user = null): array
