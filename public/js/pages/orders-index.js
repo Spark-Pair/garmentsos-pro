@@ -1,5 +1,6 @@
 (function () {
     let pendingOpenOrderId = null;
+    let printPendingOpenOrder = false;
     const canEditOrderRoles = ['developer', 'owner', 'admin', 'accountant'];
     const isDeveloper = () => isDeveloperUser('orders');
 
@@ -13,6 +14,7 @@
         if (data?.openOrderId) {
             pendingOpenOrderId = String(data.openOrderId);
         }
+        printPendingOpenOrder = data?.printOpenOrder === true;
         if (data?.currentUserRole) {
             window.__currentUserRole = data.currentUserRole;
         }
@@ -138,8 +140,19 @@
 
             generateModal(targetRow);
 
+            if (printPendingOpenOrder) {
+                printPendingOpenOrder = false;
+                window.setTimeout(() => {
+                    const printButton = document.querySelector('#print-in-modal');
+                    if (printButton) {
+                        printOrder(printButton);
+                    }
+                }, 250);
+            }
+
             const url = new URL(window.location.href);
             url.searchParams.delete('open_order');
+            url.searchParams.delete('print_order');
             window.history.replaceState({}, '', url.toString());
         }, { once: false });
     }

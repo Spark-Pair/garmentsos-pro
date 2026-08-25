@@ -152,17 +152,18 @@ class OrderController extends Controller
                 ->orderByDesc('id')
                 ->get();
 
-            $stockMap = $this->articleStockMap(
+            $physicalQuantityEnabled = $branches->isClientModuleEnabled('physical_quantities');
+            $stockMap = $physicalQuantityEnabled ? $this->articleStockMap(
                 $articles->pluck('id'),
                 $request->filled('exclude_order_id') ? (int) $request->exclude_order_id : null,
                 $branches->shouldFilterRecords('physical_quantities') ? $branches->selectedBranchIdForModule('orders') : null
-            );
+            ) : collect();
 
             foreach ($articles as $article) {
                 $stock = $stockMap->get($article->id, []);
                 $article['current_stock'] = (int) ($stock['current_stock_pcs'] ?? 0);
                 $article['current_stock_packets'] = (float) ($stock['current_stock_packets'] ?? 0);
-                $article['orderable_quantity'] = (int) ($stock['orderable_quantity_pcs'] ?? 0);
+                $article['orderable_quantity'] = $physicalQuantityEnabled ? (int) ($stock['orderable_quantity_pcs'] ?? 0) : 999999999;
                 $article['orderable_quantity_packets'] = (float) ($stock['orderable_quantity_packets'] ?? 0);
                 $article['total_quantity'] = (int) ($stock['total_quantity_pcs'] ?? 0);
                 $article['ordered_quantity'] = (int) ($stock['ordered_quantity_pcs'] ?? 0);
@@ -174,7 +175,7 @@ class OrderController extends Controller
             }
 
             $articles = $articles
-                ->filter(fn (Article $article) => (int) $article->orderable_quantity > 0)
+                ->filter(fn (Article $article) => !$physicalQuantityEnabled || (int) $article->orderable_quantity > 0)
                 ->values();
         }
 
@@ -230,7 +231,6 @@ class OrderController extends Controller
             'discount' => 'required|integer|min:0|max:100',
             'netAmount' => 'required|string',
             'articles' => 'required|json',
-            'order_no' => 'required|string',
         ];
 
         if ($this->supportsOrderDeliverToColumn()) {
@@ -250,9 +250,7 @@ class OrderController extends Controller
 
             $branches = app(ModuleBranchService::class);
             $branchId = $branches->branchIdForCreate('orders');
-            $orderNo = $branches->shouldFilterRecords('orders')
-                ? app(BranchSerialService::class)->next('orders', Order::class, 'order_no')
-                : $request->order_no;
+            $orderNo = app(BranchSerialService::class)->next('orders', Order::class, 'order_no');
 
             $orderData = [
                 'date' => $request->date,
@@ -349,6 +347,13 @@ class OrderController extends Controller
         // if ($request->generateInvoiceAfterSave) {
         //     return redirect()->route('invoices.create')->with('orderNumber', $order->order_no);
         // } else {
+            if ($request->boolean('printAfterSave')) {
+                return redirect()->route('orders.index', [
+                    'open_order' => $createdOrder->id,
+                    'print_order' => 1,
+                ])->with('success', 'Order generated successfully. Order No. : ' . $createdOrder->order_no);
+            }
+
             return redirect()->route('orders.create')->with('success', 'Order generated successfully. Order No. : ' . $createdOrder->order_no);
         // }
     }
@@ -597,6 +602,7 @@ class OrderController extends Controller
         }
 
         $branches = app(ModuleBranchService::class);
+        $physicalQuantityEnabled = $branches->isClientModuleEnabled('physical_quantities');
         $branchId = $branches->shouldFilterRecords('physical_quantities')
             ? $branches->selectedBranchIdForModule('orders')
             : null;
@@ -621,7 +627,7 @@ class OrderController extends Controller
                 : 0;
             $maxOrderPcs = (int) ($stockMap->get((int) $articleId)['orderable_quantity_pcs'] ?? 0) + $currentOrderPcs;
 
-            if ($orderedPcs > $maxOrderPcs) {
+            if ($physicalQuantityEnabled && $orderedPcs > $maxOrderPcs) {
                 $articleNo = $article?->article_no ?? $articleId;
                 throw ValidationException::withMessages([
                     'articles' => "Order quantity exceeds the remaining article quantity for {$articleNo}. Available: {$maxOrderPcs} pcs.",

@@ -591,9 +591,7 @@
     const previewContainer = document.getElementById('preview-container');
 
     function generateOrderNo() {
-        return safeDocumentNumberPreview(
-            window.__ordersGenerate?.nextOrderNo || incrementDocumentNumber(lastOrder?.order_no, 1)
-        );
+        return 'Assigned after save';
     }
 
     function getOrderDate() {
@@ -639,7 +637,6 @@
                 companyData,
                 companyLogoBase: window.__ordersGenerate?.companyLogoBase,
             });
-            previewContainer.insertAdjacentHTML('beforeend', `<input type="hidden" name="order_no" value="${orderNo}" />`);
         } else {
             previewContainer.className = 'w-[148mm] h-[210mm] mx-auto overflow-hidden relative';
             previewContainer.innerHTML =
@@ -703,19 +700,17 @@
             }
 
             const form = document.getElementById('form');
-            const preview = document.getElementById('preview-container');
-            if (!form || !preview) return;
+            if (!form) return;
 
-            window.DocumentPrint.printPreview({
-                title: 'Print Order',
-                preview,
-                delay: 1000,
-                beforePrint: printDocument => {
-                    const orderCopy = printDocument.querySelector('#preview-container .preview-copy');
-                    if (orderCopy) orderCopy.textContent = 'Order Copy: Office';
-                },
-                afterPrint: () => form.submit(),
-            });
+            let printAfterSaveInput = form.querySelector('input[name="printAfterSave"]');
+            if (!printAfterSaveInput) {
+                printAfterSaveInput = document.createElement('input');
+                printAfterSaveInput.type = 'hidden';
+                printAfterSaveInput.name = 'printAfterSave';
+                form.appendChild(printAfterSaveInput);
+            }
+            printAfterSaveInput.value = '1';
+            form.requestSubmit();
         });
     }
 

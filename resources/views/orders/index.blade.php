@@ -97,6 +97,7 @@
             authLayout: '{{ $authLayout }}',
             currentUserRole: @json(Auth::user()->role),
             openOrderId: @json(request()->integer('open_order') ?: null),
+            printOpenOrder: @json(request()->boolean('print_order')),
             ordersBaseUrl: @json(url('orders')),
         };
     </script>
