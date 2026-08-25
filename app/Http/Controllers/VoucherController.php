@@ -269,7 +269,6 @@ class VoucherController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            "voucher_no" => "required|string",
             "supplier_id" => "nullable|integer|exists:suppliers,id",
             "date" => "required|date",
             "program_id" => "nullable|exists:payment_programs,id",
@@ -285,9 +284,7 @@ class VoucherController extends Controller
 
         DB::transaction(function () use ($request, $paymentDetailsArray) {
             $branches = app(ModuleBranchService::class);
-            $voucherNo = $branches->shouldFilterRecords('vouchers')
-                ? app(BranchSerialService::class)->next('vouchers', Voucher::class, 'voucher_no', 'V')
-                : $request->voucher_no;
+            $voucherNo = app(BranchSerialService::class)->next('vouchers', Voucher::class, 'voucher_no', 'V');
 
             $voucher = Voucher::create([
                 'voucher_no' => $voucherNo,

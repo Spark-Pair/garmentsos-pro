@@ -99,6 +99,19 @@
 
     function initShipmentsIndex(data) {
         setAuthLayout(data);
+        if (data?.openRecordId) {
+            document.addEventListener('app:data:rendered', function openSavedShipment() {
+                const row = document.getElementById(String(data.openRecordId));
+                if (!row) return;
+                document.removeEventListener('app:data:rendered', openSavedShipment);
+                generateModal(row);
+                if (data.printOpenRecord) window.setTimeout(() => document.getElementById('print-in-modal')?.click(), 250);
+                const url = new URL(window.location.href);
+                url.searchParams.delete('open_shipment');
+                url.searchParams.delete('print_shipment');
+                window.history.replaceState({}, '', url);
+            });
+        }
     }
 
     window.initShipmentsIndex = initShipmentsIndex;

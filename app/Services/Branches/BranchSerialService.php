@@ -4,6 +4,7 @@ namespace App\Services\Branches;
 
 use App\Models\Branch;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class BranchSerialService
@@ -37,6 +38,8 @@ class BranchSerialService
         $branchId = $this->branches->shouldFilterRecords($moduleKey)
             ? $this->branches->selectedBranchIdForModule($moduleKey)
             : null;
+
+        $this->lockSerialNamespace($moduleKey, $branchId);
 
         $baseNumber = $this->nextBaseNumber($moduleKey, $modelClass, $column, $pad, $branchId);
 
@@ -128,6 +131,35 @@ class BranchSerialService
         }
 
         return str_pad((string) $serial, $pad, '0', STR_PAD_LEFT);
+    }
+
+    private function lockSerialNamespace(string $moduleKey, ?int $branchId): void
+    {
+        // Store actions already run in a transaction. Lock one stable coordinator
+        // row so concurrent users cannot calculate the same next document number.
+        if (DB::connection()->transactionLevel() < 1) {
+            return;
+        }
+
+        if ($branchId && Schema::hasTable('branches')) {
+            DB::table('branches')->where('id', $branchId)->lockForUpdate()->value('id');
+            return;
+        }
+
+        if (Schema::hasTable('branch_module_settings')) {
+            $locked = DB::table('branch_module_settings')
+                ->where('module_key', $moduleKey)
+                ->lockForUpdate()
+                ->value('id');
+
+            if ($locked) {
+                return;
+            }
+        }
+
+        if (Schema::hasTable('branches')) {
+            DB::table('branches')->orderByDesc('is_main')->orderBy('id')->lockForUpdate()->value('id');
+        }
     }
 
     private function nextVoucherBookNumber(string $lastBase): ?string

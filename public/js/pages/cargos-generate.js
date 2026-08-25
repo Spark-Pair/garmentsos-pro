@@ -257,7 +257,7 @@
     window.generateCargoListPreview = function generateCargoListPreview() {
         const cargoNo = isEdit && cargo?.cargo_no
             ? cargo.cargo_no
-            : String(lastCargo?.cargo_no || '').padStart(4, '0');
+            : 'Assigned after save';
         const cargoNameInpDom = document.getElementById('cargo_name');
         const dateInpDom = document.getElementById('date');
 
@@ -281,7 +281,6 @@
                 companyData,
                 companyLogoBase: window.__cargosGenerate?.companyLogoBase,
             });
-            previewContainer.insertAdjacentHTML('beforeend', `<input type="hidden" name="cargo_no" value="${cargoNo}" />`);
         } else {
             previewContainer.className = 'w-[210mm] h-[297mm] mx-auto overflow-hidden relative';
             previewContainer.innerHTML =
@@ -385,23 +384,17 @@
                 return;
             }
 
-            const preview = document.getElementById('preview-container');
-            if (!preview) return;
-
-            window.DocumentPrint.printPreview({
-                title: 'Print Cargo List',
-                preview,
-                delay: 1000,
-                beforePrint: printDocument => {
-                const listCopy = printDocument.querySelector('#preview-container .preview-copy');
-                if (listCopy) {
-                    listCopy.textContent = 'Cargo List Copy: Office';
-                }
-                },
-                afterPrint: () => {
-                    document.getElementById('form')?.submit();
-                },
-            });
+            const form = document.getElementById('form');
+            if (!form) return;
+            let printAfterSave = form.querySelector('input[name="printAfterSave"]');
+            if (!printAfterSave) {
+                printAfterSave = document.createElement('input');
+                printAfterSave.type = 'hidden';
+                printAfterSave.name = 'printAfterSave';
+                form.appendChild(printAfterSave);
+            }
+            printAfterSave.value = '1';
+            form.requestSubmit();
         });
     }
 

@@ -417,8 +417,7 @@
     const previewContainer = document.getElementById('preview-container');
 
     function generateShipmentNo() {
-        const shipmentNo = String(lastShipment?.shipment_no ?? '').trim();
-        return shipmentNo && !shipmentNo.includes('NaN') ? shipmentNo : 'Will be generated on save';
+        return 'Assigned after save';
     }
 
     function getShipmentDate() {
@@ -557,15 +556,16 @@
             }
 
             const form = document.getElementById('form');
-            const preview = document.getElementById('preview-container');
-            if (!form || !preview) return;
-
-            window.DocumentPrint.printPreview({
-                title: 'Print Shipment',
-                preview,
-                delay: 1000,
-                afterPrint: () => form.submit(),
-            });
+            if (!form) return;
+            let printAfterSave = form.querySelector('input[name="printAfterSave"]');
+            if (!printAfterSave) {
+                printAfterSave = document.createElement('input');
+                printAfterSave.type = 'hidden';
+                printAfterSave.name = 'printAfterSave';
+                form.appendChild(printAfterSave);
+            }
+            printAfterSave.value = '1';
+            form.requestSubmit();
         });
     }
 

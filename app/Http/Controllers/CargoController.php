@@ -136,7 +136,6 @@ class CargoController extends Controller
         $validator = Validator::make($request->all(), [
             'date' => 'required|date',
             'cargo_name' => 'required|string',
-            'cargo_no' => 'required|string',
             'invoices_array' => 'required|json',
         ]);
 
@@ -144,7 +143,7 @@ class CargoController extends Controller
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
-        DB::transaction(function () use ($request) {
+        $createdCargo = DB::transaction(function () use ($request) {
             $branches = app(ModuleBranchService::class);
             $invoicesArray = json_decode($request->invoices_array, true) ?? [];
             $invoiceIds = collect($invoicesArray)->pluck('id')->filter()->values();
@@ -155,16 +154,19 @@ class CargoController extends Controller
                 ]);
             }
 
-            Cargo::create([
+            return Cargo::create([
                 'date' => $request->date,
                 'cargo_name' => $request->cargo_name,
-                'cargo_no' => $branches->shouldFilterRecords('cargo')
-                    ? app(BranchSerialService::class)->next('cargo', Cargo::class, 'cargo_no', null, 4)
-                    : $request->cargo_no,
+                'cargo_no' => app(BranchSerialService::class)->next('cargo', Cargo::class, 'cargo_no', null, 4),
                 'invoices_array' => $request->invoices_array,
                 'branch_id' => $branches->branchIdForCreate('cargo'),
             ]);
         });
+
+        if ($request->boolean('printAfterSave')) {
+            return redirect()->route('cargos.index', ['open_cargo' => $createdCargo->id, 'print_cargo' => 1])
+                ->with('success', 'Cargo List generated successfully. Cargo No. : ' . $createdCargo->cargo_no);
+        }
 
         return redirect()->back()->with(['success' => 'Cargo List Generated Successfuly!']);
     }

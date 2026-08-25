@@ -146,14 +146,13 @@ class ShipmentController extends Controller
             'netAmount' => 'required|string',
             'articles' => 'required|json',
             'city' => 'required|string',
-            'shipment_no' => 'required|string',
         ]);
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
-        DB::transaction(function () use ($request) {
+        $createdShipment = DB::transaction(function () use ($request) {
             $branches = app(ModuleBranchService::class);
             $articles = json_decode($request->articles, true) ?? [];
             $this->validateShipmentArticleStock($articles);
@@ -164,9 +163,7 @@ class ShipmentController extends Controller
                 'netAmount' => str_replace(',', '', $request->netAmount),
                 'articles' => $request->articles,
                 'city' => $request->city,
-                'shipment_no' => $branches->shouldFilterRecords('shipments')
-                    ? app(BranchSerialService::class)->next('shipments', Shipment::class, 'shipment_no', null, 4)
-                    : $request->shipment_no,
+                'shipment_no' => app(BranchSerialService::class)->next('shipments', Shipment::class, 'shipment_no', null, 4),
                 'branch_id' => $branches->branchIdForCreate('shipments'),
             ]);
 
@@ -178,7 +175,14 @@ class ShipmentController extends Controller
                     'shipment_pcs' => $article['shipment_quantity'] ?? 0,
                 ]);
             }
+
+            return $shipment;
         });
+
+        if ($request->boolean('printAfterSave')) {
+            return redirect()->route('shipments.index', ['open_shipment' => $createdShipment->id, 'print_shipment' => 1])
+                ->with('success', 'Shipment generated successfully. Shipment No. : ' . $createdShipment->shipment_no);
+        }
 
         return redirect()->route('shipments.create')->with('success', 'Shipment generated successfully.');
     }

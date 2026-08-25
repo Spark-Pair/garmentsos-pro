@@ -65,6 +65,8 @@
         window.__cargosIndex = {
             companyData: @json($client_company),
             authLayout: '{{ $authLayout }}',
+            openRecordId: @json(request()->integer('open_cargo') ?: null),
+            printOpenRecord: @json(request()->boolean('print_cargo')),
         };
     </script>
 @endpush

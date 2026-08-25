@@ -100,6 +100,19 @@
 
     function initCargosIndex(data) {
         setAuthLayout(data);
+        if (data?.openRecordId) {
+            document.addEventListener('app:data:rendered', function openSavedCargo() {
+                const row = document.getElementById(String(data.openRecordId));
+                if (!row) return;
+                document.removeEventListener('app:data:rendered', openSavedCargo);
+                generateModal(row);
+                if (data.printOpenRecord) window.setTimeout(() => document.getElementById('print-in-modal')?.click(), 250);
+                const url = new URL(window.location.href);
+                url.searchParams.delete('open_cargo');
+                url.searchParams.delete('print_cargo');
+                window.history.replaceState({}, '', url);
+            });
+        }
     }
 
     window.initCargosIndex = initCargosIndex;

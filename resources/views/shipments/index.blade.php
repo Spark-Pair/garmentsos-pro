@@ -71,6 +71,8 @@
         window.__shipmentsIndex = {
             companyData: @json($client_company),
             authLayout: '{{ $authLayout }}',
+            openRecordId: @json(request()->integer('open_shipment') ?: null),
+            printOpenRecord: @json(request()->boolean('print_shipment')),
         };
     </script>
 @endpush
