@@ -116,6 +116,112 @@
         moveHighlight(initialBtn, invoiceType === "order" ? "order" : "shipment");
 
         if (invoiceType === "manual") {
+            const availableArticles = Array.isArray(config.manualArticles) ? config.manualArticles : [];
+            const availableCustomers = Array.isArray(config.manualCustomers) ? config.manualCustomers : Object.values(config.manualCustomers || {});
+            const selectedLines = [];
+            const physicalQuantityEnabled = Boolean(config.physicalQuantityEnabled);
+            const linesInput = document.getElementById('articles_in_invoice');
+            const linesContainer = document.getElementById('manual_article_list');
+            const customerValue = document.querySelector('.dbInput[data-for="customer_id"]');
+
+            const descriptionFor = article => [article.size, article.category, article.season, article.fabric_type].filter(Boolean).map(value => String(value).replaceAll('_', ' ')).join(' | ');
+
+            function renderManualLines() {
+                const totalPcs = selectedLines.reduce((sum, line) => sum + line.invoice_pcs, 0);
+                const totalAmount = selectedLines.reduce((sum, line) => sum + (line.invoice_pcs * line.rate), 0);
+                document.getElementById('totalQuantityInForm').textContent = totalPcs;
+                document.getElementById('manualTotalAmount').textContent = formatNumbersWithDigits(totalAmount, 1, 1);
+                document.getElementById('netAmountInForm').value = formatNumbersWithDigits(totalAmount, 1, 1);
+                const modalQuantity = document.querySelector('#modalForm #totalShipmentedQty');
+                const modalAmount = document.querySelector('#modalForm #totalShipmentAmount');
+                if (modalQuantity) modalQuantity.value = totalPcs;
+                if (modalAmount) modalAmount.value = formatNumbersWithDigits(totalAmount, 1, 1);
+                const modalInfo = document.querySelector('#modalForm .modalFormInfo span');
+                if (modalInfo) modalInfo.textContent = `Selected ${selectedLines.length}/500`;
+                linesInput.value = JSON.stringify(selectedLines.map(line => ({ article_id: line.article_id, description: line.description, invoice_pcs: line.invoice_pcs })));
+                linesContainer.innerHTML = selectedLines.length ? selectedLines.map((line, index) => `
+                    <div class="flex justify-between items-center border-t border-gray-600 py-3 px-4">
+                        <div class="w-[10%]">${line.article.article_no}</div>
+                        <div class="w-1/6">${line.invoice_pcs} pcs</div>
+                        <div class="grow capitalize">${line.description}</div>
+                        <div class="w-1/6">${formatNumbersWithDigits(line.rate, 1, 1)}</div>
+                        <div class="w-1/5">${formatNumbersWithDigits(line.invoice_pcs * line.rate, 1, 1)}</div>
+                        <div class="w-[10%] text-center"><button type="button" data-remove-manual-line="${index}" class="text-[var(--danger-color)] text-xs px-2 py-1 rounded-lg hover:text-[var(--h-danger-color)] transition-all duration-300 ease-in-out cursor-pointer"><i class="fas fa-trash"></i></button></div>
+                    </div>`).join('') : '<div class="text-center bg-[var(--h-bg-color)] rounded-lg py-2 px-4">No Articles Yet</div>';
+            }
+
+            window.manualInvoiceArticleSearch = value => {
+                document.querySelectorAll('#modalForm .card').forEach(card => {
+                    const row = JSON.parse(card.dataset.json || '{}');
+                    card.classList.toggle('hidden', !String(row.name || '').toLowerCase().includes(String(value || '').toLowerCase()));
+                });
+            };
+            window.generateManualInvoiceArticlesModal = function () {
+                const cards = availableArticles.map(article => ({ id: article.id, name: article.article_no, image: article.image === 'no_image_icon.png' ? '/images/no_image_icon.png' : `/storage/uploads/images/${article.image}`, details: { Category: article.category, Season: article.season, Size: article.size }, data: article, onclick: 'generateManualInvoiceQuantityModal(this)' }));
+                createModal({ id: 'modalForm', class: 'h-[80%] w-full', cards: { name: 'Articles', count: 3, data: cards }, basicSearch: true, onBasicSearch: 'manualInvoiceArticleSearch(this.value)', info: `Selected: ${selectedLines.length}/500`, flex_col: true, calcBottom: [{ label: 'Total Quantity - Pcs', name: 'totalShipmentedQty', value: selectedLines.reduce((sum, line) => sum + line.invoice_pcs, 0), disabled: true }, { label: 'Total Amount - Rs.', name: 'totalShipmentAmount', value: formatNumbersWithDigits(selectedLines.reduce((sum, line) => sum + line.invoice_pcs * line.rate, 0), 1, 1), disabled: true }] });
+                selectedLines.forEach(line => document.getElementById(line.article_id)?.insertAdjacentHTML('beforeend', `<div class="quantity-label absolute text-xs text-[var(--border-success)] top-2 right-2 rounded-md bg-[var(--secondary-bg-color)]/90 px-1.5 py-0.5">${line.invoice_pcs} Pcs</div>`));
+            };
+            window.generateManualInvoiceQuantityModal = function (elem) {
+                const article = JSON.parse(elem.dataset.json).data;
+                const limit = Number(article.orderable_quantity || 0);
+                const existing = selectedLines.find(line => line.article_id === Number(article.id));
+                const fields = [{ category: 'input', value: `${article.article_no} | ${article.season || '-'} | ${article.size || '-'} | ${article.category || '-'} | ${article.fabric_type || '-'} | ${formatMoney(article.sales_rate)} - Rs.`, disabled: true, full: true }];
+                if (physicalQuantityEnabled) fields.push({ category: 'input', label: 'Invoiceable Quantity (Current Stock)', value: formatPcsAndPackets(article.current_stock, article.pcs_per_packet), disabled: true });
+                fields.push({ category: 'input', label: 'Unit', value: `${formatNumbersDigitLess(article.pcs_per_packet || 0)} Pcs per Packet`, disabled: true }, { category: 'input', name: 'quantity', id: 'quantity', type: 'number', label: 'Quantity - Pcs.', max: physicalQuantityEnabled ? limit : '', required: true }, { category: 'input', name: 'quantity_packets', id: 'quantity_packets', type: 'number', label: 'Quantity - Pckts.', max: physicalQuantityEnabled && article.pcs_per_packet ? Math.floor(limit / article.pcs_per_packet) : '', required: true });
+                createModal({ id: 'QuantityModalForm', name: 'Enter Quantity', class: 'h-auto', fields, fieldsGridCount: '2', bottomActions: [{ id: 'setQuantityBtn', text: 'Set Quantity', onclick: `setManualInvoiceQuantity(${article.id})` }] });
+                initializeArticleQuantityPair(article.pcs_per_packet, physicalQuantityEnabled ? limit : 0, existing?.invoice_pcs || '');
+                document.getElementById('quantity')?.addEventListener('input', () => syncArticleQuantityPair('pcs', article.pcs_per_packet, physicalQuantityEnabled ? limit : 0));
+                document.getElementById('quantity_packets')?.addEventListener('input', () => syncArticleQuantityPair('packets', article.pcs_per_packet, physicalQuantityEnabled ? limit : 0));
+                document.getElementById('quantity')?.focus();
+            };
+            window.setManualInvoiceQuantity = function (articleId) {
+                const article = availableArticles.find(item => Number(item.id) === Number(articleId));
+                const pcs = Number.parseInt(document.getElementById('quantity')?.value || '0', 10);
+                if (!article || pcs <= 0) return;
+                if (!syncArticleQuantityPair('pcs', article.pcs_per_packet, physicalQuantityEnabled ? Number(article.orderable_quantity || 0) : 0)) return;
+                if (physicalQuantityEnabled && pcs > Number(article.orderable_quantity || 0)) return renderError('Quantity exceeds current stock.');
+                const existing = selectedLines.find(line => line.article_id === Number(article.id));
+                if (existing) existing.invoice_pcs = pcs;
+                else selectedLines.push({ article_id: Number(article.id), article, description: descriptionFor(article), invoice_pcs: pcs, rate: Number(article.sales_rate || 0) });
+                closeModal('QuantityModalForm');
+                renderManualLines();
+            };
+            const selectArticlesBtn = document.getElementById('manualSelectArticlesBtn');
+            if (selectArticlesBtn) { selectArticlesBtn.disabled = true; selectArticlesBtn.addEventListener('click', window.generateManualInvoiceArticlesModal); }
+            const updateSelectArticlesState = () => { if (selectArticlesBtn) selectArticlesBtn.disabled = !customerValue?.value; };
+            customerValue?.addEventListener('change', updateSelectArticlesState);
+            document.getElementById('customer_id')?.addEventListener('input', () => window.setTimeout(updateSelectArticlesState, 0));
+            linesContainer?.addEventListener('click', event => {
+                const button = event.target.closest('[data-remove-manual-line]');
+                if (!button) return;
+                selectedLines.splice(Number(button.dataset.removeManualLine), 1);
+                renderManualLines();
+            });
+
+            window.validateForNextStep = function validateForNextStep() {
+                const customer = availableCustomers.find(item => Number(item.id) === Number(customerValue?.value));
+                if (!customer || selectedLines.length === 0) {
+                    renderError(!customer ? 'Please select a customer.' : 'Please add at least one article.');
+                    return false;
+                }
+                const preview = document.getElementById('preview-container');
+                const totalAmount = selectedLines.reduce((sum, line) => sum + line.invoice_pcs * line.rate, 0);
+                preview.className = 'h-auto mx-auto relative flex flex-col';
+                const data = { customer, date: document.getElementById('date')?.value, invoice_no: 'Assigned after save', order_no: null, carton_count: 0, discount: 0, netAmount: totalAmount, branch_branding: companyData, invoice_articles: selectedLines.map(line => ({ article: line.article, description: line.description, invoice_pcs: line.invoice_pcs })) };
+                preview.innerHTML = [...buildA5InvoicePreviewPages(data, 'Customer', data.invoice_articles), ...buildA5InvoicePreviewPages(data, 'Office', data.invoice_articles)].join('');
+                return true;
+            };
+
+            document.getElementById('printAndSaveBtn')?.addEventListener('click', event => {
+                event.preventDefault();
+                if (!window.validateForNextStep()) return;
+                const form = document.getElementById('form');
+                let input = form.querySelector('[name="printAfterSave"]');
+                if (!input) { input = document.createElement('input'); input.type = 'hidden'; input.name = 'printAfterSave'; form.appendChild(input); }
+                input.value = '1';
+                form.requestSubmit();
+            });
+            renderManualLines();
             return;
         }
 
@@ -757,7 +863,7 @@
             const previewDom = document.getElementById("preview-container");
 
             function generateInvoiceNo() {
-                return nextInvoicePreviewNo();
+                return 'Assigned after save';
             }
 
             function getInvoiceDate() {
@@ -819,7 +925,6 @@
                         buildInvoicePreviewLikeModal(previewData, 'Customer'),
                         buildInvoicePreviewLikeModal(previewData, 'Office'),
                     ].join('');
-                    previewDom.insertAdjacentHTML('beforeend', `<input type="hidden" name="invoice_no" value="${invoiceNo}" />`);
                 } else {
                     previewDom.className = "w-[148mm] h-[210mm] mx-auto overflow-hidden relative";
                     previewDom.innerHTML = `
@@ -891,7 +996,7 @@
                     // Do NOT open print window here.
                     // Submit first so Laravel saves the invoice.
                     printAfterSave = 1
-                    form.submit();
+                    form.requestSubmit();
                 });
             }
 
@@ -1132,7 +1237,7 @@
             const previewDom = document.getElementById("preview-container");
 
             function generateInvoiceNo() {
-                return nextInvoicePreviewNo();
+                return 'Assigned after save';
             }
 
             function getInvoiceDate() {
@@ -1193,7 +1298,6 @@
                         buildOrderInvoicePreviewLikeModal(previewData, 'Customer'),
                         buildOrderInvoicePreviewLikeModal(previewData, 'Office'),
                     ].join('');
-                    previewDom.insertAdjacentHTML('beforeend', `<input type="hidden" name="invoice_no" value="${invoiceNo}" />`);
                 } else {
                     previewDom.className = "w-[148mm] h-[210mm] mx-auto overflow-hidden relative";
                     previewDom.innerHTML = `
@@ -1264,7 +1368,7 @@
                     // Do NOT open print window here.
                     // Submit first so Laravel saves the invoice.
                     printAfterSave = 1
-                    form.submit();
+                    form.requestSubmit();
                 });
             }
 

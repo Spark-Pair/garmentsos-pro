@@ -269,7 +269,7 @@
             return;
         }
 
-        let printStarted = false;
+        let focusRedirectArmed = false;
 
         /*
         |--------------------------------------------------------------------------
@@ -281,13 +281,14 @@
         | print page in browsers where afterprint is unreliable.
         |
         */
-        const fallbackRedirect = setTimeout(() => {
+        const fallbackRedirect = setTimeout(redirectToCreate, 30000);
 
-            if (!printStarted) {
+        const redirectWhenDialogReturnsFocus = function () {
+            if (focusRedirectArmed) {
                 redirectToCreate();
             }
-
-        }, 30000);
+        };
+        window.addEventListener('focus', redirectWhenDialogReturnsFocus);
 
         window.DocumentPrint.printHtml({
 
@@ -332,11 +333,11 @@
 
             beforePrint: printDocument => {
 
-                printStarted = true;
-
-                clearTimeout(
-                    fallbackRedirect
-                );
+                // Some browsers do not forward iframe afterprint reliably.
+                // Arm the parent-focus fallback after the dialog has opened.
+                setTimeout(() => {
+                    focusRedirectArmed = true;
+                }, 1000);
 
                 printDocument
                     .querySelectorAll('.preview')
@@ -355,6 +356,12 @@
                     .forEach(p => {
                         p.classList.remove('mb-4');
                     });
+            },
+
+            afterPrint: () => {
+                clearTimeout(fallbackRedirect);
+                window.removeEventListener('focus', redirectWhenDialogReturnsFocus);
+                redirectToCreate();
             },
         });
     }

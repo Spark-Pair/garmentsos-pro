@@ -344,7 +344,7 @@ class Controller extends BaseController
             return response()->json(["error" => "This order has already been invoiced."]);
         }
 
-        if (!$request->boolean('only_order')) {
+        if (!$request->boolean('only_order') && $branchService->isClientModuleEnabled('physical_quantities')) {
             $stockErrors = [];
             $currentInvoicePcs = collect();
             if ($request->filled('current_invoice_id')) {

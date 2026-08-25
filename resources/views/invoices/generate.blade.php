@@ -95,34 +95,38 @@
 
     <!-- Main Content -->
     <!-- Progress Bar -->
-    <div class="mb-5 max-w-4xl mx-auto">
+    <div class="mb-5 {{ $invoiceType === 'manual' ? 'max-w-5xl' : 'max-w-4xl' }} mx-auto">
         <x-search-header heading="Generate Invoice" link linkText="Show Invoices" linkHref="{{ route('invoices.index') }}"/>
         <x-progress-bar :steps="['Generate Invoice', 'Preview']" :currentStep="1" />
     </div>
 
     <!-- Form -->
     <form id="form" action="{{ route('invoices.store') }}" method="post" enctype="multipart/form-data"
-        class="bg-[var(--secondary-bg-color)] text-sm rounded-xl shadow-lg p-8 border border-[var(--glass-border-color)]/20 pt-14 max-w-4xl mx-auto  relative overflow-hidden">
+        class="bg-[var(--secondary-bg-color)] text-sm rounded-xl shadow-lg p-8 border border-[var(--glass-border-color)]/20 pt-14 {{ $invoiceType === 'manual' ? 'max-w-5xl' : 'max-w-4xl' }} mx-auto relative overflow-hidden">
         @csrf
         <x-form-title-bar title="Generate Invoice" />
 
         <!-- Step 1: Generate Invoice -->
             <div class="step1 space-y-4 ">
                 <div class="flex justify-between gap-4">
-                    <input type="hidden" name="date" value='{{ now()->toDateString() }}'>
+                    @if ($invoiceType === 'manual')
+                        <div class="w-1/2">
+                            <x-input label="Date" name="date" id="date" type="date" value="{{ now()->toDateString() }}" validateMax max="{{ now()->toDateString() }}" validateMin min="2024-01-01" required />
+                        </div>
+                    @else
+                        <input type="hidden" name="date" value='{{ now()->toDateString() }}'>
+                    @endif
                     @if ($invoiceType === 'shipment')
                         <div class="grow">
-                            <x-select label="Shipment Number" name="shipment_no" id="shipment_no" :options="$shipmentsOptions" required showDefault withButton btnId="selectCustomersBtn" btnText="Select Customers" />
+                            <x-select label="Shipment Number" name="shipment_no" id="shipment_no" :options="$shipmentsOptions" sortDirection="desc" required showDefault withButton btnId="selectCustomersBtn" btnText="Select Customers" />
                         </div>
                     @elseif ($invoiceType === 'order')
                         <div class="grow">
-                            <x-select label="Order Number" name="order_no" id="order_no" :options="$ordersOptions" :value="$orderNumber ?? ''" required showDefault withButton btnId="generateInvoiceBtn" btnText="Generate Invoice" />
+                            <x-select label="Order Number" name="order_no" id="order_no" :options="$ordersOptions" :value="$orderNumber ?? ''" sortDirection="desc" required showDefault withButton btnId="generateInvoiceBtn" btnText="Generate Invoice" />
                         </div>
                     @else
-                        <div class="grow grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <x-input label="Invoice No" name="invoice_no" id="invoice_no" :value="$nextInvoiceNo ?? $last_Invoice?->invoice_no" required />
-                            <x-select label="Customer" name="customer_id" id="customer_id" :options="$customerOptions" required showDefault />
-                            <x-input label="Net Amount" name="netAmount" id="manual_net_amount" type="number" min="0" value="0" required />
+                        <div class="grow">
+                            <x-select label="Customer" name="customer_id" id="customer_id" :options="$customerOptions" required showDefault withButton btnId="manualSelectArticlesBtn" btnText="Select Articles" />
                         </div>
                     @endif
                 </div>
@@ -171,14 +175,31 @@
                 </div>
                 @endif
                 @if ($invoiceType === 'manual')
-                    <div class="flex justify-end">
-                        <button type="submit" class="px-4 py-2 bg-[var(--primary-color)] text-white font-medium rounded-lg hover:bg-[var(--h-primary-color)] hover:scale-95 transition-all duration-300 ease-in-out cursor-pointer">Save Invoice</button>
+                    <div id="order-table" class="w-full text-left text-sm">
+                        <div class="flex justify-between items-center bg-[var(--h-bg-color)] rounded-lg py-2 px-4 mb-4">
+                            <div class="w-[10%]">#</div>
+                            <div class="w-1/6">Qty.</div>
+                            <div class="grow">Decs.</div>
+                            <div class="w-1/6">Rate/Pc</div>
+                            <div class="w-1/5">Amount</div>
+                            <div class="w-[10%] text-center">Action</div>
+                        </div>
+                        <div id="manual_article_list" class="h-[19rem] overflow-y-auto my-scrollbar-2">
+                            <div class="text-center bg-[var(--h-bg-color)] rounded-lg py-3 px-4">No Rates Added</div>
+                        </div>
                     </div>
+                    <div class="flex w-full grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mt-5 text-nowrap">
+                        <div class="total-qty flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full"><div class="grow">Total Quantity</div><div id="totalQuantityInForm">0</div></div>
+                        <div class="final flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full"><div class="grow">Total Amount - Rs.</div><div id="manualTotalAmount">0.0</div></div>
+                        <div class="final flex justify-between items-center bg-[var(--h-bg-color)] border border-gray-600 rounded-lg py-2 px-4 w-full"><div class="grow">Discount - %</div><div>0</div></div>
+                        <div class="final flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full"><div class="grow">Net Amount - Rs.</div><input type="text" name="netAmount" id="netAmountInForm" value="0.0" readonly class="text-right bg-transparent outline-none w-1/2 border-none" /></div>
+                    </div>
+                    <input type="hidden" name="articles_in_invoice" id="articles_in_invoice" value="">
                 @endif
             </div>
 
         <!-- Step 2: view order -->
-        <div class="step2 hidden space-y-4 text-black h-[35rem] overflow-y-auto my-scrollbar-2 bg-white rounded-md">
+        <div class="step2 hidden space-y-4 text-black h-[35rem] overflow-y-auto my-scrollbar-2 bg-white rounded-md {{ $invoiceType === 'manual' ? 'py-10' : '' }}">
             <div id="preview-container" class="w-[148mm] h-[210mm] mx-auto overflow-hidden relative ">
                 <div id="preview" class="preview w-[148mm] h-[210mm] gos-a5-document gos-a5-invoice overflow-hidden flex flex-col">
                     <h1 class="text-[var(--border-error)] font-medium text-center mt-5">No Preview avalaible.</h1>
@@ -204,6 +225,9 @@
             searchFieldsHtml: @json($searchFieldsHtml),
             errorAlertTemplate: @json($errorAlertTemplate),
             discountDisabled: @json($hideDocumentDiscount),
+            manualArticles: @json($manualArticles ?? []),
+            manualCustomers: @json($customers ?? []),
+            physicalQuantityEnabled: @json($physicalQuantityEnabled ?? false),
         };
     </script>
 @endpush

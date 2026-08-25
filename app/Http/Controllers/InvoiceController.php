@@ -136,6 +136,32 @@ class InvoiceController extends Controller
             ])
             ->toArray();
 
+        $manualArticles = collect();
+        $physicalQuantityEnabled = $branches->isClientModuleEnabled('physical_quantities');
+        if ($invoiceType === 'manual') {
+            $manualArticles = $branches->applyRelatedScope(Article::query(), 'articles', 'invoices')
+                ->where('sales_rate', '>', 0)
+                ->orderByDesc('id')
+                ->get();
+            $manualStock = $physicalQuantityEnabled
+                ? $this->articleStockMap($manualArticles->pluck('id'), null, $branches->shouldFilterRecords('physical_quantities') ? $branches->selectedBranchIdForModule('invoices') : null)
+                : collect();
+            $manualArticles->each(function (Article $article) use ($manualStock, $physicalQuantityEnabled) {
+                $stock = $manualStock->get($article->id, []);
+                $article->current_stock = $physicalQuantityEnabled ? (int) ($stock['current_stock_pcs'] ?? 0) : null;
+                $article->orderable_quantity = $physicalQuantityEnabled ? (int) ($stock['current_stock_pcs'] ?? 0) : 999999999;
+                $article->category = ucfirst(str_replace('_', ' ', (string) $article->category));
+                $article->season = ucfirst(str_replace('_', ' ', (string) $article->season));
+                $article->size = ucfirst(str_replace('_', '-', (string) $article->size));
+                if (!$article->image || !is_file(public_path('storage/uploads/images/' . $article->image))) {
+                    $article->image = 'no_image_icon.png';
+                }
+            });
+            if ($physicalQuantityEnabled) {
+                $manualArticles = $manualArticles->filter(fn (Article $article) => $article->orderable_quantity > 0)->values();
+            }
+        }
+
         $ordersOptions = $invoiceTypeAvailability['order']
             ? $branches->applyRelatedScope(Order::query(), 'orders', 'invoices')
                 ->where('status', '!=', 'invoiced')
@@ -155,7 +181,7 @@ class InvoiceController extends Controller
 
         $branchBranding = app(ModuleBranchService::class)->documentBranding('invoices');
 
-        return view("invoices.generate", compact("last_Invoice", 'customers', 'customerOptions', 'orderNumber', 'branchBranding', 'nextInvoiceNo', 'ordersOptions', 'shipmentsOptions', 'invoiceType', 'invoiceTypeAvailability', 'showInvoiceTypeSwitcher'));
+        return view("invoices.generate", compact("last_Invoice", 'customers', 'customerOptions', 'orderNumber', 'branchBranding', 'nextInvoiceNo', 'ordersOptions', 'shipmentsOptions', 'invoiceType', 'invoiceTypeAvailability', 'showInvoiceTypeSwitcher', 'manualArticles', 'physicalQuantityEnabled'));
     }
 
     /**
@@ -399,7 +425,6 @@ class InvoiceController extends Controller
             }
 
             $validator = Validator::make($request->all(), [
-                'invoice_no' => 'required|string',
                 'order_no' => 'required|string',
                 'date' => 'required|date',
                 'netAmount' => 'required|string',
@@ -418,15 +443,6 @@ class InvoiceController extends Controller
             $invoiceCustomerId = null;
 
             $data = [
-                'invoice_no' => app(ModuleBranchService::class)->shouldFilterRecords('invoices')
-                    ? app(BranchSerialService::class)->next(
-                        'invoices',
-                        Invoice::class,
-                        'invoice_no',
-                        'INV'
-                    )
-                    : $request->invoice_no,
-
                 'order_no' => $request->order_no,
                 'date' => $request->date,
                 'netAmount' => $request->netAmount,
@@ -482,7 +498,7 @@ class InvoiceController extends Controller
                 );
 
                 $invoice = Invoice::create([
-                    'invoice_no' => $data['invoice_no'],
+                    'invoice_no' => app(BranchSerialService::class)->next('invoices', Invoice::class, 'invoice_no', 'INV'),
                     'order_no' => $orderDb->order_no,
                     'shipment_no' => null,
                     'date' => $data['date'],
@@ -525,7 +541,7 @@ class InvoiceController extends Controller
                 ->route('invoices.create')
                 ->with(
                     'success',
-                    'Invoice generated successfully.'
+                    'Invoice generated successfully. Invoice No. : ' . $invoice->invoice_no
                 );
         }
 
@@ -715,14 +731,12 @@ class InvoiceController extends Controller
                     /*
                     * Generate invoice number.
                     */
-                    $invoiceNo = $branches->shouldFilterRecords('invoices')
-                        ? app(BranchSerialService::class)->next(
-                            'invoices',
-                            Invoice::class,
-                            'invoice_no',
-                            'INV'
-                        )
-                        : $request->invoice_no;
+                    $invoiceNo = app(BranchSerialService::class)->next(
+                        'invoices',
+                        Invoice::class,
+                        'invoice_no',
+                        'INV'
+                    );
 
                     /*
                     * Calculate invoice amount.
@@ -831,10 +845,10 @@ class InvoiceController extends Controller
 
         if (!$branches->isClientModuleEnabled('orders') && !$branches->isClientModuleEnabled('shipments')) {
             $validator = Validator::make($request->all(), [
-                'invoice_no' => 'required|string',
                 'customer_id' => 'required|integer|exists:customers,id',
                 'date' => 'required|date',
                 'netAmount' => 'required|string',
+                'articles_in_invoice' => 'required|json',
             ]);
 
             if ($validator->fails()) {
@@ -845,17 +859,50 @@ class InvoiceController extends Controller
                     ->with('error', $validator->errors()->first());
             }
 
-            $invoice = Invoice::create([
-                'invoice_no' => $branches->shouldFilterRecords('invoices')
-                    ? app(BranchSerialService::class)->next('invoices', Invoice::class, 'invoice_no', 'INV')
-                    : $request->invoice_no,
-                'order_no' => null,
-                'shipment_no' => null,
-                'date' => $request->date,
-                'netAmount' => (int) str_replace(',', '', $request->netAmount),
-                'customer_id' => (int) $request->customer_id,
-                'branch_id' => $branches->branchIdForCreate('invoices'),
-            ]);
+            $manualLines = collect(json_decode($request->articles_in_invoice, true))
+                ->filter(fn ($line) => is_array($line))
+                ->map(fn ($line) => [
+                    'article_id' => (int) ($line['article_id'] ?? $line['id'] ?? 0),
+                    'description' => trim((string) ($line['description'] ?? '')),
+                    'invoice_pcs' => (int) ($line['invoice_pcs'] ?? $line['quantity'] ?? 0),
+                ])->filter(fn ($line) => $line['article_id'] > 0 && $line['invoice_pcs'] > 0)->values();
+
+            if ($manualLines->isEmpty()) {
+                throw ValidationException::withMessages(['articles_in_invoice' => 'Please add at least one article.']);
+            }
+
+            $validArticleIds = Article::whereIn('id', $manualLines->pluck('article_id'))->pluck('id');
+            if ($validArticleIds->count() !== $manualLines->pluck('article_id')->unique()->count()) {
+                throw ValidationException::withMessages(['articles_in_invoice' => 'One or more selected articles are invalid.']);
+            }
+
+            if ($branches->isClientModuleEnabled('physical_quantities')) {
+                $stock = $this->articleStockMap($manualLines->pluck('article_id'), null,
+                    $branches->shouldFilterRecords('physical_quantities') ? $branches->selectedBranchIdForModule('invoices') : null);
+                foreach ($manualLines->groupBy('article_id') as $articleId => $lines) {
+                    $requested = (int) $lines->sum('invoice_pcs');
+                    $available = (int) ($stock->get((int) $articleId)['current_stock_pcs'] ?? 0);
+                    if ($requested > $available) {
+                        throw ValidationException::withMessages(['articles_in_invoice' => "Invoice quantity exceeds available stock for article {$articleId}. Available: {$available} pcs."]);
+                    }
+                }
+            }
+
+            $invoice = DB::transaction(function () use ($request, $branches, $manualLines) {
+                $invoice = Invoice::create([
+                    'invoice_no' => app(BranchSerialService::class)->next('invoices', Invoice::class, 'invoice_no', 'INV'),
+                    'order_no' => null,
+                    'shipment_no' => null,
+                    'date' => $request->date,
+                    'netAmount' => (int) str_replace(',', '', $request->netAmount),
+                    'customer_id' => (int) $request->customer_id,
+                    'branch_id' => $branches->branchIdForCreate('invoices'),
+                ]);
+                foreach ($manualLines as $line) {
+                    $invoice->invoiceArticles()->create($line);
+                }
+                return $invoice;
+            });
 
             $this->notifyCustomerAboutInvoice((int) $request->customer_id, $invoice->invoice_no);
 
@@ -867,7 +914,7 @@ class InvoiceController extends Controller
 
             return redirect()
                 ->route('invoices.create')
-                ->with('success', 'Manual invoice generated successfully.');
+                ->with('success', 'Manual invoice generated successfully. Invoice No. : ' . $invoice->invoice_no);
         }
 
         /*
