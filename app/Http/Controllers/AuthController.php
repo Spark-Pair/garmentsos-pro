@@ -58,7 +58,11 @@ class AuthController extends Controller
                         'is_active' => true,
                     ]);
 
-                    return redirect(route('home'))->with('success', 'Welcome back! You have successfully logged in. Previous active sessions were signed out.'); // Redirect to home
+                    $request->session()->put('clear_browser_cache_after_login', true);
+
+                    return redirect(route('home'))
+                        ->with('success', 'Welcome back! You have successfully logged in. Previous active sessions were signed out.')
+                        ->header('Clear-Site-Data', '"cache"');
                 } else {
                     return redirect('/login')->with('error', 'Your account is currently inactive. Please reach out to the administrator for assistance.')
                         ->withInput($request->only('username'));

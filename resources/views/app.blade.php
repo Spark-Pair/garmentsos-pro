@@ -19,6 +19,7 @@
             : (json_decode((string) $rawMenuShortcuts, true) ?: []);
     }
     $activeUpdateLock = null;
+    $clearBrowserCacheAfterLogin = (bool) session()->pull('clear_browser_cache_after_login', false);
     try {
         $activeUpdateLock = app(\App\Services\Updater\UpdateLockService::class)->activeLock();
     } catch (\Throwable) {
@@ -27,6 +28,7 @@
 
     $appConfig = [
         'authenticated' => Auth::check(),
+        'clearBrowserCache' => $clearBrowserCacheAfterLogin,
         'homeUrl' => route('home'),
         'menuShortcuts' => $menuShortcuts,
         'maxShortcutsLimit' => 7,
