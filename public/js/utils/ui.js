@@ -256,6 +256,11 @@ function initGlobalUI() {
             return;
         }
 
+        if (target.dataset.suppressAutoPickerOnce === 'true') {
+            delete target.dataset.suppressAutoPickerOnce;
+            return;
+        }
+
         window.setTimeout(() => {
             if (document.activeElement !== target || target.disabled || target.readOnly) {
                 return;

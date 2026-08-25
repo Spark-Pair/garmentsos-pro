@@ -17,6 +17,7 @@
     'addBtnLink' => '',
     'required' => false,
     'multiple' => false,
+    'sortDirection' => 'asc',
 ])
 
 @php
@@ -141,6 +142,7 @@
             name="{{ $id }}_name"
             parentGrow
             autocomplete="off"
+            data-sort-direction="{{ $sortDirection }}"
             :disabled="$isDisabled"
             :value="$isDisabled ? '' : $selectedText"
             :placeholder="$placeholderText"
@@ -307,8 +309,10 @@
         var placeholder = items.find(function (li) { return li.dataset.value === ''; });
         var rest = items.filter(function (li) { return li.dataset.value !== ''; });
 
+        var direction = triggerEl?.dataset?.sortDirection === 'desc' ? -1 : 1;
+
         rest.sort(function (a, b) {
-            return a.textContent.trim().localeCompare(b.textContent.trim(), undefined, {
+            return direction * a.textContent.trim().localeCompare(b.textContent.trim(), undefined, {
                 sensitivity: 'base',
                 numeric: true,
             });

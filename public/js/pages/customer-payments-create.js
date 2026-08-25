@@ -50,7 +50,7 @@ function initCustomerPaymentsCreate() {
                         </label>
                     </span>
                 ` : ''}
-                <div class="relative flex gap-4">
+                <div class="field-control relative flex gap-4">
                     <input
                         id="${id}"
                         type="${type}"
@@ -62,10 +62,16 @@ function initCustomerPaymentsCreate() {
                         ${disabledAttr}
                         ${dataValidateAttr}
                         ${oninputAttr}
+                        aria-describedby="${name}-error"
                         class="w-full rounded-lg bg-[var(--h-bg-color)] border border-gray-600 text-[var(--text-color)] px-3 ${type === 'date' ? 'py-[7px]' : 'py-2'} focus:ring-1 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out disabled:bg-transparent disabled:opacity-70 placeholder:capitalize"
                     />
+                    <div class="errorIconWrap absolute right-3 top-1/2 z-20 -translate-y-1/2">
+                        <button type="button" tabindex="-1" aria-label="Validation error"
+                            class="errorIcon peer flex size-[20px] items-center justify-center rounded-full border border-[var(--border-error)] bg-[color-mix(in_srgb,var(--border-error)_10%,var(--secondary-bg-color))] text-[13px] font-bold leading-none text-[var(--border-error)] opacity-0 pointer-events-none transition-all duration-200">!</button>
+                        <div id="${name}-error" role="alert"
+                            class="field-error-msg hidden absolute bottom-[calc(100%+8px)] right-0 z-50 w-max min-w-[9rem] max-w-[230px] rounded-md border border-[color-mix(in_srgb,var(--border-error)_35%,transparent)] bg-[var(--secondary-bg-color)] px-3 py-2 text-xs font-medium leading-4 text-[var(--text-color)] shadow-[0_10px_30px_rgba(15,23,42,0.16)] opacity-0 pointer-events-none translate-y-1 transition-all duration-150 peer-hover:translate-y-0 peer-hover:opacity-100 peer-focus:translate-y-0 peer-focus:opacity-100"></div>
+                    </div>
                 </div>
-                <div id="${name}-error" class="text-[var(--border-error)] text-xs mt-1 hidden transition-all duration-300 ease-in-out"></div>
             </div>
         `;
     }
@@ -104,7 +110,7 @@ function initCustomerPaymentsCreate() {
                         ${addBtnLink ? `<a class="text-lg px-2 leading-none" href="${addBtnLink}">+</a>` : ''}
                     </span>
                 ` : ''}
-                <div class="selectParent flex gap-4">
+                <div class="selectParent field-control relative flex gap-4">
                     <input
                         id="${id}"
                         name="${id}_name"
@@ -112,6 +118,8 @@ function initCustomerPaymentsCreate() {
                         ${disabledAttr}
                         placeholder="-- Select ${label} --"
                         onfocus="selectClicked(this)"
+                        data-error-for="${name}"
+                        aria-describedby="${name}-error"
                         class="w-full rounded-lg bg-[var(--h-bg-color)] border border-gray-600 text-[var(--text-color)] px-3 py-2 focus:ring-1 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out disabled:bg-transparent disabled:opacity-70 placeholder:capitalize"
                     />
                     <input
@@ -138,11 +146,21 @@ function initCustomerPaymentsCreate() {
                             ${optionsHtml}
                         </ul>
                     </div>
+                    <div class="errorIconWrap absolute right-3 top-1/2 z-20 -translate-y-1/2">
+                        <button type="button" tabindex="-1" aria-label="Validation error"
+                            class="errorIcon peer flex size-[20px] items-center justify-center rounded-full border border-[var(--border-error)] bg-[color-mix(in_srgb,var(--border-error)_10%,var(--secondary-bg-color))] text-[13px] font-bold leading-none text-[var(--border-error)] opacity-0 pointer-events-none transition-all duration-200">!</button>
+                        <div id="${name}-error" role="alert"
+                            class="field-error-msg hidden absolute bottom-[calc(100%+8px)] right-0 z-50 w-max min-w-[9rem] max-w-[230px] rounded-md border border-[color-mix(in_srgb,var(--border-error)_35%,transparent)] bg-[var(--secondary-bg-color)] px-3 py-2 text-xs font-medium leading-4 text-[var(--text-color)] shadow-[0_10px_30px_rgba(15,23,42,0.16)] opacity-0 pointer-events-none translate-y-1 transition-all duration-150 peer-hover:translate-y-0 peer-hover:opacity-100 peer-focus:translate-y-0 peer-focus:opacity-100"></div>
+                    </div>
                 </div>
-                <div id="${name}-error" class="text-[var(--border-error)] text-xs mt-1 hidden transition-all duration-300 ease-in-out"></div>
             </div>
         `;
     }
+
+    // Shared Blade-compatible builders keep every JS-generated field aligned
+    // with the server-rendered input/select components.
+    buildInput = options => window.AppDynamicFields.input(options);
+    buildSelect = options => window.AppDynamicFields.select(options);
 
     function formatProgramBalance(balance) {
         const normalized = typeof balance === 'string' ? balance.replace(/,/g, '') : balance;

@@ -138,7 +138,7 @@
                             if (res === false) {
                                 return;
                             }
-                            form.submit();
+                            form.requestSubmit();
                         });
                         return;
                     }
@@ -148,7 +148,7 @@
                         return;
                     }
                 }
-                form.submit();
+                form.requestSubmit();
             });
 
             const saveBtn = document.getElementById('saveBtn');

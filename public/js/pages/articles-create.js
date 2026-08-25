@@ -113,88 +113,66 @@ function initArticlesCreate() {
         });
 
         if (!articleNoValue) {
-            articleNoDom.classList.add('border-[var(--border-error)]');
-            articleNoError.classList.remove('hidden');
-            articleNoError.textContent = 'Article No field is required.';
+            setValidationError(articleNoDom, 'Article No field is required.');
             return false;
         } else if (existingArticle) {
-            articleNoDom.classList.add('border-[var(--border-error)]');
-            articleNoError.classList.remove('hidden');
-            articleNoError.textContent = 'Article No is already exist.';
+            setValidationError(articleNoDom, 'Article No already exists.');
             return false;
         } else {
-            articleNoDom.classList.remove('border-[var(--border-)]');
-            articleNoError.classList.add('hidden');
+            setValidationError(articleNoDom, '');
             return true;
         }
     }
 
     function validateDate() {
         if (dateDom.value === '') {
-            dateDom.classList.add('border-[var(--border-error)]');
-            dateError.classList.remove('hidden');
-            dateError.textContent = 'Date field is required.';
+            setValidationError(dateDom, 'Date field is required.');
             return false;
         } else {
-            dateDom.classList.remove('border-[var(--border-error)]');
-            dateError.classList.add('hidden');
+            setValidationError(dateDom, '');
             return true;
         }
     }
 
     function validateSize() {
         if (sizeDom.value === '') {
-            sizeDom.classList.add('border-[var(--border-error)]');
-            sizeError.classList.remove('hidden');
-            sizeError.textContent = 'Size field is required.';
+            setValidationError(sizeDom, 'Size field is required.');
             return false;
         } else {
-            sizeDom.classList.remove('border-[var(--border-error)]');
-            sizeError.classList.add('hidden');
+            setValidationError(sizeDom, '');
             return true;
         }
     }
 
     function validateSeason() {
         if (seasonDom.value === '') {
-            seasonDom.classList.add('border-[var(--border-error)]');
-            seasonError.classList.remove('hidden');
-            seasonError.textContent = 'Season field is required.';
+            setValidationError(seasonDom, 'Season field is required.');
             return false;
         } else {
-            seasonDom.classList.remove('border-[var(--border-error)]');
-            seasonError.classList.add('hidden');
+            setValidationError(seasonDom, '');
             return true;
         }
     }
 
     function validateQuantity() {
         if (quantityDom.value === '') {
-            quantityDom.classList.add('border-[var(--border-error)]');
-            quantityError.classList.remove('hidden');
-            quantityError.textContent = 'Quantity field is required.';
+            setValidationError(quantityDom, 'Quantity field is required.');
             return false;
         } else if (quantityDom.value < 0) {
-            quantityDom.classList.add('border-[var(--border-error)]');
-            quantityError.classList.remove('hidden');
-            quantityError.textContent = 'Quantity is lessthen 0.';
+            setValidationError(quantityDom, 'Quantity cannot be less than 0.');
             return false;
         } else {
-            quantityDom.classList.remove('border-[var(--border-error)]');
-            quantityError.classList.add('hidden');
+            setValidationError(quantityDom, '');
             return true;
         }
     }
 
     function validateExtraPcs() {
         if (extraPcsDom.value === '') {
-            extraPcsDom.classList.add('border-[var(--border-error)]');
-            extraPcsError.classList.remove('hidden');
-            extraPcsError.textContent = 'Extra Pcs field is required.';
+            setValidationError(extraPcsDom, 'Extra Pcs field is required.');
             return false;
         } else {
-            extraPcsDom.classList.remove('border-[var(--border-error)]');
-            extraPcsError.classList.add('hidden');
+            setValidationError(extraPcsDom, '');
             return true;
         }
     }
@@ -214,7 +192,7 @@ function initArticlesCreate() {
         let isValidQuantity = validateQuantity();
         let isValidExtraPcs = validateExtraPcs();
 
-        let isValid = isValidArticleNo || isValidDate || isValidSize || isValidSeason || isValidQuantity || isValidExtraPcs;
+        let isValid = isValidArticleNo && isValidDate && isValidSize && isValidSeason && isValidQuantity && isValidExtraPcs;
 
         if (!isValid) {
             if (typeof showMessageBox === 'function') {

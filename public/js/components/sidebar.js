@@ -388,60 +388,6 @@
             }
         });
 
-        const html = document.documentElement;
-        const themeIcon = document.querySelector('#themeToggle i');
-        const themeToggle = document.getElementById('themeToggle');
-        const themeToggleMobile = document.getElementById('themeToggleMobile');
-
-        themeToggle?.addEventListener('click', () => {
-            themefunction();
-        });
-        themeToggleMobile?.addEventListener('click', () => {
-            themefunction();
-        });
-
-        function changeTheme() {
-            const currentTheme = html.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            html.setAttribute('data-theme', newTheme);
-
-            themeIcon?.classList.toggle('fa-sun');
-            themeIcon?.classList.toggle('fa-moon');
-        }
-
-        function themefunction() {
-            changeTheme();
-            const currentTheme = $('html').attr('data-theme');
-
-            $.ajax({
-                url: '/update-theme',
-                type: 'POST',
-                data: {
-                    theme: currentTheme,
-                    _token: $('meta[name="csrf-token"]').attr('content'),
-                },
-                success: function (response) {
-                    if (typeof messageBox !== 'undefined') {
-                        if (response.success) {
-                            messageBox.innerHTML =
-                                (config.themeSuccessTemplate || '').replace('__MESSAGE__', response.message || '');
-                            messageBoxAnimation();
-                        } else {
-                            messageBox.innerHTML = config.themeFailureTemplate || '';
-                            messageBoxAnimation();
-                        }
-                    }
-                },
-                error: function (xhr, status, error) {
-                    console.error('AJAX Error:', error);
-                    if (typeof messageBox !== 'undefined') {
-                        messageBox.innerHTML = config.themeErrorTemplate || '';
-                        messageBoxAnimation();
-                    }
-                },
-            });
-        }
-
         document.getElementById('logoutModal')?.addEventListener('click', e => {
             if (e.target.id === 'logoutModal') {
                 closeLogoutModal();

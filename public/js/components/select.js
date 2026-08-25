@@ -1,4 +1,19 @@
 let keyboardFieldNavigation = false;
+window.sortSelectOptions = window.sortSelectOptions || function sortSelectOptions(triggerEl) {
+    const id = triggerEl?.id || triggerEl?.dataset?.for;
+    if (!id) return;
+    const scope = triggerEl.closest('form') || document;
+    const list = scope.querySelector(`.optionsDropdown[data-for="${CSS.escape(id)}"]`);
+    if (!list) return;
+    const items = Array.from(list.children);
+    const placeholder = items.find(item => item.dataset.value === '');
+    const direction = triggerEl?.dataset?.sortDirection === 'desc' ? -1 : 1;
+    const rest = items.filter(item => item.dataset.value !== '').sort((left, right) => direction * left.textContent.trim().localeCompare(right.textContent.trim(), undefined, { sensitivity: 'base', numeric: true }));
+    const fragment = document.createDocumentFragment();
+    if (placeholder) fragment.appendChild(placeholder);
+    rest.forEach(item => fragment.appendChild(item));
+    list.appendChild(fragment);
+};
 function getSelectScope(elem) {
     return elem.closest('form') || document;
 }
@@ -54,6 +69,17 @@ function selectThisOption(optionLiElem, options = {}) {
             defaultOption?.classList.add("selected");
             selectSearch.value = defaultOption?.textContent.trim() || "";
         }
+
+        // Multi-select remains open so the user can pick more options without
+        // reopening it after every selection. Single-select behavior is unchanged.
+        requestAnimationFrame(() => {
+            if (!selectSearch.isConnected) return;
+            dropdownSearch?.focus({ preventScroll: true });
+            if (dropdownSearch) {
+                dropdownSearch.value = '';
+                searchSelect(dropdownSearch);
+            }
+        });
     } else {
         selectSearch.value = optionLiElem.textContent.trim();
         if (dropdownSearch) {
@@ -98,6 +124,18 @@ function selectThisOption(optionLiElem, options = {}) {
         validateInput(selectSearch);
     }
 }
+
+document.addEventListener('mousedown', event => {
+    const option = event.target.closest?.('.optionsDropdown li[data-for]');
+    if (!option) return;
+
+    const dbInput = getSelectScope(option).querySelector(
+        `.dbInput[data-for="${CSS.escape(option.dataset.for || '')}"]`
+    );
+    if (dbInput?.dataset.multiple === 'true') {
+        event.preventDefault();
+    }
+}, true);
 
 function searchSelect(selectSearchInput) {
     const inputValue = selectSearchInput.value.toLowerCase().trim();

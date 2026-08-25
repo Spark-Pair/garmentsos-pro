@@ -202,6 +202,16 @@ function getNextFooterActionButton() {
 }
 
 (function initEnterToNextField() {
+    let userInteractedBeforeInitialFocus = false;
+
+    document.addEventListener('pointerdown', () => {
+        userInteractedBeforeInitialFocus = true;
+    }, { capture: true, once: true });
+
+    document.addEventListener('keydown', () => {
+        userInteractedBeforeInitialFocus = true;
+    }, { capture: true, once: true });
+
     const fieldSelector = [
         'input:not([type="hidden"])',
         'select',
@@ -316,14 +326,19 @@ function getNextFooterActionButton() {
         if (!field) return;
 
         const fromKeyboard = options.fromKeyboard ?? false;
+        const initialFocus = options.initialFocus ?? false;
 
         isKeyboardNavigationFocus = fromKeyboard;
+
+        if (initialFocus && isPickerField(field)) {
+            field.dataset.suppressAutoPickerOnce = 'true';
+        }
 
         field.focus();
 
         isKeyboardNavigationFocus = false;
 
-        if (fromKeyboard) {
+        if (fromKeyboard || initialFocus) {
             return;
         }
 
@@ -373,6 +388,19 @@ function getNextFooterActionButton() {
 
     function isActionField(field) {
         return field?.matches?.('button, a[href], [role="button"], input[type="button"]');
+    }
+
+    function getFirstEditableField(scope) {
+        return getFocusableFields(scope).find(field => !isActionField(field)) || null;
+    }
+
+    function isInterfaceLoading(scope) {
+        const loader = document.getElementById('page-loader');
+        const loaderIsVisible = loader && !loader.classList.contains('hidden');
+        const formIsBusy = scope?.matches?.('[aria-busy="true"]')
+            || scope?.querySelector?.('[aria-busy="true"]');
+
+        return window.isGlobalLoaderActive?.() === true || loaderIsVisible || Boolean(formIsBusy);
     }
 
     function nextRenderedField(currentField) {
@@ -440,8 +468,24 @@ function getNextFooterActionButton() {
 
         const start = Date.now();
         const timeout = 1500;
+        const originallyActiveField = fieldAnchor(document.activeElement);
+
+        function focusWasMovedByUser() {
+            const active = document.activeElement;
+
+            if (!active || active === document.body || active === document.documentElement) {
+                return false;
+            }
+
+            const activeField = fieldAnchor(active);
+            return activeField !== current && activeField !== originallyActiveField;
+        }
 
         function findNext() {
+            if (!current?.isConnected || focusWasMovedByUser()) {
+                return false;
+            }
+
             const fields = getRenderedFields(scope);
             const currentIndex = fields.indexOf(current);
 
@@ -456,18 +500,34 @@ function getNextFooterActionButton() {
                 return false;
             }
 
-            for (let i = currentIndex + 1; i < fields.length; i++) {
+            const immediateNextField = fields[currentIndex + 1];
+
+            if (immediateNextField?.isConnected && isVisibleField(immediateNextField)) {
+                focusField(immediateNextField, {
+                    fromKeyboard: true
+                });
+
+                return true;
+            }
+
+            // Wait only when a disabled field is expected to become available
+            // during the active request. Permanent disabled/readonly fields
+            // must be skipped without adding navigation delay.
+            const shouldWaitForImmediateField = immediateNextField?.isConnected
+                && immediateNextField.disabled
+                && !immediateNextField.readOnly
+                && isInterfaceLoading(scope);
+
+            if (shouldWaitForImmediateField && Date.now() - start < timeout) {
+                setTimeout(findNext, 50);
+                return true;
+            }
+
+            for (let i = currentIndex + 2; i < fields.length; i++) {
                 const field = fields[i];
 
-                if (!field?.isConnected) {
-                    continue;
-                }
-
-                if (isVisibleField(field)) {
-                    focusField(field, {
-                        fromKeyboard: true
-                    });
-
+                if (field?.isConnected && isVisibleField(field)) {
+                    focusField(field, { fromKeyboard: true });
                     return true;
                 }
             }
@@ -499,12 +559,21 @@ function getNextFooterActionButton() {
             if (!canMoveFocus) return false;
         }
 
-        const first = getFocusableFields(form)[0];
+        const first = getFirstEditableField(form);
         if (!first) return false;
 
         form.dataset.autoFocusApplied = 'true';
         deferUntilInterfaceReady(() => {
-            focusField(first, false);
+            const active = document.activeElement;
+            const canMoveFocus = options.onlyWhenIdle === false
+                || !active
+                || active === document.body
+                || active === document.documentElement;
+            const currentFirst = getFirstEditableField(form);
+
+            if (canMoveFocus && currentFirst) {
+                focusField(currentFirst, { initialFocus: true });
+            }
         }, options.delay ?? 80);
         return true;
     };
@@ -661,9 +730,16 @@ function getNextFooterActionButton() {
     });
 
     function focusInitialPageForm() {
-        document.querySelectorAll('form').forEach(form => {
-            window.focusFirstFormField(form);
-        });
+        if (userInteractedBeforeInitialFocus) {
+            return;
+        }
+
+        const forms = Array.from(document.querySelectorAll('form'));
+        const firstForm = forms.find(form => getFirstEditableField(form));
+
+        if (firstForm) {
+            window.focusFirstFormField(firstForm, { onlyWhenIdle: false });
+        }
     }
 
     const scheduleInitialPageFocus = () => deferUntilInterfaceReady(focusInitialPageForm, 120);

@@ -4,6 +4,18 @@ function initGlobalLoader() {
     let loaderShownAt = 0;
     const minVisibleMs = 180;
 
+    window.isGlobalLoaderActive = function isGlobalLoaderActive() {
+        return activeLoads > 0;
+    };
+
+    if (!HTMLFormElement.prototype.submit.__garmentsosGuarded) {
+        const guardedSubmit = function guardedSubmit() {
+            this.requestSubmit();
+        };
+        guardedSubmit.__garmentsosGuarded = true;
+        HTMLFormElement.prototype.submit = guardedSubmit;
+    }
+
     function shouldSkipUrl(url) {
         const text = String(url || '');
 
@@ -80,10 +92,40 @@ function initGlobalLoader() {
             });
         });
 
-        document.querySelectorAll('form').forEach(form => {
-            form.addEventListener('submit', function () {
-                beginLoad();
+        document.addEventListener('submit', function (event) {
+            const form = event.target;
+            if (!(form instanceof HTMLFormElement)) return;
+
+            if (form.dataset.submitting === 'true') {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                return;
+            }
+
+            form.dataset.submitting = 'true';
+            form.setAttribute('aria-busy', 'true');
+            const controls = Array.from(form.querySelectorAll('button, input[type="submit"], input[type="button"]'));
+            controls.forEach(control => {
+                control.dataset.previousPointerEvents = control.style.pointerEvents || '';
+                control.style.pointerEvents = 'none';
+                control.setAttribute('aria-disabled', 'true');
             });
+            beginLoad();
+
+            // Validation and page-specific handlers run later in this event.
+            // Restore the form if one of them cancelled the submission.
+            window.setTimeout(function () {
+                if (!event.defaultPrevented) return;
+
+                delete form.dataset.submitting;
+                form.removeAttribute('aria-busy');
+                controls.forEach(control => {
+                    control.style.pointerEvents = control.dataset.previousPointerEvents || '';
+                    control.removeAttribute('aria-disabled');
+                    delete control.dataset.previousPointerEvents;
+                });
+                endLoad(true);
+            }, 0);
         });
     }
 

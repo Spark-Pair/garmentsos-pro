@@ -790,33 +790,7 @@ function initVouchersCreate() {
     }
 
     function generateVoucherNo() {
-        if (config.nextVoucherNo) {
-            return safeDocumentNumberPreview(config.nextVoucherNo);
-        }
-
-        const rawVoucherNo = safeDocumentNumberPreview(lastVoucher?.voucher_no, '');
-        if (!rawVoucherNo || rawVoucherNo.includes('-')) {
-            return incrementDocumentNumber(rawVoucherNo, 1);
-        }
-
-        let parts = lastVoucher.voucher_no.split('/');
-        let left = parseInt(parts[0], 10);
-        let right = parseInt(parts[1], 10);
-
-        if (!Number.isFinite(left) || !Number.isFinite(right)) {
-            return incrementDocumentNumber(rawVoucherNo, 1);
-        }
-
-        left += 1;
-        if (parseInt(parts[0], 10) >= 100) {
-            right += 1;
-            left = 1;
-        }
-
-        let newLeft = left.toString().padStart(2, '0');
-        let newRight = right.toString().padStart(3, '0');
-
-        return `${newLeft}/${newRight}`;
+        return 'Assigned after save';
     }
 
     const previewDom = document.getElementById('preview');
@@ -879,7 +853,6 @@ function initVouchersCreate() {
                 companyData,
                 companyLogoBase: config.companyLogoBase,
             });
-            previewContainer.insertAdjacentHTML('beforeend', `<input type="hidden" name="voucher_no" value="${voucherNo}" />`);
         } else {
             previewContainer.className = 'w-[148mm] h-[210mm] mx-auto overflow-hidden relative';
             previewContainer.innerHTML = `

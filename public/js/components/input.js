@@ -1,4 +1,200 @@
 (() => {
+    const escapeFieldAttribute = value => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    const dynamicErrorMarkup = name => `
+        <div class="errorIconWrap absolute right-3 top-1/2 z-20 -translate-y-1/2">
+            <button type="button" tabindex="-1" aria-label="Validation error"
+                class="errorIcon peer flex size-[20px] items-center justify-center rounded-full border border-[var(--border-error)] bg-[color-mix(in_srgb,var(--border-error)_10%,var(--secondary-bg-color))] text-[13px] font-bold leading-none text-[var(--border-error)] opacity-0 pointer-events-none transition-all duration-200">!</button>
+            <div id="${escapeFieldAttribute(name)}-error" role="alert"
+                class="field-error-msg hidden absolute bottom-[calc(100%+8px)] right-0 z-50 w-max min-w-[9rem] max-w-[230px] rounded-md border border-[color-mix(in_srgb,var(--border-error)_35%,transparent)] bg-[var(--secondary-bg-color)] px-3 py-2 text-xs font-medium leading-4 text-[var(--text-color)] shadow-[0_10px_30px_rgba(15,23,42,0.16)] opacity-0 pointer-events-none translate-y-1 transition-all duration-150 peer-hover:translate-y-0 peer-hover:opacity-100 peer-focus:translate-y-0 peer-focus:opacity-100"></div>
+        </div>`;
+
+    function dynamicFieldLabel({ label, id, name, required, readonly, disabled, addBtnLink = '' }) {
+        if (!label) return '';
+        return `
+            <span class="mb-2 flex items-center justify-between">
+                <label for="${escapeFieldAttribute(id || name)}" class="block font-medium text-[var(--secondary-text)]">
+                    ${escapeFieldAttribute(label)}${!required && !readonly && !disabled ? ' (optional)' : ''}
+                </label>
+                ${addBtnLink ? `<a class="px-2 text-lg leading-none" href="${escapeFieldAttribute(addBtnLink)}">+</a>` : ''}
+            </span>`;
+    }
+
+    function dynamicInputMarkup(options = {}) {
+        const {
+            label = '', name = '', id = '', type = 'text', placeholder = '', value = '',
+            required = false, disabled = false, readonly = false, dataValidate = '', oninput = '',
+            className = '', min = '', max = '', step = '',
+        } = options;
+        const attr = (key, val) => val !== '' && val !== null && typeof val !== 'undefined'
+            ? `${key}="${escapeFieldAttribute(val)}"` : '';
+
+        return `
+            <div class="form-group relative ${escapeFieldAttribute(className)}">
+                ${dynamicFieldLabel({ label, id, name, required, readonly, disabled })}
+                <div class="field-control relative flex gap-4">
+                    <input id="${escapeFieldAttribute(id)}" type="${escapeFieldAttribute(type)}" name="${escapeFieldAttribute(name)}"
+                        ${attr('placeholder', placeholder)} ${attr('value', value)} ${required ? 'required aria-required="true"' : ''}
+                        ${readonly ? 'readonly' : ''} ${disabled ? 'disabled' : ''} ${attr('data-validate', dataValidate)}
+                        ${attr('oninput', oninput)} ${attr('min', min)} ${attr('max', max)} ${attr('step', step)}
+                        aria-describedby="${escapeFieldAttribute(name)}-error"
+                        class="w-full rounded-lg border border-gray-600 bg-[var(--h-bg-color)] px-3 ${type === 'date' ? 'py-[7px]' : 'py-2'} text-[var(--text-color)] transition-all duration-200 ease-out placeholder:capitalize disabled:bg-transparent disabled:opacity-70" />
+                    ${dynamicErrorMarkup(name)}
+                </div>
+            </div>`;
+    }
+
+    function dynamicSelectMarkup(options = {}) {
+        const {
+            label = '', name = '', id = '', options: choices = [], showDefault = false,
+            required = false, disabled = false, onchange = '', addBtnLink = '', className = '', value = '',
+        } = options;
+        const choiceMarkup = choices.map(choice => {
+            const choiceValue = choice.value ?? choice.id ?? '';
+            const choiceText = choice.text ?? choice.label ?? choice.name ?? choiceValue;
+            const dataOption = choice.data_option
+                ? `data-option="${escapeFieldAttribute(JSON.stringify(choice.data_option))}"`
+                : '';
+            return `<li data-for="${escapeFieldAttribute(id)}" data-value="${escapeFieldAttribute(choiceValue)}" ${dataOption}
+                onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg transition hover:bg-[var(--h-bg-color)] text-nowrap overflow-x-auto scrollbar-hidden">${escapeFieldAttribute(choiceText)}</li>`;
+        }).join('');
+
+        return `
+            <div class="form-group relative grow ${escapeFieldAttribute(className)}">
+                ${dynamicFieldLabel({ label, id, name, required, disabled, addBtnLink })}
+                <div class="selectParent field-control relative flex gap-4">
+                    <input id="${escapeFieldAttribute(id)}" name="${escapeFieldAttribute(id)}_name" autocomplete="off"
+                        ${disabled ? 'disabled' : ''} placeholder="-- Select ${escapeFieldAttribute(label)} --"
+                        onfocus="selectClicked(this)" data-error-for="${escapeFieldAttribute(name)}"
+                        aria-describedby="${escapeFieldAttribute(name)}-error"
+                        class="w-full rounded-lg border border-gray-600 bg-[var(--h-bg-color)] px-3 py-2 text-[var(--text-color)] transition-all duration-200 ease-out placeholder:capitalize disabled:bg-transparent disabled:opacity-70" />
+                    <input type="hidden" class="dbInput" data-for="${escapeFieldAttribute(id)}" name="${escapeFieldAttribute(name)}"
+                        value="${escapeFieldAttribute(value)}" ${onchange ? `onchange="${escapeFieldAttribute(onchange)}"` : ''} ${required ? 'required' : ''}>
+                    <div class="dropDownParent flex flex-col gap-2 fixed z-50 mt-2 w-full rounded-xl bg-[var(--secondary-bg-color)] border-gray-600 text-[var(--text-color)] p-1.5 border appearance-none max-h-[13rem]">
+                        <input data-for="${escapeFieldAttribute(id)}" oninput="searchSelect(this)" onblur="validateSelectInput(this)"
+                            autocomplete="off" placeholder="-- Select ${escapeFieldAttribute(label)} --" onkeydown="selectKeyDown(event, this)"
+                            class="w-full rounded-lg border border-gray-600 bg-[var(--h-bg-color)] px-3 py-2 text-[var(--text-color)] transition-all duration-200 ease-out placeholder:capitalize" />
+                        <ul class="optionsDropdown overflow-auto my-scrollbar-2 space-y-0.5 grow" data-for="${escapeFieldAttribute(id)}">
+                            ${showDefault ? `<li data-for="${escapeFieldAttribute(id)}" data-value="" onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg transition hover:bg-[var(--h-bg-color)]">-- Select ${escapeFieldAttribute(label)} --</li>` : ''}
+                            ${choiceMarkup}
+                        </ul>
+                    </div>
+                    ${dynamicErrorMarkup(name)}
+                </div>
+            </div>`;
+    }
+
+    window.AppDynamicFields = Object.freeze({
+        input: dynamicInputMarkup,
+        select: dynamicSelectMarkup,
+        error: dynamicErrorMarkup,
+        hydrate: root => hydrateDynamicPageFields(root),
+    });
+
+    const dynamicPageFieldSelector = [
+        'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"])',
+        'select',
+        'textarea',
+    ].join(',');
+
+    function isModalField(field) {
+        return Boolean(field.closest(
+            '.fixed[id$="-wrapper"], #context-menu, .dropDownParent, #printIframe, #preview-container, .preview-container'
+        ));
+    }
+
+    function hydrateDynamicPageField(field) {
+        if (!field?.matches?.(dynamicPageFieldSelector) || isModalField(field)) return;
+        if (field.dataset.bladeInputBehavior === 'true') return;
+
+        field.dataset.bladeInputBehavior = 'true';
+        field.classList.add(
+            'focus:outline-none',
+            'focus:ring-2',
+            'focus:ring-[var(--primary-color)]',
+            'focus:border-transparent',
+            'transition-all',
+            'duration-200',
+            'ease-out'
+        );
+
+        if (!field.hasAttribute('autocomplete') && field.matches('input:not([type="date"]):not([type="time"]):not([type="month"])')) {
+            field.setAttribute('autocomplete', 'on');
+        }
+
+        if (field.required && !field.hasAttribute('aria-required')) {
+            field.setAttribute('aria-required', 'true');
+        }
+
+        normalizeDynamicFieldError(field);
+
+        document.dispatchEvent(new CustomEvent('app:dynamic-field-hydrated', {
+            detail: { field },
+        }));
+    }
+
+    function normalizeDynamicFieldError(field) {
+        const selectValueField = field.closest('.selectParent')?.querySelector('input.dbInput[name]');
+        const fieldName = field.dataset.errorFor || selectValueField?.name || field.name || field.id;
+        const group = field.closest('.form-group');
+        if (!fieldName || !group) return;
+
+        if (selectValueField && !field.dataset.errorFor) {
+            field.dataset.errorFor = fieldName;
+        }
+
+        const error = document.getElementById(`${fieldName}-error`);
+        if (!error || !group.contains(error) || error.closest('.errorIconWrap')) return;
+
+        const control = field.closest('.field-control') || field.parentElement;
+        if (!control || !group.contains(control)) return;
+
+        control.classList.add('field-control', 'relative');
+
+        const wrap = document.createElement('div');
+        wrap.className = 'errorIconWrap absolute right-3 top-1/2 z-20 -translate-y-1/2';
+
+        const icon = document.createElement('button');
+        icon.type = 'button';
+        icon.tabIndex = -1;
+        icon.setAttribute('aria-label', 'Validation error');
+        icon.className = 'errorIcon peer flex size-[20px] items-center justify-center rounded-full border border-[var(--border-error)] bg-[color-mix(in_srgb,var(--border-error)_10%,var(--secondary-bg-color))] text-[13px] font-bold leading-none text-[var(--border-error)] opacity-0 pointer-events-none transition-all duration-200';
+        icon.textContent = '!';
+
+        error.setAttribute('role', 'alert');
+        error.className = 'field-error-msg hidden absolute bottom-[calc(100%+8px)] right-0 z-50 w-max min-w-[9rem] max-w-[230px] rounded-md border border-[color-mix(in_srgb,var(--border-error)_35%,transparent)] bg-[var(--secondary-bg-color)] px-3 py-2 text-xs font-medium leading-4 text-[var(--text-color)] shadow-[0_10px_30px_rgba(15,23,42,0.16)] opacity-0 pointer-events-none translate-y-1 transition-all duration-150 peer-hover:translate-y-0 peer-hover:opacity-100 peer-focus:translate-y-0 peer-focus:opacity-100';
+        field.setAttribute('aria-describedby', error.id);
+
+        wrap.append(icon, error);
+        control.appendChild(wrap);
+    }
+
+    function hydrateDynamicPageFields(root) {
+        if (!root) return;
+        if (root.matches?.(dynamicPageFieldSelector)) hydrateDynamicPageField(root);
+        root.querySelectorAll?.(dynamicPageFieldSelector).forEach(hydrateDynamicPageField);
+    }
+
+    function initDynamicPageInputBehavior() {
+        const observer = new MutationObserver(mutations => {
+            mutations.forEach(mutation => {
+                mutation.addedNodes.forEach(node => {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        hydrateDynamicPageFields(node);
+                    }
+                });
+            });
+        });
+
+        observer.observe(document.body, { childList: true, subtree: true });
+    }
+
+    window.hydrateDynamicPageFields = hydrateDynamicPageFields;
+
     window.formatUsername = function formatUsername(input) {
         input.value = input.value.toLowerCase().replace(/[^a-z0-9]/g, '');
     };
@@ -239,5 +435,6 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         window.refreshListInput();
+        initDynamicPageInputBehavior();
     });
 })();

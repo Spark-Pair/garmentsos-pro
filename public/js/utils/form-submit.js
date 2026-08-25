@@ -19,8 +19,6 @@ function initGlobalFormValidation() {
             }
         }
 
-        hideLoader();
-
         document.querySelectorAll('input[type="amount"]').forEach(input => {
             formatAmountInput(input);
         });
@@ -36,7 +34,7 @@ window.submitModalForm = function submitModalForm(button) {
         return;
     }
 
-    form.submit();
+    form.requestSubmit();
 }
 
 function showValidationToast(message) {

@@ -15,6 +15,19 @@
     function initAppCommon() {
         const config = window.__appConfig || {};
 
+        if (config.clearBrowserCache) {
+            if ('caches' in window) {
+                caches.keys()
+                    .then(names => Promise.all(names.map(name => caches.delete(name))))
+                    .catch(() => {});
+            }
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations()
+                    .then(registrations => Promise.all(registrations.map(registration => registration.update())))
+                    .catch(() => {});
+            }
+        }
+
         window.messageBox = document.getElementById('messageBox');
         window.notificationBox = document.getElementById('notificationBox');
 
@@ -127,10 +140,10 @@
         if (themeButtons.length) {
             const html = document.documentElement;
             const themeIcons = document.querySelectorAll('#themeToggle i, #themeToggleMobile i');
-            const updateIcons = () => {
+            const updateIcons = theme => {
                 themeIcons.forEach(icon => {
-                    icon.classList.toggle('fa-sun');
-                    icon.classList.toggle('fa-moon');
+                    icon.classList.toggle('fa-sun', theme === 'dark');
+                    icon.classList.toggle('fa-moon', theme !== 'dark');
                 });
             };
             const persistTheme = (theme) => {
@@ -160,10 +173,12 @@
                     const current = html.getAttribute('data-theme');
                     const next = current === 'dark' ? 'light' : 'dark';
                     html.setAttribute('data-theme', next);
-                    updateIcons();
+                    localStorage.setItem('theme', next);
+                    updateIcons(next);
                     persistTheme(next);
                 });
             });
+            updateIcons(html.getAttribute('data-theme') || 'light');
         }
     }
 

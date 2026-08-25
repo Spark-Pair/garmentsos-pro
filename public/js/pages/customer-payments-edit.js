@@ -9,6 +9,7 @@ function initCustomerPaymentsEdit() {
     let typeSelectDom = document.getElementById('type');
     let dateDom = document.getElementById('date');
     let detailsDom = document.getElementById('details');
+    const customerSelectDom = document.getElementById('customer_id');
 
     selectedCustomerData = null;
     let selectedProgramData = {};
@@ -44,7 +45,7 @@ function initCustomerPaymentsEdit() {
                         </label>
                     </span>
                 ` : ''}
-                <div class="relative flex gap-4">
+                <div class="field-control relative flex gap-4">
                     <input
                         id="${id}"
                         type="${type}"
@@ -56,10 +57,16 @@ function initCustomerPaymentsEdit() {
                         ${disabledAttr}
                         ${dataValidateAttr}
                         ${oninputAttr}
+                        aria-describedby="${name}-error"
                         class="w-full rounded-lg bg-[var(--h-bg-color)] border border-gray-600 text-[var(--text-color)] px-3 ${type === 'date' ? 'py-[7px]' : 'py-2'} focus:ring-1 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out disabled:bg-transparent disabled:opacity-70 placeholder:capitalize"
                     />
+                    <div class="errorIconWrap absolute right-3 top-1/2 z-20 -translate-y-1/2">
+                        <button type="button" tabindex="-1" aria-label="Validation error"
+                            class="errorIcon peer flex size-[20px] items-center justify-center rounded-full border border-[var(--border-error)] bg-[color-mix(in_srgb,var(--border-error)_10%,var(--secondary-bg-color))] text-[13px] font-bold leading-none text-[var(--border-error)] opacity-0 pointer-events-none transition-all duration-200">!</button>
+                        <div id="${name}-error" role="alert"
+                            class="field-error-msg hidden absolute bottom-[calc(100%+8px)] right-0 z-50 w-max min-w-[9rem] max-w-[230px] rounded-md border border-[color-mix(in_srgb,var(--border-error)_35%,transparent)] bg-[var(--secondary-bg-color)] px-3 py-2 text-xs font-medium leading-4 text-[var(--text-color)] shadow-[0_10px_30px_rgba(15,23,42,0.16)] opacity-0 pointer-events-none translate-y-1 transition-all duration-150 peer-hover:translate-y-0 peer-hover:opacity-100 peer-focus:translate-y-0 peer-focus:opacity-100"></div>
+                    </div>
                 </div>
-                <div id="${name}-error" class="text-[var(--border-error)] text-xs mt-1 hidden transition-all duration-300 ease-in-out"></div>
             </div>
         `;
     }
@@ -95,7 +102,7 @@ function initCustomerPaymentsEdit() {
                         </label>
                     </span>
                 ` : ''}
-                <div class="selectParent flex gap-4">
+                <div class="selectParent field-control relative flex gap-4">
                     <input
                         id="${id}"
                         name="${id}_name"
@@ -103,6 +110,8 @@ function initCustomerPaymentsEdit() {
                         ${disabledAttr}
                         placeholder="-- Select ${label} --"
                         onfocus="selectClicked(this)"
+                        data-error-for="${name}"
+                        aria-describedby="${name}-error"
                         class="w-full rounded-lg bg-[var(--h-bg-color)] border border-gray-600 text-[var(--text-color)] px-3 py-2 focus:ring-1 focus:ring-primary focus:border-transparent transition-all duration-300 ease-in-out disabled:bg-transparent disabled:opacity-70 placeholder:capitalize"
                     />
                     <input
@@ -129,11 +138,19 @@ function initCustomerPaymentsEdit() {
                             ${optionsHtml}
                         </ul>
                     </div>
+                    <div class="errorIconWrap absolute right-3 top-1/2 z-20 -translate-y-1/2">
+                        <button type="button" tabindex="-1" aria-label="Validation error"
+                            class="errorIcon peer flex size-[20px] items-center justify-center rounded-full border border-[var(--border-error)] bg-[color-mix(in_srgb,var(--border-error)_10%,var(--secondary-bg-color))] text-[13px] font-bold leading-none text-[var(--border-error)] opacity-0 pointer-events-none transition-all duration-200">!</button>
+                        <div id="${name}-error" role="alert"
+                            class="field-error-msg hidden absolute bottom-[calc(100%+8px)] right-0 z-50 w-max min-w-[9rem] max-w-[230px] rounded-md border border-[color-mix(in_srgb,var(--border-error)_35%,transparent)] bg-[var(--secondary-bg-color)] px-3 py-2 text-xs font-medium leading-4 text-[var(--text-color)] shadow-[0_10px_30px_rgba(15,23,42,0.16)] opacity-0 pointer-events-none translate-y-1 transition-all duration-150 peer-hover:translate-y-0 peer-hover:opacity-100 peer-focus:translate-y-0 peer-focus:opacity-100"></div>
+                    </div>
                 </div>
-                <div id="${name}-error" class="text-[var(--border-error)] text-xs mt-1 hidden transition-all duration-300 ease-in-out"></div>
             </div>
         `;
     }
+
+    buildInput = options => window.AppDynamicFields.input(options);
+    buildSelect = options => window.AppDynamicFields.select(options);
 
     function setOptionOnNthLi(triggerDom, index, key, value = '') {
         const li = triggerDom.closest('.selectParent')?.querySelectorAll('ul li')[index];
@@ -145,19 +162,26 @@ function initCustomerPaymentsEdit() {
         if (li) li.dataset[key] = dataValue;
     }
 
-    window.trackCustomerState = function() {
+    window.trackCustomerState = function(elem = null) {
         setOptionOnNthLi(typeSelectDom, 2, 'option');
         setOptionForValue(typeSelectDom, 'payment_program', 'option', '');
         methodSelectDom.value = '';
         typeSelectDom.value = '';
 
         if (customerPayment) {
-            selectedCustomer = customerPayment.customer;
+            const selectedCustomerLi = elem?.closest?.('.selectParent')?.querySelector('ul li.selected');
+            selectedCustomer = selectedCustomerLi?.dataset?.option
+                ? JSON.parse(selectedCustomerLi.dataset.option)
+                : customerPayment.customer;
             dateDom.disabled = false;
             methodSelectDom.disabled = false;
             dateDom.min = selectedCustomer?.date ? selectedCustomer.date.toString().split('T')[0] : '';
             dateDom.max = today;
             selectedCustomerData = selectedCustomer;
+            const customerBalanceDom = document.getElementById('customer_balance');
+            if (customerBalanceDom && typeof selectedCustomer?.balance !== 'undefined') {
+                customerBalanceDom.value = formatNumbersWithDigits(selectedCustomer.balance, 1, 1);
+            }
 
             const programData = JSON.stringify(selectedCustomer?.payment_programs) ?? '';
             setOptionOnNthLi(typeSelectDom, 2, 'option', programData);
@@ -326,10 +350,10 @@ function initCustomerPaymentsEdit() {
                 }
 
                 detailsDom.innerHTML = [
-                    buildInput({ label: 'Category', name: 'category', id: 'category', value: selectedProgramData.category, disabled: !isDeveloper }),
-                    buildInput({ label: 'Beneficiary', name: 'beneficiary', id: 'beneficiary', value: selectedProgramData.beneficiary, disabled: !isDeveloper }),
-                    buildInput({ label: 'Program Date', name: 'program_date', id: 'program_date', value: selectedProgramData.date, disabled: !isDeveloper }),
-                    buildInput({ label: 'Program Balance', name: 'program_balance', id: 'program_balance', type: 'number', value: selectedProgramData.balance, disabled: !isDeveloper }),
+                    buildInput({ label: 'Category', name: 'category', id: 'category', value: selectedProgramData.category, disabled: true }),
+                    buildInput({ label: 'Beneficiary', name: 'beneficiary', id: 'beneficiary', value: selectedProgramData.beneficiary, disabled: true }),
+                    buildInput({ label: 'Program Date', name: 'program_date', id: 'program_date', value: selectedProgramData.date, disabled: true }),
+                    buildInput({ label: 'Program Balance', name: 'program_balance', id: 'program_balance', type: 'number', value: selectedProgramData.balance, disabled: true }),
                     buildInput({ label: 'Amount', name: 'amount', id: 'amount', type: 'amount', placeholder: 'Enter amount', value: customerPayment.amount, dataValidate: 'required|amount', oninput: 'validateInput(this)', required: true }),
                     buildSelect({ label: 'Bank Accounts', name: 'bank_account_id', id: 'bank_accounts', required: true, showDefault: true }),
                     buildInput({ label: 'Transaction Id', name: 'transaction_id', id: 'transaction_id', placeholder: 'Enter Transaction Id', value: customerPayment.transaction_id, dataValidate: 'required|friendly', oninput: 'validateInput(this)', required: true }),

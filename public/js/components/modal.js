@@ -85,7 +85,7 @@ function createModal(data, animate = 'animate') {
     if (data.image) {
         clutter += `
                 <div class="${!data.profile ? 'rounded-lg' : 'rounded-[41.5%]'} ${data.image && data.image == '/images/no_image_icon.png' ? 'scale-75' : ''} h-full aspect-square overflow-hidden">
-                    <img id="imageInModal" src="${data.image}" alt=""
+                    <img id="imageInModal" src="${data.image}" alt="" onerror="this.onerror=null;this.src='/images/no_image_icon.png';"
                         class="w-full h-full object-cover aspect-square">
                 </div>
         `;
