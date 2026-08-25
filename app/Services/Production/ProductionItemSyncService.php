@@ -13,6 +13,7 @@ use App\Services\Branches\ModuleBranchService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 class ProductionItemSyncService
 {
@@ -53,7 +54,24 @@ class ProductionItemSyncService
                 ]);
 
                 if (!empty($material['inventory_item_id'])) {
-                    $item = InventoryItem::find($material['inventory_item_id']);
+                    $item = InventoryItem::whereKey($material['inventory_item_id'])->lockForUpdate()->first();
+                    if (!$item) {
+                        throw ValidationException::withMessages([
+                            'materials' => "Inventory item for {$row->title} is no longer available.",
+                        ]);
+                    }
+
+                    $transactions = InventoryTransaction::where('inventory_item_id', $item->id)
+                        ->lockForUpdate()
+                        ->get();
+                    $available = (float) $transactions->where('direction', 'in')->sum('quantity')
+                        - (float) $transactions->where('direction', 'out')->sum('quantity');
+                    if ((float) $material['quantity'] > $available) {
+                        throw ValidationException::withMessages([
+                            'materials' => "{$row->title} quantity cannot exceed available stock ({$available} {$item->unit}).",
+                        ]);
+                    }
+
                     InventoryTransaction::create([
                         'branch_id' => $production->branch_id,
                         'inventory_item_id' => $material['inventory_item_id'],

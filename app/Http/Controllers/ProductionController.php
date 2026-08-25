@@ -217,7 +217,12 @@ class ProductionController extends Controller
                     ->values();
             }
         }
-        $articles->each->setAppends([]);
+        $articles->each(function (Article $article) {
+            $article->setAppends([]);
+            if (!$article->image || !is_file(public_path('storage/uploads/images/' . $article->image))) {
+                $article->image = 'no_image_icon.png';
+            }
+        });
         $work_options = [];
         $workerTypes = Setup::where('type', 'worker_type')->get();
         foreach($workerTypes as $workerType) {
@@ -279,7 +284,7 @@ class ProductionController extends Controller
         $inventoryItems = collect();
         if (Schema::hasTable('inventory_items')) {
             $inventoryRecords = $branches->applyRelatedScope(
-                    InventoryItem::where('is_active', true)->with('fabric'),
+                    InventoryItem::where('is_active', true)->with(['fabric', 'transactions']),
                     'inventory',
                     'productions',
                 )
@@ -297,7 +302,9 @@ class ProductionController extends Controller
                     ->get()
                     ->keyBy('inventory_item_id');
             $inventoryItems = $inventoryRecords
-                ->map(fn (InventoryItem $item) => [
+                ->map(function (InventoryItem $item) use ($inventorySums) {
+                    $purchase = $item->transactions->sortByDesc('id')->first(fn ($row) => $row->direction === 'in' && $row->unit_price !== null);
+                    return [
                     'id' => $item->id,
                     'name' => $item->name,
                     'type' => $item->type,
@@ -306,7 +313,9 @@ class ProductionController extends Controller
                     'fabric' => $item->fabric?->title,
                     'stock_quantity' => (float) ($inventorySums->get($item->id)?->in_quantity ?? 0)
                         - (float) ($inventorySums->get($item->id)?->out_quantity ?? 0),
-                ])
+                    'unit_price' => $purchase?->unit_price,
+                    ];
+                })
                 ->values();
         }
 

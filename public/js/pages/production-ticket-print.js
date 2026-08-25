@@ -425,7 +425,7 @@
                         font-size: 15px;
                         font-weight: 700;
                         color: #2563eb;
-                        line-height: 1.05;
+                        // line-height: 1.05;
                     }
 
                     .pt-doc-sub {
