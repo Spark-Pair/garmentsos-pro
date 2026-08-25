@@ -10,6 +10,7 @@ use App\Services\Branches\ModuleBranchService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 class InventoryController extends Controller
 {
@@ -27,13 +28,29 @@ class InventoryController extends Controller
             }
 
             $items = app(ModuleBranchService::class)
-                ->applyScope(InventoryItem::with(['fabric', 'transactions'])->orderByDesc('id'), 'inventory')
+                ->applyScope(InventoryItem::with(['fabric', 'transactions.supplier', 'transactions.source'])->orderByDesc('id'), 'inventory')
                 ->applyFilters($request);
 
             return response()->json(['data' => $items, 'authLayout' => $authLayout]);
         }
 
-        return view('inventory.index', compact('authLayout'));
+        [$supplierOptions, $fabricOptions] = $this->formOptions();
+        $typeOptions = [];
+        if (Schema::hasTable('inventory_items')) {
+            $types = app(ModuleBranchService::class)
+                ->applyScope(InventoryItem::query(), 'inventory')
+                ->whereNotNull('type')
+                ->where('type', '!=', '')
+                ->distinct()
+                ->orderBy('type')
+                ->pluck('type');
+
+            $typeOptions = $types->mapWithKeys(fn ($type) => [
+                $type => ['text' => ucfirst(str_replace('_', ' ', $type))],
+            ])->all();
+        }
+
+        return view('inventory.index', compact('authLayout', 'supplierOptions', 'fabricOptions', 'typeOptions'));
     }
 
     public function create()
@@ -105,7 +122,7 @@ class InventoryController extends Controller
 
     public function edit(InventoryItem $inventory)
     {
-        if ($resp = $this->denyIfNoRole(['developer'])) {
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'store_keeper'])) {
             return $resp;
         }
 
@@ -123,7 +140,7 @@ class InventoryController extends Controller
 
     public function update(Request $request, InventoryItem $inventory)
     {
-        if ($resp = $this->denyIfNoRole(['developer'])) {
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'store_keeper'])) {
             return $resp;
         }
 
@@ -144,7 +161,7 @@ class InventoryController extends Controller
                 'tag' => $validated['tag'] ?? null,
                 'fabric_id' => $validated['fabric_id'] ?? null,
                 'color' => $validated['color'] ?? null,
-                'is_active' => $validated['is_active'] ?? true,
+                'is_active' => $inventory->is_active,
                 'remarks' => $validated['remarks'] ?? null,
             ]);
 
@@ -173,7 +190,7 @@ class InventoryController extends Controller
 
     public function destroy(InventoryItem $inventory)
     {
-        if ($resp = $this->denyIfNoRole(['developer'])) {
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin'])) {
             return $resp;
         }
 
@@ -185,6 +202,105 @@ class InventoryController extends Controller
         });
 
         return redirect()->route('inventory.index')->with('success', 'Inventory item deleted successfully.');
+    }
+
+    public function returnCreate(InventoryItem $inventory)
+    {
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'store_keeper'])) {
+            return $resp;
+        }
+
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($inventory, 'inventory');
+        $inventory->load(['fabric', 'transactions.supplier', 'transactions.source']);
+        $inventoryData = $inventory->toFormattedArray();
+        $supplierOptions = collect($inventoryData['supplier_balances'] ?? [])
+            ->mapWithKeys(fn (array $balance) => [
+                $balance['supplier_id'] => [
+                    'text' => $balance['supplier_name'] . ' | Available: '
+                        . rtrim(rtrim(number_format($balance['available_quantity'], 3), '0'), '.')
+                        . ' ' . ($inventory->unit ?? ''),
+                    'data_option' => $balance,
+                ],
+            ])->all();
+        $selectedSupplierId = old('supplier_id', array_key_first($supplierOptions));
+        $selectedSupplierBalance = collect($inventoryData['supplier_balances'] ?? [])
+            ->firstWhere('supplier_id', (int) $selectedSupplierId);
+        $selectedPaymentMethod = old('payment_method', $selectedSupplierBalance['payment_method'] ?? null);
+
+        return view('inventory.return', compact(
+            'inventory',
+            'inventoryData',
+            'supplierOptions',
+            'selectedSupplierId',
+            'selectedPaymentMethod',
+        ));
+    }
+
+    public function returnStock(Request $request, InventoryItem $inventory)
+    {
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'store_keeper'])) return $resp;
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($inventory, 'inventory');
+        $validated = $request->validate([
+            'date' => 'required|date',
+            'quantity' => 'required|numeric|min:0.001',
+            'supplier_id' => 'required|exists:suppliers,id',
+            'payment_method' => 'nullable|string|max:50',
+            'reference_no' => 'nullable|string|max:255',
+            'remarks' => 'nullable|string|max:500',
+        ]);
+
+        DB::transaction(function () use ($inventory, $validated) {
+            $transactions = InventoryTransaction::where('inventory_item_id', $inventory->id)
+                ->lockForUpdate()
+                ->get();
+            $available = (float) $transactions->where('direction', 'in')->sum('quantity')
+                - (float) $transactions->where('direction', 'out')->sum('quantity');
+            $quantity = (float) $validated['quantity'];
+            $supplierReceived = (float) $transactions
+                ->where('direction', 'in')
+                ->where('supplier_id', (int) $validated['supplier_id'])
+                ->sum('quantity');
+            $supplierReturned = (float) $transactions
+                ->where('direction', 'out')
+                ->where('supplier_id', (int) $validated['supplier_id'])
+                ->sum('quantity');
+            $supplierAvailable = max(0, $supplierReceived - $supplierReturned);
+
+            if ($quantity > $available) {
+                throw ValidationException::withMessages([
+                    'quantity' => 'Return quantity cannot exceed available stock.',
+                ]);
+            }
+
+            if ($quantity > $supplierAvailable) {
+                throw ValidationException::withMessages([
+                    'quantity' => 'Return quantity cannot exceed the quantity received from this supplier.',
+                ]);
+            }
+
+            $purchase = $transactions
+                ->where('direction', 'in')
+                ->where('supplier_id', (int) $validated['supplier_id'])
+                ->sortByDesc('id')
+                ->first();
+
+            InventoryTransaction::create([
+                'branch_id' => $inventory->branch_id ?: app(ModuleBranchService::class)->branchIdForCreate('inventory'),
+                'inventory_item_id' => $inventory->id,
+                'direction' => 'out',
+                'date' => $validated['date'],
+                'supplier_id' => $validated['supplier_id'],
+                'payment_method' => $validated['payment_method'] ?? null,
+                'quantity' => $quantity,
+                'unit' => $inventory->unit,
+                'unit_price' => $purchase?->unit_price,
+                'amount' => $purchase?->unit_price !== null ? $quantity * (float) $purchase->unit_price : null,
+                'reference_no' => $validated['reference_no'] ?? null,
+                'remarks' => $validated['remarks'] ?? 'Returned to supplier',
+            ]);
+        });
+
+        return redirect()->route('inventory.index')->with('success', 'Inventory returned to supplier successfully.');
     }
 
     private function formOptions(): array

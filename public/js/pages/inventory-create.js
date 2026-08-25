@@ -1,4 +1,8 @@
 (() => {
+    document.addEventListener('wizard:step-changed', event => {
+        document.getElementById('lastRecordStep1')?.classList.toggle('hidden', event.detail.step !== 1);
+        document.getElementById('lastRecordStep2')?.classList.toggle('hidden', event.detail.step !== 2);
+    });
     window.calculateInventoryAmount = function calculateInventoryAmount() {
         const quantity = parseFloat(document.getElementById("quantity")?.value || "0");
         const unitPrice = parseFloat(document.getElementById("unit_price")?.value || "0");

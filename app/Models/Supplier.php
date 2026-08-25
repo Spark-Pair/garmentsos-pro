@@ -116,8 +116,7 @@ class Supplier extends Model
     {
         $expenseQuery = $this->expenses();
 
-        $inventoryExpenseQuery = $this->inventoryTransactions()
-            ->where('direction', 'in');
+        $inventoryExpenseQuery = $this->inventoryTransactions();
 
         $paymentsQuery = $this->payments()
             ->whereRaw('LOWER(method) IN (?, ?, ?, ?, ?, ?, ?, ?)', [
@@ -182,7 +181,11 @@ class Supplier extends Model
 
         $totalExpense = $expenseQuery->sum('amount') ?? 0;
 
-        $totalInventoryExpense = $inventoryExpenseQuery->sum('amount') ?? 0;
+        $totalInventoryExpense = (float) $inventoryExpenseQuery->get()->sum(
+            fn ($transaction) => $transaction->direction === 'out'
+                ? -(float) ($transaction->amount ?? 0)
+                : (float) ($transaction->amount ?? 0)
+        );
 
         $totalPayments = $paymentsQuery->sum('amount') ?? 0;
 
@@ -229,7 +232,6 @@ class Supplier extends Model
             ->whereBetween(\Illuminate\Support\Facades\DB::raw('DATE(date)'), [$start, $end])
             ->when($hasBranchScope && Schema::hasColumn('expenses', 'branch_id'), $branchScope);
         $inventoryExpenseQuery = $this->inventoryTransactions()
-            ->where('direction', 'in')
             ->whereBetween(
                 \Illuminate\Support\Facades\DB::raw('DATE(date)'),
                 [$start, $end]
@@ -368,10 +370,10 @@ class Supplier extends Model
             ]);
 
             $inventoryExpenses = $mapQuery($inventoryExpenseQuery, fn($i) => [
-                'type' => 'invoice',
+                'type' => $i->direction === 'out' ? 'payment' : 'invoice',
                 'date' => $rawDate($i, 'date')?->toDateString(),
-                'bill' => (float) ($i->amount ?? 0),
-                'payment' => 0,
+                'bill' => $i->direction === 'out' ? 0 : (float) ($i->amount ?? 0),
+                'payment' => $i->direction === 'out' ? (float) ($i->amount ?? 0) : 0,
                 'created_at' => $i->created_at,
             ]);
 
@@ -453,11 +455,11 @@ class Supplier extends Model
             $inventoryExpenses = $mapQuery($inventoryExpenseQuery, fn($i) => [
                 'date' => $rawDate($i, 'date'),
                 'reff_no' => $i->reference_no ?? ('INV-' . $i->id),
-                'type' => 'invoice',
-                'method' => 'Inventory Purchase',
-                'bill' => (float) ($i->amount ?? 0),
-                'payment' => 0,
-                'description' => $i->remarks ?? 'Inventory Purchase',
+                'type' => $i->direction === 'out' ? 'payment' : 'invoice',
+                'method' => $i->direction === 'out' ? 'Inventory Return' : 'Inventory Purchase',
+                'bill' => $i->direction === 'out' ? 0 : (float) ($i->amount ?? 0),
+                'payment' => $i->direction === 'out' ? (float) ($i->amount ?? 0) : 0,
+                'description' => $i->remarks ?? ($i->direction === 'out' ? 'Inventory Return' : 'Inventory Purchase'),
                 'created_at' => $i->created_at,
                 'source' => [
                     'type' => 'inventory_transaction',
@@ -521,13 +523,13 @@ class Supplier extends Model
             $inventoryExpenses = $mapQuery($inventoryExpenseQuery, fn($i) => [
                 'date' => $rawDate($i, 'date'),
                 'reff_no' => $i->reference_no ?? ('INV-' . $i->id),
-                'type' => 'invoice',
-                'method' => 'Inventory Purchase',
-                'bill' => (float) ($i->amount ?? 0),
-                'payment' => 0,
+                'type' => $i->direction === 'out' ? 'payment' : 'invoice',
+                'method' => $i->direction === 'out' ? 'Inventory Return' : 'Inventory Purchase',
+                'bill' => $i->direction === 'out' ? 0 : (float) ($i->amount ?? 0),
+                'payment' => $i->direction === 'out' ? (float) ($i->amount ?? 0) : 0,
                 'description' => $i->remarks
                     ? $i->remarks . ' (' . $i->id . ')'
-                    : 'Inventory Purchase (' . $i->id . ')',
+                    : ($i->direction === 'out' ? 'Inventory Return' : 'Inventory Purchase') . ' (' . $i->id . ')',
                 'created_at' => $i->created_at,
                 'source' => [
                     'type' => 'inventory_transaction',

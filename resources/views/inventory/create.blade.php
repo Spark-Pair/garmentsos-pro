@@ -19,9 +19,10 @@
             'supplier_credit' => ['text' => 'Supplier Credit'],
             'bank' => ['text' => 'Bank'],
         ];
+        $lastStockTransaction = $lastRecord?->transactions?->sortByDesc('id')->first();
     @endphp
 
-    <div class="mb-5 max-w-4xl mx-auto">
+    <div class="mb-5 max-w-5xl mx-auto">
         <x-search-header heading="{{ $isEdit ? 'Edit Inventory' : 'Add Inventory' }}" link linkText="Show Inventory" linkHref="{{ route('inventory.index') }}" />
         <x-progress-bar
             :steps="['Item Details', 'Stock In']"
@@ -29,7 +30,7 @@
         />
     </div>
 
-    <div class="row max-w-4xl mx-auto flex gap-4">
+    <div class="row max-w-5xl mx-auto flex gap-4">
         <form id="form" action="{{ $isEdit ? route('inventory.update', $inventory) : route('inventory.store') }}" method="post" enctype="multipart/form-data"
             class="bg-[var(--secondary-bg-color)] text-sm rounded-xl shadow-lg p-8 border border-[var(--glass-border-color)]/20 pt-14 grow relative overflow-hidden">
             @csrf
@@ -46,9 +47,6 @@
                     <x-select label="Fabric" name="fabric_id" id="fabric_id" :options="$fabricOptions" value="{{ old('fabric_id', $inventory->fabric_id ?? '') }}" showDefault />
                     <x-input label="Tag" name="tag" id="tag" placeholder="Optional tag / batch no." value="{{ old('tag', $inventory->tag ?? '') }}" />
                     <x-input label="Color" name="color" id="color" placeholder="Optional color" value="{{ old('color', $inventory->color ?? '') }}" />
-                    @if($isEdit)
-                        <x-select label="Status" name="is_active" id="is_active" :options="[1 => ['text' => 'Active'], 0 => ['text' => 'Inactive']]" value="{{ old('is_active', $inventory->is_active ? 1 : 0) }}" required />
-                    @endif
                 </div>
             </div>
 
@@ -65,6 +63,39 @@
                 </div>
             </div>
         </form>
+
+        <div class="bg-[var(--secondary-bg-color)] rounded-xl shadow-xl p-8 border border-[var(--glass-border-color)]/20 w-[35%] pt-14 relative overflow-hidden fade-in">
+            <x-form-title-bar title="{{ $isEdit ? 'Current Record' : 'Last Record' }}" />
+
+            <div class="space-y-4">
+                @if ($lastRecord)
+                    <div id="lastRecordStep1" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <x-input label="Item" id="last_item" disabled value="{{ $lastRecord->name }}" />
+                        <x-input label="Type" id="last_type" disabled capitalized value="{{ str_replace('_', ' ', $lastRecord->type) }}" />
+                        <x-input label="Fabric" id="last_fabric" disabled value="{{ $lastRecord->fabric?->title ?? '-' }}" />
+                        <x-input label="Tag" id="last_tag" disabled value="{{ $lastRecord->tag ?? '-' }}" />
+                        <x-input label="Color" id="last_color" disabled value="{{ $lastRecord->color ?? '-' }}" />
+                    </div>
+                    <div id="lastRecordStep2" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <x-input label="Date" id="last_date" disabled value="{{ $lastStockTransaction?->date?->format('d-M-Y, D') ?? '-' }}" />
+                        <x-input label="Supplier" id="last_supplier" disabled value="{{ $lastStockTransaction?->supplier?->supplier_name ?? '-' }}" />
+                        <x-input label="Quantity" id="last_quantity" disabled value="{{ $lastStockTransaction?->quantity ?? '-' }}" />
+                        <x-input label="Unit" id="last_unit" disabled capitalized value="{{ $lastRecord->unit ?? '-' }}" />
+                        <x-input label="Unit Price" id="last_unit_price" disabled value="{{ \App\Support\Money::format($lastStockTransaction?->unit_price ?? 0) }}" />
+                        <x-input label="Amount" id="last_amount" disabled value="{{ \App\Support\Money::format($lastStockTransaction?->amount ?? 0) }}" />
+                        <x-input label="Payment" id="last_payment" disabled capitalized value="{{ str_replace('_', ' ', $lastStockTransaction?->payment_method ?? '-') }}" />
+                        <x-input label="Reference No." id="last_reference" disabled value="{{ $lastStockTransaction?->reference_no ?? '-' }}" />
+                        <div class="col-span-full">
+                            <x-input label="Remarks" id="last_remarks" disabled value="{{ $lastRecord->remarks ?? 'No Remarks' }}" />
+                        </div>
+                    </div>
+                @else
+                    <div class="text-center text-gray-500">
+                        <p>No last record found.</p>
+                    </div>
+                @endif
+            </div>
+        </div>
     </div>
 @endsection
 
