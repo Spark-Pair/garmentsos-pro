@@ -180,6 +180,8 @@ Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensur
     Route::resource('physical-quantities', PhysicalQuantityController::class);
 
     Route::resource('inventory', InventoryController::class)->except(['show'])->middleware('moduleEnabled:inventory');
+    Route::get('inventory/{inventory}/return', [InventoryController::class, 'returnCreate'])->middleware('moduleEnabled:inventory')->name('inventory.return.create');
+    Route::post('inventory/{inventory}/return', [InventoryController::class, 'returnStock'])->middleware('moduleEnabled:inventory')->name('inventory.return');
 
     Route::resource('invoices', InvoiceController::class);
     Route::get('print-invoices', [InvoiceController::class, 'print'])->name('invoices.print');
