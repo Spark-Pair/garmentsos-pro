@@ -2,8 +2,10 @@
 
 namespace App\Services\Updater;
 
+use App\Models\UserSession;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class UpdateLockService
@@ -31,7 +33,13 @@ class UpdateLockService
             return null;
         }
 
-        if ($this->isExpired($lock) || $this->targetVersionInstalled($lock)) {
+        if ($this->targetVersionInstalled($lock)) {
+            $this->invalidateAllUserSessions();
+            $this->clear();
+            return null;
+        }
+
+        if ($this->isExpired($lock)) {
             $this->clear();
             return null;
         }
@@ -96,7 +104,13 @@ class UpdateLockService
             return;
         }
 
-        if ($this->isExpired($lock) || $this->targetVersionInstalled($lock)) {
+        if ($this->targetVersionInstalled($lock)) {
+            $this->invalidateAllUserSessions();
+            $this->clear();
+            return;
+        }
+
+        if ($this->isExpired($lock)) {
             $this->clear();
         }
     }
@@ -166,6 +180,20 @@ class UpdateLockService
         }
 
         return version_compare($this->versions->currentVersion(), $target, '>=');
+    }
+
+    protected function invalidateAllUserSessions(): void
+    {
+        if (!Schema::hasTable('user_sessions')) {
+            return;
+        }
+
+        UserSession::query()
+            ->where('is_active', true)
+            ->update([
+                'is_active' => false,
+                'last_activity' => now(),
+            ]);
     }
 
     protected function recentFailure(): ?array

@@ -2,9 +2,11 @@
 
 namespace App\Services\Updater;
 
+use App\Models\UserSession;
 use App\Services\BackupService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
@@ -114,6 +116,8 @@ class UpdateApplyService
                 throw new RuntimeException($versionCheck['message']);
             }
 
+            $invalidatedSessions = $this->invalidateAllUserSessions();
+
             $this->logs->record('apply_succeeded', [
                 'version' => $manifest['latest_version'],
                 'channel' => $manifest['update_channel'],
@@ -123,6 +127,8 @@ class UpdateApplyService
                 'migration_required' => (bool) ($manifest['migration_required'] ?? false),
                 'migration_exit_code' => $migrationCode,
                 'post_update_maintenance' => $maintenance,
+                'invalidated_user_sessions' => $invalidatedSessions,
+                'database_restore_performed' => false,
             ]);
 
             return $this->result(true, 'applied', 'Update applied safely. Review the app and keep the pre-update backup/snapshot until verified.', [
@@ -130,6 +136,8 @@ class UpdateApplyService
                 'snapshot' => basename($snapshot),
                 'file_count' => count($plannedFiles),
                 'post_update_maintenance' => $maintenance,
+                'invalidated_user_sessions' => $invalidatedSessions,
+                'database_restore_performed' => false,
             ]);
         } catch (Throwable $e) {
             $rollback = $this->rollbackFiles($snapshot);
@@ -316,6 +324,20 @@ class UpdateApplyService
             'route_cache' => $this->callArtisanSafely('route:cache'),
             'view_cache' => $this->callArtisanSafely('view:cache'),
         ];
+    }
+
+    protected function invalidateAllUserSessions(): int
+    {
+        if (!Schema::hasTable('user_sessions')) {
+            return 0;
+        }
+
+        return UserSession::query()
+            ->where('is_active', true)
+            ->update([
+                'is_active' => false,
+                'last_activity' => now(),
+            ]);
     }
 
     protected function runPendingMigrationsOnly(): int
