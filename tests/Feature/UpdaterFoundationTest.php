@@ -44,11 +44,11 @@ class UpdaterFoundationTest extends TestCase
             'licensing.identity_path' => storage_path('framework/testing/license-' . Str::random(12) . '/installation.json'),
         ]);
 
-        $keyPair = openssl_pkey_new([
+        $keyPair = openssl_pkey_new(array_merge($this->opensslKeyOptions(), [
             'private_key_bits' => 2048,
             'private_key_type' => OPENSSL_KEYTYPE_RSA,
-        ]);
-        openssl_pkey_export($keyPair, $privateKey);
+        ]));
+        openssl_pkey_export($keyPair, $privateKey, null, $this->opensslKeyOptions());
         $this->privateKey = $privateKey;
         $details = openssl_pkey_get_details($keyPair);
         config(['updater.public_key' => $details['key']]);

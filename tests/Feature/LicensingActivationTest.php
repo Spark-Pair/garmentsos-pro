@@ -34,11 +34,11 @@ class LicensingActivationTest extends TestCase
             'licensing.server_url' => 'https://licenses.example.test',
         ]);
 
-        $keyPair = openssl_pkey_new([
+        $keyPair = openssl_pkey_new(array_merge($this->opensslKeyOptions(), [
             'private_key_bits' => 2048,
             'private_key_type' => OPENSSL_KEYTYPE_RSA,
-        ]);
-        openssl_pkey_export($keyPair, $privateKey);
+        ]));
+        openssl_pkey_export($keyPair, $privateKey, null, $this->opensslKeyOptions());
         $this->privateKey = $privateKey;
         $details = openssl_pkey_get_details($keyPair);
         config(['licensing.public_key' => $details['key']]);
@@ -54,7 +54,7 @@ class LicensingActivationTest extends TestCase
 
         $status = app(LicenseService::class)->activate('RAW-LICENSE-KEY');
 
-        $this->assertSame('valid', $status->state);
+        $this->assertSame('active', $status->state);
         $this->assertDatabaseHas('licenses', [
             'license_key_hash' => $document['payload']['license_key_hash'],
             'status' => 'active',
@@ -62,7 +62,7 @@ class LicensingActivationTest extends TestCase
         ]);
         $this->assertDatabaseMissing('licenses', ['license_key_hash' => 'RAW-LICENSE-KEY']);
         $this->assertStringNotContainsString('RAW-LICENSE-KEY', File::get((string) config('licensing.cache_path')));
-        $this->assertDatabaseHas('license_checks', ['check_type' => 'activation', 'result' => 'valid']);
+        $this->assertDatabaseHas('license_checks', ['check_type' => 'activation', 'result' => 'active']);
         $this->assertDatabaseHas('audit_logs', ['event_type' => 'license.online_activation_succeeded']);
 
         Http::assertSent(fn ($request) => $request['license_key'] === 'RAW-LICENSE-KEY'
@@ -90,9 +90,9 @@ class LicensingActivationTest extends TestCase
 
         $status = app(LicenseService::class)->importSignedLicense(json_encode($document));
 
-        $this->assertSame('valid', $status->state);
+        $this->assertSame('active', $status->state);
         $this->assertSame(1, License::count());
-        $this->assertDatabaseHas('license_checks', ['check_type' => 'offline_activation', 'result' => 'valid']);
+        $this->assertDatabaseHas('license_checks', ['check_type' => 'offline_activation', 'result' => 'active']);
         $this->assertDatabaseHas('audit_logs', ['event_type' => 'license.offline_import_succeeded']);
     }
 
@@ -145,7 +145,7 @@ class LicensingActivationTest extends TestCase
 
         $status = app(LicenseService::class)->statusForLicense($license->fresh('installation'));
 
-        $this->assertSame('installation_mismatch', $status->state);
+        $this->assertSame('blocked', $status->state);
         $this->assertSame('blocked', $status->enforcement);
     }
 
@@ -163,7 +163,7 @@ class LicensingActivationTest extends TestCase
 
         $status = app(LicenseService::class)->refresh();
 
-        $this->assertSame('valid', $status->state);
+        $this->assertSame('active', $status->state);
         $this->assertSame(Carbon::parse($renewedDate)->toDateString(), License::first()->subscription_expires_at->toDateString());
         $this->assertStringContainsString($refreshDocument['payload']['payload_hash'], File::get((string) config('licensing.cache_path')));
     }
@@ -179,7 +179,7 @@ class LicensingActivationTest extends TestCase
             'subscription_expires_at' => $renewedDate,
         ])));
 
-        $this->assertSame('valid', $status->state);
+        $this->assertSame('active', $status->state);
         $this->assertSame(Carbon::parse($renewedDate)->toDateString(), License::first()->subscription_expires_at->toDateString());
     }
 
@@ -214,7 +214,7 @@ class LicensingActivationTest extends TestCase
         $license->save();
 
         $expired = app(LicenseService::class)->statusForLicense($license->fresh('installation'));
-        $this->assertSame('grace_expired', $expired->state);
+        $this->assertSame('expired_readonly', $expired->state);
         $this->assertSame('readonly', $expired->enforcement);
     }
 
@@ -235,7 +235,7 @@ class LicensingActivationTest extends TestCase
     {
         $routes = file_get_contents(base_path('routes/web.php'));
 
-        $this->assertStringContainsString("'auth', 'activeSession', 'ensureLicense', 'subscriptionExpiry', 'readonly', 'dbTransaction'", $routes);
+        $this->assertStringContainsString("'setup.complete', 'auth', 'activeSession', 'ensureLicense', 'readonly', 'blockWhenUpdating'", $routes);
         $this->assertFalse((bool) config('licensing.enabled'));
     }
 

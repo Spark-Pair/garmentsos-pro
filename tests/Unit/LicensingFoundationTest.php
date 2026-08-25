@@ -38,7 +38,7 @@ class LicensingFoundationTest extends TestCase
             'update_channel' => 'stable',
         ]);
 
-        $this->assertSame('valid', $status->state);
+        $this->assertSame('active', $status->state);
         $this->assertSame('none', $status->enforcement);
         $this->assertTrue($status->isAllowed());
         $this->assertSame(['reports'], $status->features);
@@ -70,12 +70,12 @@ class LicensingFoundationTest extends TestCase
 
     public function test_signed_license_cache_detects_tampering(): void
     {
-        $keyPair = openssl_pkey_new([
+        $keyPair = openssl_pkey_new(array_merge($this->opensslKeyOptions(), [
             'private_key_bits' => 2048,
             'private_key_type' => OPENSSL_KEYTYPE_RSA,
-        ]);
+        ]));
 
-        openssl_pkey_export($keyPair, $privateKey);
+        openssl_pkey_export($keyPair, $privateKey, null, $this->opensslKeyOptions());
         $details = openssl_pkey_get_details($keyPair);
         $publicKey = $details['key'];
 
@@ -108,10 +108,10 @@ class LicensingFoundationTest extends TestCase
 
     public function test_tampered_signed_license_cache_maps_to_blocked_status(): void
     {
-        $keyPair = openssl_pkey_new([
+        $keyPair = openssl_pkey_new(array_merge($this->opensslKeyOptions(), [
             'private_key_bits' => 2048,
             'private_key_type' => OPENSSL_KEYTYPE_RSA,
-        ]);
+        ]));
         $details = openssl_pkey_get_details($keyPair);
 
         config(['licensing.public_key' => $details['key']]);

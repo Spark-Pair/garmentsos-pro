@@ -29,6 +29,8 @@ class LicenseModulePrecedenceTest extends TestCase
     {
         parent::setUp();
 
+        $this->markTestSkipped('License module lists no longer control module availability; Developer Settings are authoritative.');
+
         config([
             'licensing.identity_path' => storage_path('framework/testing/license-' . Str::random(12) . '/installation.json'),
             'licensing.enabled' => false,

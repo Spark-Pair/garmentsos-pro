@@ -18,4 +18,16 @@ abstract class TestCase extends BaseTestCase
             'backup.restore.enabled' => false,
         ]);
     }
+
+    protected function opensslKeyOptions(): array
+    {
+        $candidates = [
+            dirname(PHP_BINARY) . DIRECTORY_SEPARATOR . 'extras' . DIRECTORY_SEPARATOR . 'ssl' . DIRECTORY_SEPARATOR . 'openssl.cnf',
+            (string) getenv('OPENSSL_CONF'),
+        ];
+
+        $configPath = collect($candidates)->first(fn ($path) => $path !== '' && is_file($path));
+
+        return $configPath ? ['config' => $configPath] : [];
+    }
 }

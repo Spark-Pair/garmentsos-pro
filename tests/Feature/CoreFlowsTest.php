@@ -10,6 +10,8 @@ use App\Models\Customer;
 use App\Models\CustomerPayment;
 use App\Models\PaymentProgram;
 use App\Models\Setup;
+use App\Models\Supplier;
+use App\Models\SupplierPayment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -167,11 +169,30 @@ class CoreFlowsTest extends TestCase
             'creator_id' => $user->id,
         ]);
 
+        $supplierUser = User::create([
+            'name' => 'Program Supplier',
+            'username' => 'program_supplier_user',
+            'password' => Hash::make('password'),
+            'role' => 'guest',
+            'status' => 'active',
+        ]);
+        $supplier = Supplier::create([
+            'user_id' => $supplierUser->id,
+            'supplier_name' => 'Program Supplier',
+            'person_name' => 'Supplier Person',
+            'phone_number' => '03001112222',
+            'date' => '2026-02-26',
+            'categories_array' => '[]',
+            'creator_id' => $user->id,
+        ]);
+
         $program = PaymentProgram::create([
             'program_no' => 999002,
             'date' => '2026-02-26',
             'customer_id' => $customer->id,
             'category' => 'supplier',
+            'sub_category_id' => $supplier->id,
+            'sub_category_type' => Supplier::class,
             'amount' => 1000,
             'status' => 'Unpaid',
         ]);
@@ -199,6 +220,28 @@ class CoreFlowsTest extends TestCase
             'customer_id' => $customer->id,
             'program_id' => $program->id,
             'amount' => 200,
+        ]);
+        $createdPayment = CustomerPayment::where('program_id', $program->id)->latest('id')->firstOrFail();
+        $this->assertDatabaseHas('supplier_payments', [
+            'customer_payment_id' => $createdPayment->id,
+            'supplier_id' => $supplier->id,
+            'amount' => 200,
+        ]);
+
+        $updateResponse = $this->put(route('customer-payments.update', $createdPayment), [
+            'customer_id' => $customer->id,
+            'date' => '2026-02-27',
+            'type' => 'payment_program',
+            'method' => 'program',
+            'amount' => 250,
+            'program_id' => $program->id,
+        ]);
+        $updateResponse->assertSessionHas('success');
+        $this->assertSame(1, SupplierPayment::where('customer_payment_id', $createdPayment->id)->count());
+        $this->assertDatabaseHas('supplier_payments', [
+            'customer_payment_id' => $createdPayment->id,
+            'amount' => 250,
+            'date' => '2026-02-27 00:00:00',
         ]);
 
         $markPaidResponse = $this->post(route('payment-programs.mark-paid', $program->id));
@@ -269,6 +312,6 @@ class CoreFlowsTest extends TestCase
             'reff_no' => 'CLR-001',
         ]);
 
-        $response->assertSessionHas('error', 'Clear amount remaining outstanding se zyada nahi ho sakta.');
+        $response->assertSessionHas('error', 'Clear amount cannot be greater than the remaining outstanding amount.');
     }
 }

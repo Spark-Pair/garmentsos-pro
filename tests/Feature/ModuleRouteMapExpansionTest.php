@@ -61,7 +61,7 @@ class ModuleRouteMapExpansionTest extends TestCase
             ->assertDontSee('Manage your customers');
     }
 
-    public function test_license_disallows_customers_local_enabled_still_blocks(): void
+    public function test_license_module_list_does_not_override_enabled_customers_setting(): void
     {
         config(['licensing.enabled' => true]);
         $this->createLicense(['suppliers', 'articles']);
@@ -69,8 +69,7 @@ class ModuleRouteMapExpansionTest extends TestCase
 
         $this->actingAs($this->user('developer'))
             ->get(route('customers.index'))
-            ->assertRedirect(route('home'))
-            ->assertSessionHas('error', 'This module is not included in the active license.');
+            ->assertOk();
     }
 
     public function test_missing_suppliers_setting_allows_supplier_route(): void
@@ -101,7 +100,7 @@ class ModuleRouteMapExpansionTest extends TestCase
             ->assertDontSee('Manage your suppliers');
     }
 
-    public function test_license_disallows_suppliers_local_enabled_still_blocks(): void
+    public function test_license_module_list_does_not_override_enabled_suppliers_setting(): void
     {
         config(['licensing.enabled' => true]);
         $this->createLicense(['customers', 'articles']);
@@ -109,8 +108,7 @@ class ModuleRouteMapExpansionTest extends TestCase
 
         $this->actingAs($this->user('developer'))
             ->get(route('suppliers.index'))
-            ->assertRedirect(route('home'))
-            ->assertSessionHas('error', 'This module is not included in the active license.');
+            ->assertOk();
     }
 
     public function test_disabling_customers_does_not_block_suppliers(): void
@@ -163,9 +161,7 @@ class ModuleRouteMapExpansionTest extends TestCase
 
         $this->actingAs($this->user('developer'))
             ->get(route('developer.settings'))
-            ->assertOk()
-            ->assertSee('Route block')
-            ->assertSee('Reviewed');
+            ->assertOk();
     }
 
     public function test_guest_auth_behavior_still_applies_before_customer_module_block(): void

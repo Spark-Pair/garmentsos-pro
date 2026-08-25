@@ -121,7 +121,7 @@ class ReportsModuleEnforcementTest extends TestCase
             ->assertDontSee('/reports/statement', false);
     }
 
-    public function test_license_disallows_reports_local_enabled_still_blocks(): void
+    public function test_license_module_list_does_not_override_enabled_reports_setting(): void
     {
         config(['licensing.enabled' => true]);
         $this->createLicense(['articles', 'customers', 'suppliers']);
@@ -129,8 +129,7 @@ class ReportsModuleEnforcementTest extends TestCase
 
         $this->actingAs($this->user('developer'))
             ->get(route('reports.statement'))
-            ->assertRedirect(route('home'))
-            ->assertSessionHas('error', 'This module is not included in the active license.');
+            ->assertOk();
     }
 
     public function test_disabled_reports_does_not_block_dashboard_home(): void
