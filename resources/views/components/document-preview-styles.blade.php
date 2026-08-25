@@ -15,7 +15,7 @@
         overflow: hidden !important;
         text-overflow: clip !important;
         white-space: nowrap !important;
-        line-height: 1.05;
+        /* line-height: 1.05; */
     }
 
     #preview-container .truncate,

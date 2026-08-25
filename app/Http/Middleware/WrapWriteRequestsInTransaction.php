@@ -15,6 +15,8 @@ class WrapWriteRequestsInTransaction
             return $next($request);
         }
 
-        return DB::transaction(fn() => $next($request));
+        // Retry transient deadlocks / serialization conflicts. This is especially
+        // important when several users save documents and allocate serials together.
+        return DB::transaction(fn() => $next($request), 5);
     }
 }
