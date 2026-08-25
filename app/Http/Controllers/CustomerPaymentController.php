@@ -11,6 +11,7 @@ use App\Models\Supplier;
 use App\Models\SupplierPayment;
 use App\Services\Branches\ModuleBranchService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -440,10 +441,11 @@ class CustomerPaymentController extends Controller
         }
 
         DB::transaction(function () use ($payload, $program) {
-            CustomerPayment::create($payload);
+            $customerPayment = CustomerPayment::create($payload);
 
             if ($program && $payload['method'] === 'program' && $program->category === 'supplier') {
                 SupplierPayment::create(array_merge($payload, [
+                    'customer_payment_id' => $customerPayment->id,
                     'supplier_id' => $program->sub_category_id,
                     'branch_id' => $payload['branch_id'],
                 ]));
@@ -474,7 +476,15 @@ class CustomerPaymentController extends Controller
             return $resp;
         }
 
-        $customerPayment->load('customer');
+        $customerPayment->load(['customer', 'relatedSupplierPayment']);
+        if (!$customerPayment->relatedSupplierPayment && $customerPayment->method === 'program') {
+            $legacyRelatedPayment = $this->findLegacyRelatedSupplierPayment($customerPayment);
+            if ($legacyRelatedPayment) {
+                $legacyRelatedPayment->update(['customer_payment_id' => $customerPayment->id]);
+                $customerPayment->setRelation('relatedSupplierPayment', $legacyRelatedPayment);
+            }
+        }
+        $canFullyEdit = Auth::user()?->role === 'developer' || app_can('customer_payments', 'override');
 
         $banks_options = [];
         $banks = Setup::where('type', 'bank_name')->get();
@@ -510,6 +520,10 @@ class CustomerPaymentController extends Controller
             'bank_account_id' => $customerPayment->bank_account_id,
             'program_id' => $customerPayment->program_id,
             'remarks' => $customerPayment->remarks,
+            'related_supplier_payment' => $customerPayment->relatedSupplierPayment ? [
+                'id' => $customerPayment->relatedSupplierPayment->id,
+                'supplier_id' => $customerPayment->relatedSupplierPayment->supplier_id,
+            ] : null,
             'customer' => [
                 'id' => $customerPayment->customer->id,
                 'customer_name' => $customerPayment->customer->customer_name,
@@ -518,7 +532,32 @@ class CustomerPaymentController extends Controller
             ],
         ];
 
-        return view('customer-payments.edit', compact('customerPayment', 'banks_options', 'customerPaymentPayload'));
+        $customers_options = [];
+        if ($canFullyEdit) {
+            $customers = app(ModuleBranchService::class)->applyRelatedScope(Customer::with([
+                'city:id,title',
+                'paymentPrograms' => fn ($query) => $query
+                    ->select('id', 'program_no', 'order_no', 'date', 'customer_id', 'category', 'sub_category_id', 'sub_category_type', 'amount', 'remarks', 'status')
+                    ->withSum('customerPayments as paid_amount', 'amount')
+                    ->with(['subCategory' => fn ($query) => $query->with('bankAccounts.bank')]),
+            ]), 'customers', 'customer_payments')->get();
+
+            $customers_options = $customers->mapWithKeys(fn (Customer $customer) => [
+                (int) $customer->id => [
+                    'text' => trim($customer->customer_name . ' | ' . ($customer->city?->title ?? '-')),
+                    'data_option' => [
+                        'id' => $customer->id,
+                        'customer_name' => $customer->customer_name,
+                        'date' => $customer->date?->format('Y-m-d'),
+                        'balance' => (float) $customer->balance,
+                        'payment_programs' => $customer->paymentPrograms
+                            ->map(fn ($program) => $this->formatProgramPayload($program))->values()->all(),
+                    ],
+                ],
+            ])->all();
+        }
+
+        return view('customer-payments.edit', compact('customerPayment', 'banks_options', 'customerPaymentPayload', 'customers_options', 'canFullyEdit'));
     }
 
 
@@ -606,7 +645,13 @@ class CustomerPaymentController extends Controller
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
-        $payload = $this->buildCustomerPaymentPayload($request);
+        $canFullyEdit = Auth::user()?->role === 'developer' || app_can('customer_payments', 'override');
+        $payload = $this->buildCustomerPaymentPayload($request, $customerPayment);
+        if (!$canFullyEdit) {
+            $payload['customer_id'] = $customerPayment->customer_id;
+            $payload['date'] = $customerPayment->date?->format('Y-m-d');
+            $payload['type'] = $customerPayment->type;
+        }
         $oldProgramId = $customerPayment->program_id;
 
         try {
@@ -619,24 +664,25 @@ class CustomerPaymentController extends Controller
         }
 
         DB::transaction(function () use ($payload, $customerPayment, $program, $oldProgramId) {
+            $relatedSupplierPayment = SupplierPayment::where('customer_payment_id', $customerPayment->id)->lockForUpdate()->first()
+                ?? $this->findLegacyRelatedSupplierPayment($customerPayment, true);
             $payload['is_return'] = $customerPayment->is_return; // Preserve return status
             $customerPayment->update($payload);
 
-            if (!empty($payload['program_id'])) {
-                SupplierPayment::where([
-                    'program_id' => $payload['program_id'],
-                    'method' => $payload['method'],
-                    'transaction_id' => $payload['transaction_id'],
-                    'bank_account_id' => $payload['bank_account_id'],
-                ])->delete();
-
-                if ($program && $payload['method'] === 'program' && $program['category'] == 'supplier') {
-                    SupplierPayment::create(array_merge($payload, [
+            if ($program && $payload['method'] === 'program' && $program->category === 'supplier') {
+                $supplierPayload = array_merge($payload, [
+                    'customer_payment_id' => $customerPayment->id,
                         'supplier_id' => $program->sub_category_id,
                         'branch_id' => $payload['branch_id'],
-                    ]));
-                }
+                ]);
+                $relatedSupplierPayment
+                    ? $relatedSupplierPayment->update($supplierPayload)
+                    : SupplierPayment::create($supplierPayload);
+            } elseif ($relatedSupplierPayment) {
+                $relatedSupplierPayment->delete();
+            }
 
+            if (!empty($payload['program_id'])) {
                 $this->syncProgramStatus((int) $payload['program_id']);
             }
 
@@ -1101,7 +1147,7 @@ class CustomerPaymentController extends Controller
 
         return [
             'customer_id' => $request->customer_id,
-            'branch_id' => app(ModuleBranchService::class)->branchIdForCreate('customer_payments'),
+            'branch_id' => $existingPayment?->branch_id ?? app(ModuleBranchService::class)->branchIdForCreate('customer_payments'),
             'date' => $request->date,
             'type' => $request->type,
             'method' => $request->method,
@@ -1154,5 +1200,26 @@ class CustomerPaymentController extends Controller
         }
 
         PaymentProgram::where('id', $programId)->update(['status' => $status]);
+    }
+
+    private function findLegacyRelatedSupplierPayment(CustomerPayment $payment, bool $lock = false): ?SupplierPayment
+    {
+        if (!$payment->program_id || $payment->method !== 'program') {
+            return null;
+        }
+
+        $query = SupplierPayment::whereNull('customer_payment_id')
+            ->where('program_id', $payment->program_id)
+            ->where('method', $payment->method)
+            ->where('amount', $payment->amount)
+            ->whereDate('date', $payment->date)
+            ->where('transaction_id', $payment->transaction_id)
+            ->where('bank_account_id', $payment->bank_account_id);
+
+        if ($query->count() !== 1) {
+            return null;
+        }
+
+        return $lock ? $query->lockForUpdate()->first() : $query->first();
     }
 }

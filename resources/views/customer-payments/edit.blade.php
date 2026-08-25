@@ -26,23 +26,29 @@
             class="bg-[var(--secondary-bg-color)] text-sm rounded-xl shadow-lg p-7 border border-[var(--h-bg-color)] pt-12 w-full mx-auto relative overflow-hidden">
             @csrf
             @method('PUT')
-            <input type="hidden" name="customer_id" value="{{ $customerPayment->customer_id }}">
+            @unless ($canFullyEdit)
+                <input type="hidden" name="customer_id" value="{{ $customerPayment->customer_id }}">
+            @endunless
             <x-form-title-bar title="Edit Customer Payment" />
 
             <div class="step space-y-4 overflow-y-auto max-h-[65vh] p-1 my-scrollbar-2">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {{-- customer --}}
-                    <x-input
-                        label="Customer"
-                        value="{{ $customerPayment->customer->customer_name }}"
-                        disabled
-                    />
+                    @if ($canFullyEdit)
+                        <x-select label="Customer" name="customer_id" id="customer_id" :options="$customers_options" :value="$customerPayment->customer_id" required showDefault onchange="trackCustomerState(this)" />
+                    @else
+                        <x-input label="Customer" value="{{ $customerPayment->customer->customer_name }}" disabled />
+                    @endif
 
                     {{-- balance --}}
-                    <x-input label="Balance" value="{{ \App\Support\Money::format($customerPayment->customer->balance) }}" disabled />
+                    <x-input label="Balance" id="customer_balance" value="{{ \App\Support\Money::format($customerPayment->customer->balance) }}" disabled />
+
+                    @if ($customerPaymentPayload['related_supplier_payment'])
+                        <x-input label="Related Record" value="Supplier Payment #{{ $customerPaymentPayload['related_supplier_payment']['id'] }}" disabled />
+                    @endif
 
                     {{-- date --}}
-                    <x-input label="Date" name="date" id="date" type="date" required value="{{ $customerPayment->date->format('Y-m-d') }}" readonly onchange="trackDateState(this)"/>
+                    <x-input label="Date" name="date" id="date" type="date" required value="{{ $customerPayment->date->format('Y-m-d') }}" :readonly="!$canFullyEdit" onchange="trackDateState(this)"/>
 
                     {{-- type --}}
                     <x-select
@@ -53,7 +59,7 @@
                         required
                         showDefault
                         onchange="trackTypeState(this)"
-                        disabled
+                        :disabled="!$canFullyEdit"
                     />
 
                     <div class="col-span-full">
@@ -97,6 +103,7 @@
             customerPayment: @json($customerPaymentPayload),
             banksOptions: @json($banks_options),
             isDeveloper: @json(Auth::user()?->role === 'developer' || app_can('customer_payments', 'override')),
+            customersOptions: @json($customers_options),
         };
     </script>
 @endpush

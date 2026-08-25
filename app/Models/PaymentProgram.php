@@ -18,7 +18,7 @@ class PaymentProgram extends Model
         'updated_at',
     ];
 
-    protected $fillable = ['program_no', 'order_no', 'date', 'customer_id', 'category', 'sub_category', 'amount', 'remarks', 'branch_id'];
+    protected $fillable = ['program_no', 'order_no', 'date', 'customer_id', 'category', 'sub_category', 'sub_category_id', 'sub_category_type', 'amount', 'remarks', 'branch_id'];
 
     protected $casts = [
         'date' => 'date'

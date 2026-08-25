@@ -22,6 +22,8 @@ class SupplierPayment extends Model
 
     protected $fillable = [
         "supplier_id",
+        "customer_payment_id",
+        "branch_id",
         "date",
         "method",
         "amount",
@@ -65,6 +67,11 @@ class SupplierPayment extends Model
     public function supplier()
     {
         return $this->belongsTo(Supplier::class, "supplier_id");
+    }
+
+    public function sourceCustomerPayment()
+    {
+        return $this->belongsTo(CustomerPayment::class, 'customer_payment_id');
     }
 
     public function program()

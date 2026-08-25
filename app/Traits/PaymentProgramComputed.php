@@ -122,7 +122,7 @@ trait PaymentProgramComputed
 
                 return [
                     'id' => $payment->id,
-                    'date' => $payment->date,
+                    'date' => $payment->date->format('Y-m-d'),
                     'amount' => (float) $payment->amount,
                     'method' => $payment->method,
                     'type' => $payment->type,

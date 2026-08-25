@@ -85,6 +85,11 @@ class CustomerPayment extends Model
         return $this->belongsTo(PaymentProgram::class, "program_id");
     }
 
+    public function relatedSupplierPayment()
+    {
+        return $this->hasOne(SupplierPayment::class, 'customer_payment_id');
+    }
+
     public function bank()
     {
         return $this->belongsTo(Setup::class, "bank_id");
