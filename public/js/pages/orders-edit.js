@@ -140,9 +140,11 @@
     function orderDetailLine(article) {
         const description = String(article?.description ?? '').trim();
         const fabricType = String(article?.fabric_type ?? '').trim();
-        const parts = [description, fabricType].filter((part, index, list) => (
-            part && list.findIndex(item => item.toLowerCase() === part.toLowerCase()) === index
-        ));
+        const parts = [...description.split('|'), fabricType]
+            .map(part => part.trim())
+            .filter((part, index, list) => (
+                part && list.findIndex(item => item.toLowerCase() === part.toLowerCase()) === index
+            ));
 
         return parts.join(' | ');
     }

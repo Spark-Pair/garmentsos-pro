@@ -6,9 +6,11 @@
     const invoiceDetailLine = (orderedArticle, article) => {
         const description = String(orderedArticle?.description ?? '').trim();
         const fabricType = String(article?.fabric_type ?? orderedArticle?.fabric_type ?? orderedArticle?.article?.fabric_type ?? orderedArticle?.articles?.fabric_type ?? '').trim();
-        const parts = [description, fabricType].filter((part, index, list) => (
-            part && list.findIndex(item => item.toLowerCase() === part.toLowerCase()) === index
-        ));
+        const parts = [...description.split('|'), fabricType]
+            .map(part => part.trim())
+            .filter((part, index, list) => (
+                part && list.findIndex(item => item.toLowerCase() === part.toLowerCase()) === index
+            ));
 
         return parts.length ? parts.join(' | ') : '';
     };
