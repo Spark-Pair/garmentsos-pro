@@ -74,12 +74,32 @@
     }
 
     $currentBranchModuleKey = null;
+    $branchEditRecordToken = null;
     if (Auth::check() && !request()->is('login') && !request()->is('setup')) {
         try {
             $currentBranchModuleKey = app(\App\Services\Branches\BranchModuleRegistryService::class)
                 ->moduleKeyForRoute(request()->route());
+
+            $isEditRoute = request()->route()?->getActionMethod() === 'edit'
+                || str_ends_with((string) request()->route()?->getName(), '.edit');
+            if ($isEditRoute && $currentBranchModuleKey && app_can($currentBranchModuleKey, 'update')) {
+                $routeRecord = collect(request()->route()?->parameters() ?? [])
+                    ->first(fn ($parameter) => $parameter instanceof \Illuminate\Database\Eloquent\Model
+                        && \Illuminate\Support\Facades\Schema::hasColumn($parameter->getTable(), 'branch_id'));
+
+                if ($routeRecord) {
+                    $branchEditRecordToken = \Illuminate\Support\Facades\Crypt::encryptString(json_encode([
+                        'module_key' => $currentBranchModuleKey,
+                        'model' => get_class($routeRecord),
+                        'id' => $routeRecord->getKey(),
+                        'branch_id' => $routeRecord->getAttribute('branch_id'),
+                        'issued_at' => now()->timestamp,
+                    ]));
+                }
+            }
         } catch (\Throwable) {
             $currentBranchModuleKey = null;
+            $branchEditRecordToken = null;
         }
     }
 
@@ -1011,6 +1031,7 @@
         <input type="hidden" name="branch_id" value="">
         <input type="hidden" name="selection_mode" value="single">
         <input type="hidden" name="redirect_to" value="">
+        <input type="hidden" name="edit_record_token" value="{{ $branchEditRecordToken }}">
     </form>
 
     <script>
