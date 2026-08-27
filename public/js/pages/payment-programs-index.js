@@ -430,7 +430,6 @@ function initPaymentProgramsIndex() {
                     type: 'hidden',
                     name: 'program_id',
                     value: item.id,
-                    disabled: true,
                 },
                 {
                     category: 'input',
@@ -443,7 +442,7 @@ function initPaymentProgramsIndex() {
                     category: 'input',
                     label: 'Amount',
                     type: 'amount',
-                    data_validate: 'required|amount',
+                    data_validate: 'amount',
                     name: 'amount',
                     id: 'amount',
                     value: item.amount,
@@ -481,16 +480,7 @@ function initPaymentProgramsIndex() {
         if (!canEditCategory) {
             categoryInput?.setAttribute('disabled', 'disabled');
             subCategoryInput?.setAttribute('disabled', 'disabled');
-
-            categoryHidden?.setAttribute('disabled', 'disabled');
-            subCategoryHidden?.setAttribute('disabled', 'disabled');
         }
-
-        document.getElementById('updateProgramModalForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            formatAmountInput(this.querySelector('#amount'));
-            this.submit();
-        });
     }
 
     window.printDetails = function(elem) {
