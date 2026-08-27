@@ -281,6 +281,7 @@ class VoucherController extends Controller
 
         $paymentDetailsArray = json_decode($request->payment_details_array, true) ?? [];
         $this->assertVoucherPaymentsAreUnique($paymentDetailsArray);
+        $this->assertSelfVoucherPaymentsAreComplete($paymentDetailsArray, empty($request->supplier_id));
 
         DB::transaction(function () use ($request, $paymentDetailsArray) {
             $branches = app(ModuleBranchService::class);
@@ -372,6 +373,7 @@ class VoucherController extends Controller
                             'method'         => $paymentDetails['method'],
                             'amount'         => $paymentDetails['amount'],
                             'cheque_id'      => $customerPayment->id, // link, not duplicate
+                            'cheque_no'      => $paymentDetails['cheque_no'],
                             'remarks'        => $paymentDetails['remarks'],
                             'bank_account_id'=> $paymentDetails['bank_account_id'],
                             'self_account_id'=> $paymentDetails['self_account_id'],
@@ -559,7 +561,7 @@ class VoucherController extends Controller
             'branch_id' => $voucher->branch_id,
             'branch_branding' => app(ModuleBranchService::class)->documentBranding('vouchers', $voucher),
             'supplier_id' => $voucher->supplier_id,
-            'date' => optional($voucher->date)->toJSON(),
+            'date' => $voucher->date?->format('Y-m-d'),
             'supplier' => $voucher->supplier ? $this->formatVoucherSupplierPayload($voucher->supplier) : null,
             'payments' => $voucher->payments
                 ? $voucher->payments->map(fn ($payment) => $this->formatVoucherSupplierPaymentPayload($payment))->values()->all()
@@ -593,7 +595,7 @@ class VoucherController extends Controller
             'payment_id' => $payment->id,
             'supplier_id' => $payment->supplier_id,
             'voucher_id' => $payment->voucher_id,
-            'date' => optional($payment->date)->toJSON(),
+            'date' => $payment->date?->format('Y-m-d'),
             'method' => $payment->method,
             'amount' => (float) ($payment->amount ?? 0),
             'reff_no' => $payment->reff_no,
@@ -618,7 +620,7 @@ class VoucherController extends Controller
         return [
             'id' => $payment->id,
             'customer_id' => $payment->customer_id,
-            'date' => optional($payment->date)->toJSON(),
+            'date' => $payment->date?->format('Y-m-d'),
             'method' => $payment->method,
             'type' => $payment->type,
             'amount' => (float) ($payment->amount ?? 0),
@@ -626,8 +628,8 @@ class VoucherController extends Controller
             'slip_no' => $payment->slip_no,
             'reff_no' => $payment->reff_no,
             'transaction_id' => $payment->transaction_id,
-            'cheque_date' => optional($payment->cheque_date)->toJSON(),
-            'slip_date' => optional($payment->slip_date)->toJSON(),
+            'cheque_date' => $payment->cheque_date?->format('Y-m-d'),
+            'slip_date' => $payment->slip_date?->format('Y-m-d'),
             'remarks' => $payment->remarks,
             'customer' => $payment->customer ? [
                 'id' => $payment->customer->id,
@@ -665,6 +667,7 @@ class VoucherController extends Controller
         return array_merge($accountPayload ?? $this->bankAccountOptionPayload($account), [
             'date' => optional($account->date)->toJSON(),
             'available_cheques' => $account->available_cheques ?? [],
+            'display_label' => $this->selfAccountDisplayLabel($account->account_title),
         ]);
     }
 
@@ -708,6 +711,7 @@ class VoucherController extends Controller
 
         $requestPayments = json_decode($request->payment_details_array, true);
         $this->assertVoucherPaymentsAreUnique($requestPayments ?? [], $voucher);
+        $this->assertSelfVoucherPaymentsAreComplete($requestPayments ?? [], !$voucher->supplier_id);
 
         DB::transaction(function () use ($voucher, $requestPayments) {
 
@@ -826,7 +830,7 @@ class VoucherController extends Controller
 
                         SupplierPayment::create(array_merge($pd, [
                             'cheque_id' => $cp->id,
-                            'cheque_no' => null,
+                            'cheque_no' => $pd['cheque_no'] ?? $pd['cheque']['cheque_no'] ?? null,
                             'bank_account_id' => $pd['bank_account_id'],
                             'self_account_id' => $pd['self_account_id'],
                         ]));        
@@ -1003,7 +1007,10 @@ class VoucherController extends Controller
                     $seen['cheque_no'][$chequeNo] = true;
 
                     $chequeExists = SupplierPayment::query()
-                        ->where('cheque_no', $chequeNo)
+                        ->where(function ($query) use ($chequeNo) {
+                            $query->where('cheque_no', $chequeNo)
+                                ->orWhereHas('cheque', fn ($cheque) => $cheque->where('cheque_no', $chequeNo));
+                        })
                         ->when($currentVoucherId, fn($q) => $q->where('voucher_id', '!=', $currentVoucherId))
                         ->exists();
 
@@ -1036,8 +1043,112 @@ class VoucherController extends Controller
         }
     }
 
+    private function assertSelfVoucherPaymentsAreComplete(array $payments, bool $isSelfVoucher): void
+    {
+        if (!$isSelfVoucher) {
+            return;
+        }
+
+        if ($payments === []) {
+            throw ValidationException::withMessages([
+                'payment_details_array' => 'Self voucher mein kam az kam aik payment required hai.',
+            ]);
+        }
+
+        foreach ($payments as $index => $payment) {
+            $row = $index + 1;
+            $method = $this->normalizeVoucherPaymentMethod($payment['method'] ?? '');
+            $amount = (float) ($payment['amount'] ?? 0);
+            $sourceAccountId = (int) ($payment['bank_account_id'] ?? 0);
+            $destinationAccountId = (int) ($payment['self_account_id'] ?? 0);
+
+            if ($amount <= 0) {
+                throw ValidationException::withMessages([
+                    'payment_details_array' => "Self voucher row {$row} mein valid amount required hai.",
+                ]);
+            }
+
+            if ($destinationAccountId <= 0) {
+                throw ValidationException::withMessages([
+                    'payment_details_array' => "Self voucher row {$row} mein To Account required hai.",
+                ]);
+            }
+
+            $destinationExists = BankAccount::query()
+                ->whereKey($destinationAccountId)
+                ->where('category', 'self')
+                ->exists();
+
+            if (!$destinationExists) {
+                throw ValidationException::withMessages([
+                    'payment_details_array' => "Self voucher row {$row} ka To Account valid self account nahi hai.",
+                ]);
+            }
+
+            if (in_array($method, ['selfcheque', 'atm'], true)) {
+                if ($sourceAccountId <= 0) {
+                    throw ValidationException::withMessages([
+                        'payment_details_array' => "Self voucher row {$row} mein From Account required hai.",
+                    ]);
+                }
+
+                $sourceExists = BankAccount::query()
+                    ->whereKey($sourceAccountId)
+                    ->where('category', 'self')
+                    ->exists();
+
+                if (!$sourceExists) {
+                    throw ValidationException::withMessages([
+                        'payment_details_array' => "Self voucher row {$row} ka From Account valid self account nahi hai.",
+                    ]);
+                }
+
+                if ($sourceAccountId === $destinationAccountId) {
+                    throw ValidationException::withMessages([
+                        'payment_details_array' => "Self voucher row {$row} mein From aur To Account different hone chahiye.",
+                    ]);
+                }
+            }
+
+            if ($method === 'selfcheque') {
+                if (!filled($payment['cheque_no'] ?? null) || !filled($payment['cheque_date'] ?? null)) {
+                    throw ValidationException::withMessages([
+                        'payment_details_array' => "Self voucher row {$row} mein cheque number aur cheque date required hain.",
+                    ]);
+                }
+            }
+
+            if ($method === 'atm' && !filled($payment['reff_no'] ?? null)) {
+                throw ValidationException::withMessages([
+                    'payment_details_array' => "Self voucher row {$row} mein ATM reference number required hai.",
+                ]);
+            }
+
+            if ($method === 'cheque' && (int) ($payment['cheque_id'] ?? 0) <= 0) {
+                throw ValidationException::withMessages([
+                    'payment_details_array' => "Self voucher row {$row} mein cheque selection required hai.",
+                ]);
+            }
+
+            if ($method === 'slip' && (int) ($payment['slip_id'] ?? 0) <= 0) {
+                throw ValidationException::withMessages([
+                    'payment_details_array' => "Self voucher row {$row} mein slip selection required hai.",
+                ]);
+            }
+        }
+    }
+
     private function normalizeVoucherPaymentMethod(?string $method): string
     {
         return strtolower(str_replace([' ', '_', '.'], '', (string) $method));
+    }
+
+    private function selfAccountDisplayLabel(?string $accountTitle): string
+    {
+        $parts = collect(explode('|', (string) $accountTitle))
+            ->map(fn ($part) => trim($part))
+            ->filter();
+
+        return (string) ($parts->last() ?: $accountTitle ?: '-');
     }
 }

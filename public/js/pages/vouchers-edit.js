@@ -39,6 +39,11 @@ function initVouchersEdit() {
         });
     }
 
+    function shortAccountLabel(value) {
+        const parts = String(value ?? '').split('|').map(part => part.trim()).filter(Boolean);
+        return parts.at(-1) || '-';
+    }
+
     function buildChequeSelect({ id, name, label, onchange }) {
         return renderTemplate(templates.chequeSelect, {
             ID: id,
@@ -710,9 +715,14 @@ function initVouchersEdit() {
             let clutter = "";
             paymentDetailsArray.forEach((paymentDetail, index) => {
                 let selected = paymentDetail.selected ? JSON.parse(paymentDetail.selected) : null;
+                const fromAccount = paymentDetail.bank_account?.display_label
+                    ?? selected?.display_label
+                    ?? shortAccountLabel(paymentDetail.bank_account_id_name ?? paymentDetail.bank_account?.account_title ?? selected?.account_title);
+                const toAccount = paymentDetail.self_account?.display_label
+                    ?? shortAccountLabel(paymentDetail.self_account_id_name ?? paymentDetail.self_account?.account_title);
 
                 const accountCol = isSelfAccount
-                    ? `<div class="w-1/3 capitalize">${paymentDetail.self_account_id_name ?? paymentDetail.self_account?.account_title}</div>`
+                    ? `<div class="w-1/3 capitalize">${toAccount} (+)</div>`
                     : '';
 
                 clutter += `
@@ -720,7 +730,7 @@ function initVouchersEdit() {
                         <div class="w-[7%]">${index+1}</div>
                         ${accountCol}
                         <div class="w-1/5 capitalize">${paymentDetail.method}</div>
-                        <div class="w-1/3 capitalize">${selected?.customer ? `${selected.customer.customer_name} | ${selected.customer.city?.title ?? '-'}` : selected?.program?.customer ? `${selected.program.customer.customer_name} | ${selected.program.customer.city?.title ?? '-'}` : selected?.account_title ? `${selected.account_title} | ${selected.bank?.short_title ?? '-'}` : paymentDetail?.cheque ? `${paymentDetail.cheque.customer?.customer_name ?? '-'} | ${paymentDetail.cheque.customer?.city?.title ?? '-'}` : paymentDetail?.slip ? `${paymentDetail.slip.customer?.customer_name ?? '-'} | ${paymentDetail.slip.customer?.city?.title ?? '-'}` : paymentDetail?.self_account?.account_title ?? paymentDetail?.bank_account?.account_title ?? paymentDetail?.bank_account_id_name ?? paymentDetail?.self_account_id_name ?? '-'}</div>
+                        <div class="w-1/3 capitalize">${isSelfAccount && paymentDetail.bank_account_id ? `${fromAccount} (-)` : selected?.customer ? `${selected.customer.customer_name} | ${selected.customer.city?.title ?? '-'}` : selected?.program?.customer ? `${selected.program.customer.customer_name} | ${selected.program.customer.city?.title ?? '-'}` : selected?.account_title ? `${selected.account_title} | ${selected.bank?.short_title ?? '-'}` : paymentDetail?.cheque ? `${paymentDetail.cheque.customer?.customer_name ?? '-'} | ${paymentDetail.cheque.customer?.city?.title ?? '-'}` : paymentDetail?.slip ? `${paymentDetail.slip.customer?.customer_name ?? '-'} | ${paymentDetail.slip.customer?.city?.title ?? '-'}` : paymentDetail?.self_account?.account_title ?? paymentDetail?.bank_account?.account_title ?? paymentDetail?.bank_account_id_name ?? paymentDetail?.self_account_id_name ?? '-'}</div>
                         <div class="w-1/5 capitalize">${selected?.slip_no ?? selected?.cheque_no ?? selected?.reff_no ?? selected?.transaction_id ?? paymentDetail?.cheque?.cheque_no ?? paymentDetail.cheque_no ?? paymentDetail.reff_no ?? paymentDetail?.slip?.slip_no ?? paymentDetail.slip_no ?? paymentDetail.transaction_id ?? '-'}</div>
                         <div class="w-1/6 capitalize">${selected?.remarks ?? (paymentDetail.remarks !== '' && paymentDetail.remarks) !== null ? paymentDetail.remarks : '-' ?? '-'}</div>
                         <div class="w-[15%]">${formatNumbersWithDigits(paymentDetail.amount, 1, 1)}</div>
@@ -756,9 +766,13 @@ function initVouchersEdit() {
             const selected = payment.selected ? JSON.parse(payment.selected || '{}') : {};
             const selectedBank = selected.bank_account || (selected.account_title ? {
                 account_title: selected.account_title,
+                display_label: selected.display_label ?? shortAccountLabel(selected.account_title),
                 bank: selected.bank || { short_title: selected.bank_short_title },
             } : null);
-            const selectedSelfAccount = selected.self_account || (payment.self_account_id_name ? { account_title: payment.self_account_id_name } : null);
+            const selectedSelfAccount = selected.self_account || (payment.self_account_id_name ? {
+                account_title: payment.self_account_id_name,
+                display_label: shortAccountLabel(payment.self_account_id_name),
+            } : null);
 
             return {
                 ...payment,
@@ -769,6 +783,7 @@ function initVouchersEdit() {
                 slip: payment.slip || selected.slip,
                 bank_account: payment.bank_account || selectedBank,
                 self_account: payment.self_account || selectedSelfAccount,
+                voucher_no: payment.voucher_no || config.voucher?.voucher_no,
                 cheque_no: payment.cheque_no || selected.cheque_no,
                 slip_no: payment.slip_no || selected.slip_no,
                 reff_no: payment.reff_no || selected.reff_no,

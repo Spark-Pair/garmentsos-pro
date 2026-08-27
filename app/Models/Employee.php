@@ -196,6 +196,10 @@ class Employee extends Model
                 'bill' => (float) ($production->amount ?? 0),
                 'payment' => 0,
                 'created_at' => $production->created_at,
+                'source' => [
+                    'type' => 'production',
+                    'id' => $production->id,
+                ],
             ]);
             $salaries = $mapQuery($salaryQuery, fn ($salary) => [
                 'type' => 'invoice',
@@ -203,6 +207,10 @@ class Employee extends Model
                 'bill' => (float) ($salary->amount ?? 0),
                 'payment' => 0,
                 'created_at' => $salary->created_at,
+                'source' => [
+                    'type' => 'salary',
+                    'id' => $salary->id,
+                ],
             ]);
             $payments = $mapQuery($paymentQuery, fn ($payment) => [
                 'type' => 'payment',
@@ -256,6 +264,10 @@ class Employee extends Model
                 'payment' => 0,
                 'description' => $production->title ?? '-',
                 'created_at' => $production->created_at,
+                'source' => [
+                    'type' => 'production',
+                    'id' => $production->id,
+                ],
             ]);
             $salaries = $mapQuery($salaryQuery, fn ($salary) => [
                 'date' => $salaryDate($salary),
@@ -266,6 +278,10 @@ class Employee extends Model
                 'payment' => 0,
                 'description' => Carbon::parse($salary->month . '-01')->format('M Y'),
                 'created_at' => $salary->created_at,
+                'source' => [
+                    'type' => 'salary',
+                    'id' => $salary->id,
+                ],
             ]);
             $payments = $mapQuery($paymentQuery, fn ($payment) => [
                 'date' => $rawDate($payment, 'date'),

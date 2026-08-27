@@ -38,11 +38,13 @@ trait VoucherComputed
             return [
                 'id' => $payment->id,
                 'method' => $payment->method,
-                'date' => $payment->date,
+                'date' => $payment->date?->format('Y-m-d'),
                 'amount' => (float) $payment->amount,
-                'cheque_no' => $payment->cheque_no,
+                'voucher_no' => $this->voucher_no,
+                'cheque_no' => $payment->cheque_no ?? $payment->cheque?->cheque_no,
                 'reff_no' => $payment->reff_no,
                 'transaction_id' => $payment->transaction_id,
+                'remarks' => $payment->remarks,
                 'program' => $payment->program ? [
                     'id' => $payment->program->id,
                     'customer' => $payment->program->customer ? [
@@ -69,6 +71,7 @@ trait VoucherComputed
                 'bank_account' => $payment->bankAccount ? [
                     'id' => $payment->bankAccount->id,
                     'account_title' => $payment->bankAccount->account_title,
+                    'display_label' => $this->voucherAccountLabel($payment->bankAccount->account_title),
                     'bank' => $payment->bankAccount->bank ? [
                         'id' => $payment->bankAccount->bank->id,
                         'short_title' => $payment->bankAccount->bank->short_title,
@@ -77,6 +80,7 @@ trait VoucherComputed
                 'self_account' => $payment->selfAccount ? [
                     'id' => $payment->selfAccount->id,
                     'account_title' => $payment->selfAccount->account_title,
+                    'display_label' => $this->voucherAccountLabel($payment->selfAccount->account_title),
                     'bank' => $payment->selfAccount->bank ? [
                         'id' => $payment->selfAccount->bank->id,
                         'short_title' => $payment->selfAccount->bank->short_title,
@@ -164,6 +168,15 @@ trait VoucherComputed
                 'include_null_branch_records' => false,
             ];
         }
+    }
+
+    private function voucherAccountLabel(?string $accountTitle): string
+    {
+        $parts = collect(explode('|', (string) $accountTitle))
+            ->map(fn ($part) => trim($part))
+            ->filter();
+
+        return (string) ($parts->last() ?: $accountTitle ?: '-');
     }
 
     public function scopeApplyModelFilters($query, $key, $value)

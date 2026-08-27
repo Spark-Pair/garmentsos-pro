@@ -509,6 +509,7 @@
         getNamesUrl: @json(route('reports.statement.get-names')),
         statementUrl: @json(route('reports.statement')),
         recordDetailsUrl: @json(route('reports.statement.record-details')),
+        selectedBranchIds: @json($selectedBranchIds),
         companyData: @json($companyData),
         companyLogoBase: @json(url('/') . '/'),
         portal: {

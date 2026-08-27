@@ -490,8 +490,8 @@
                     invoiceTableHeader = `
                         <div class="th text-sm font-medium w-[4%]">S.#</div>
                         <div class="th text-sm font-medium w-[12%]">Method</div>
-                        ${hasSupplier ? '<div class="th text-sm font-medium w-[17%]">Customer</div>' : ''}
-                        <div class="th text-sm font-medium ${hasSupplier ? 'w-[21%]' : 'grow'}">Account</div>
+                        <div class="th text-sm font-medium w-[17%]">Customer</div>
+                        <div class="th text-sm font-medium w-[21%]">Account</div>
                         <div class="th text-sm font-medium w-[15%]">Date</div>
                         <div class="th text-sm font-medium w-[11%]">Reff. No.</div>
                         <div class="th text-sm font-medium w-[12%] text-right">Amount</div>
@@ -502,15 +502,17 @@
                     invoiceTableBody = pageRows.map((payment, index) => `
                         <div>
                             ${rowDivider(index, 'border-gray-600')}
-                            <div class="tr flex justify-between w-full px-2 gap-2" style="align-items:center !important;">
+                            <div class="tr flex justify-between w-full px-2 gap-3" style="align-items:center !important;">
                                 <div class="td text-sm font-semibold w-[4%]" style="${cellStyle}">${voucherSerial++}.</div>
                                 <div class="td text-sm font-semibold w-[12%] capitalize" style="${cellStyle}">${payment.method ?? '-'}</div>
-                                ${hasSupplier ? `<div class="td text-sm font-semibold w-[17%] capitalize" style="${cellStyle}">${payment.program?.customer?.customer_name ?? payment.cheque?.customer?.customer_name ?? payment.slip?.customer?.customer_name ?? '-'}</div>` : ''}
+                                <div class="td text-sm font-semibold w-[17%] capitalize" style="${cellStyle}">${payment.program?.customer?.customer_name ?? payment.cheque?.customer?.customer_name ?? payment.slip?.customer?.customer_name ?? '-'}</div>
                                 ${hasSupplier
                                     ? `<div class="td text-sm font-semibold w-[21%]" style="${cellStyle}">${(payment.bank_account?.account_title?.split('|')[0] ?? '-') + ' | ' + (payment.bank_account?.bank?.short_title ?? '-')}</div>`
-                                    : `<div class="td text-sm font-semibold grow" style="${cellStyle}">${(payment.self_account?.account_title?.split('|')[0] ?? '-') + ' | ' + (payment.self_account?.bank?.short_title ?? '-')}</div>`}
+                                    : `<div class="td text-sm font-semibold w-[21%]" style="${cellStyle}">${payment.bank_account
+                                        ? ((payment.bank_account.display_label ?? '-') + ' (-) -> ' + (payment.self_account?.display_label ?? '-') + ' (+)')
+                                        : ((payment.self_account?.display_label ?? '-') + ' (+)')}</div>`}
                                 <div class="td text-sm font-semibold w-[15%]" style="${cellStyle}">${formatDate(payment.date, true) ?? '-'}</div>
-                                <div class="td text-sm font-semibold w-[11%]" style="${cellStyle}">${payment.cheque?.cheque_no ?? payment.cheque_no ?? payment.reff_no ?? payment.slip?.slip_no ?? payment.transaction_id ?? payment.reff_no ?? '-'}</div>
+                                <div class="td text-sm font-semibold w-[11%]" style="${cellStyle}">${payment.cheque?.cheque_no ?? payment.cheque_no ?? payment.reff_no ?? payment.slip?.slip_no ?? payment.transaction_id ?? '-'}</div>
                                 <div class="td text-sm font-semibold w-[12%] text-right" style="${cellStyle}">${formatNumbersWithDigits(payment.amount, 1, 1) ?? '-'}</div>
                             </div>
                         </div>
@@ -832,7 +834,7 @@
                             <div class="table w-full">
                                 <div class="table w-full border border-black rounded-lg p-1">
                                     <div class="thead w-full">
-                                        <div class="tr ${data.preview.type == 'voucher' || data.preview.type == 'cargo_list' ? 'flex justify-between' : 'grid'} ${data.preview.type == 'order' ? 'grid-cols-9' : data.preview.type == 'invoice' ? 'grid-cols-8' : data.preview.type == 'shipment' ? 'grid-cols-8' : 'grid-cols-9'} w-full px-4 py-1.5 bg-[var(--primary-color)] text-white rounded-md">
+                                        <div class="tr ${data.preview.type == 'voucher' || data.preview.type == 'cargo_list' ? 'flex justify-between' : 'grid'} ${data.preview.type == 'voucher' ? 'gap-3 px-2' : 'px-4'} ${data.preview.type == 'order' ? 'grid-cols-9' : data.preview.type == 'invoice' ? 'grid-cols-8' : data.preview.type == 'shipment' ? 'grid-cols-8' : 'grid-cols-9'} w-full py-1.5 bg-[var(--primary-color)] text-white rounded-md">
                                             ${invoiceTableHeader}
                                         </div>
                                     </div>

@@ -468,9 +468,8 @@ class Customer extends Model
                             . ' | ' . rtrim(rtrim(number_format($discountPercent, 2), '0'), '.') . '%',
                         'created_at' => $i->created_at,
                         'source' => [
-                            'type' => 'invoice_article',
-                            'id' => $article->id,
-                            'invoice_id' => $i->id,
+                            'type' => 'invoice',
+                            'id' => $i->id,
                         ],
                     ]);
                 }

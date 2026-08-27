@@ -98,8 +98,14 @@ class BankAccount extends Model
         if ($start <= 0 || $end <= 0 || $end < $start) return [];
 
         $usedCheques = SupplierPayment::where('bank_account_id', $this->id)
-            ->pluck('cheque_no')
-            ->toArray();
+            ->with('cheque:id,cheque_no')
+            ->get(['id', 'cheque_id', 'cheque_no'])
+            ->map(fn ($payment) => $payment->cheque_no ?: $payment->cheque?->cheque_no)
+            ->filter(fn ($chequeNo) => filled($chequeNo))
+            ->map(fn ($chequeNo) => (int) $chequeNo)
+            ->unique()
+            ->values()
+            ->all();
 
         return array_values(array_diff(range($start, $end), $usedCheques));
     }
@@ -139,6 +145,7 @@ class BankAccount extends Model
         if ($this->category === 'self') {
             // Normal CustomerPayments (no cheque, no slip) — filter by own date
             $normalPayments = CustomerPayment::where('bank_account_id', $this->id)
+                ->where('is_return', false)
                 ->whereNull('cheque_no')
                 ->whereNull('slip_no');
             $applyBranchScope($normalPayments, 'customer_payments');
@@ -146,6 +153,7 @@ class BankAccount extends Model
 
             // Cheque CustomerPayments — filter by voucher date
             $chequePayments = CustomerPayment::where('bank_account_id', $this->id)
+                ->where('is_return', false)
                 ->whereNotNull('cheque_no')
                 ->whereHas('cheque.voucher', function ($q) use ($fromDate, $toDate, $includeGivenDate) {
                     $this->applyDateFilter($q, 'date', $fromDate, $toDate, $includeGivenDate);
@@ -154,6 +162,7 @@ class BankAccount extends Model
 
             // Slip CustomerPayments — filter by voucher date
             $slipPayments = CustomerPayment::where('bank_account_id', $this->id)
+                ->where('is_return', false)
                 ->whereNotNull('slip_no')
                 ->whereHas('slip.voucher', function ($q) use ($fromDate, $toDate, $includeGivenDate) {
                     $this->applyDateFilter($q, 'date', $fromDate, $toDate, $includeGivenDate);
@@ -161,9 +170,23 @@ class BankAccount extends Model
             $applyBranchScope($slipPayments, 'customer_payments');
 
             // SupplierPayments — filter by own date
-            $supplierPayments = SupplierPayment::where('bank_account_id', $this->id);
+            $supplierPayments = SupplierPayment::where('bank_account_id', $this->id)
+                ->whereNotNull('voucher_id')
+                ->where('is_return', false);
             $applyBranchScope($supplierPayments, 'supplier_payments');
             $this->applyDateFilter($supplierPayments, 'date', $fromDate, $toDate, $includeGivenDate);
+
+            // Older self transfers can have the source withdrawal and voucher but
+            // no linked CustomerPayment for the destination account.
+            $unpairedTransferInflows = SupplierPayment::where('self_account_id', $this->id)
+                ->whereIn('method', ['Self Cheque', 'ATM'])
+                ->where('is_return', false)
+                ->where(function ($query) {
+                    $query->whereNull('cheque_id')
+                        ->orWhereDoesntHave('cheque');
+                });
+            $applyBranchScope($unpairedTransferInflows, 'supplier_payments');
+            $this->applyDateFilter($unpairedTransferInflows, 'date', $fromDate, $toDate, $includeGivenDate);
 
             // Adjustments
             $adjustmentsQuery = $this->statementAdjustments();
@@ -172,7 +195,8 @@ class BankAccount extends Model
 
             $totalInflow  = $normalPayments->sum('amount')
                         + $chequePayments->sum('amount')
-                        + $slipPayments->sum('amount');
+                        + $slipPayments->sum('amount')
+                        + $unpairedTransferInflows->sum('amount');
 
             $totalOutflow = $supplierPayments->sum('amount');
 
@@ -233,6 +257,7 @@ class BankAccount extends Model
 
         // ── CustomerPayments query ── (aligned with calculateBalance logic)
         $customerQuery = CustomerPayment::where('bank_account_id', $this->id)
+            ->when($this->category === 'self', fn ($query) => $query->where('is_return', false))
             ->when($hasBranchScope && Schema::hasColumn('customer_payments', 'branch_id'), $branchScope)
             ->where(function ($q) use ($from, $to) {
                 // Normal (no cheque, no slip) — filter by own date
@@ -258,18 +283,33 @@ class BankAccount extends Model
             })
             ->with([
                 'cheque.voucher',
+                'cheque.bankAccount.bank',
+                'cheque.selfAccount.bank',
                 'slip.voucher',
                 'customer.city',
             ]);
 
         // ── SupplierPayments query ──
         $supplierQuery = SupplierPayment::where('bank_account_id', $this->id)
+            ->when($this->category === 'self', fn ($query) => $query->where('is_return', false))
             ->whereBetween(DB::raw('DATE(date)'), [$from, $to])
             ->when($hasBranchScope && Schema::hasColumn('supplier_payments', 'branch_id'), $branchScope)
-            ->with('bankAccount.bank', 'cheque', 'slip');
+            ->with('bankAccount.bank', 'selfAccount.bank', 'voucher', 'cheque', 'slip');
         $pendingPaymentTotal = (clone $supplierQuery)
             ->whereNull('voucher_id')
             ->sum('amount') ?? 0;
+        $supplierQuery->whereNotNull('voucher_id');
+
+        $unpairedTransferQuery = SupplierPayment::where('self_account_id', $this->id)
+            ->whereIn('method', ['Self Cheque', 'ATM'])
+            ->where('is_return', false)
+            ->where(function ($query) {
+                $query->whereNull('cheque_id')
+                    ->orWhereDoesntHave('cheque');
+            })
+            ->whereBetween(DB::raw('DATE(date)'), [$from, $to])
+            ->when($hasBranchScope && Schema::hasColumn('supplier_payments', 'branch_id'), $branchScope)
+            ->with('bankAccount.bank', 'selfAccount.bank', 'voucher');
 
         // ── Adjustments ──
         $adjustments = $this->statementAdjustments()
@@ -305,6 +345,62 @@ class BankAccount extends Model
                 ? ($p->slip?->voucher?->date ?? $p->date)
                 : $p->date);
 
+        $customerPaymentDescription = function ($payment): string {
+            $linkedTransfer = $payment->type === 'self_account_deposit'
+                ? ($payment->cheque ?: $payment->slip)
+                : null;
+
+            if ($linkedTransfer?->bankAccount && $linkedTransfer?->selfAccount) {
+                return $this->supplierPaymentStatementDescription($linkedTransfer);
+            }
+
+            $party = collect([
+                $payment->customer?->customer_name,
+                $payment->customer?->city?->short_title,
+            ])->filter(fn ($value) => filled($value))->implode(' | ');
+
+            if ($party !== '') {
+                return $party;
+            }
+
+            if (filled($payment->remarks)) {
+                return (string) $payment->remarks;
+            }
+
+            return $payment->type === 'self_account_deposit'
+                ? 'Self Account Deposit'
+                : 'Customer Payment';
+        };
+
+        $customerPaymentSource = function ($payment): array {
+            $linkedTransfer = $payment->type === 'self_account_deposit'
+                ? ($payment->cheque ?: $payment->slip)
+                : null;
+
+            if ($linkedTransfer?->voucher_id) {
+                return [
+                    'type' => 'voucher',
+                    'id' => $linkedTransfer->voucher_id,
+                ];
+            }
+
+            return [
+                'type' => 'customer_payment',
+                'id' => $payment->id,
+            ];
+        };
+
+        $customerPaymentReference = function ($payment) {
+            $linkedTransfer = $payment->type === 'self_account_deposit'
+                ? ($payment->cheque ?: $payment->slip)
+                : null;
+
+            return $payment->cheque_no
+                ?? $payment->slip_no
+                ?? $payment->transaction_id
+                ?? $payment->reff_no;
+        };
+
         // ─────────────────────────────────────
         // SUMMARIZED
         // ─────────────────────────────────────
@@ -326,10 +422,19 @@ class BankAccount extends Model
                 'created_at' => $p->created_at,
             ]);
 
+            $unpairedTransferPayments = collect($unpairedTransferQuery->get())->map(fn($p) => [
+                'type'       => 'invoice',
+                'date'       => Carbon::parse($p->date)->toDateString(),
+                'bill'       => (float) ($p->amount ?? 0),
+                'payment'    => 0,
+                'created_at' => $p->created_at,
+            ]);
+
             $adjustmentRows = $adjustments->map(fn($adj) => $formatAdjustment($adj, true));
 
             $statement = $customerPayments
                 ->merge($supplierPayments)
+                ->merge($unpairedTransferPayments)
                 ->merge($adjustmentRows)
                 ->groupBy('date')
                 ->flatMap(function ($rows, $date) {
@@ -370,28 +475,40 @@ class BankAccount extends Model
 
             $customerPayments = collect($customerQuery->get())->map(fn($p) => [
                 'date'        => $effectiveDate($p),
-                'reff_no'     => $p->cheque_no ?? $p->slip_no ?? $p->transaction_id ?? $p->reff_no ?? null,
+                'reff_no'     => $customerPaymentReference($p),
                 'type'        => 'invoice',
                 'method'      => $p->method ?? null,
                 'bill'        => (float) ($p->amount ?? 0),
                 'payment'     => 0,
-                'description' => ($p->customer?->customer_name . ' | ' . $p->customer?->city?->short_title) ?? $p->remarks ?? null,
+                'description' => $customerPaymentDescription($p),
                 'created_at'  => $p->created_at ?? null,
-                'source'      => [
-                    'type' => 'customer_payment',
-                    'id'   => $p->id,
-                ],
+                'source'      => $customerPaymentSource($p),
             ]);
 
             $supplierPayments = collect($supplierQuery->get())->map(fn($p) => [
                 'date'        => $p->date ?? null,
-                'reff_no'     => $p->cheque_no ?? $p->slip?->slip_no ?? $p->cheque?->cheque_no ?? $p->transaction_id ?? $p->reff_no ?? null,
+                'reff_no'     => $this->supplierPaymentStatementReference($p),
                 'type'        => 'payment',
                 'method'      => $p->method ?? null,
                 'payment'     => (float) ($p->amount ?? 0),
                 'bill'        => 0,
-                'description' => $p->supplier?->supplier_name ?? $p->remarks ?? null,
+                'description' => $this->supplierPaymentStatementDescription($p),
                 'created_at'  => $p->created_at ?? null,
+                'source'      => [
+                    'type' => $p->voucher_id ? 'voucher' : 'supplier_payment',
+                    'id'   => $p->voucher_id ?: $p->id,
+                ],
+            ]);
+
+            $unpairedTransferPayments = collect($unpairedTransferQuery->get())->map(fn($p) => [
+                'date'        => $p->date,
+                'reff_no'     => $this->supplierPaymentStatementReference($p),
+                'type'        => 'invoice',
+                'method'      => $p->method,
+                'payment'     => 0,
+                'bill'        => (float) ($p->amount ?? 0),
+                'description' => $this->supplierPaymentStatementDescription($p),
+                'created_at'  => $p->created_at,
                 'source'      => [
                     'type' => $p->voucher_id ? 'voucher' : 'supplier_payment',
                     'id'   => $p->voucher_id ?: $p->id,
@@ -402,6 +519,7 @@ class BankAccount extends Model
 
             $statement = $customerPayments
                 ->merge($supplierPayments)
+                ->merge($unpairedTransferPayments)
                 ->merge($adjustmentRows)
                 ->sortBy([['date', 'asc'], ['created_at', 'asc']])
                 ->values();
@@ -447,5 +565,50 @@ class BankAccount extends Model
         } elseif ($to) {
             $query->where(DB::raw("DATE($column)"), $includeGivenDate ? '<=' : '<', $to);
         }
+    }
+
+    private function supplierPaymentStatementDescription(SupplierPayment $payment): string
+    {
+        if ($payment->bankAccount && $payment->selfAccount) {
+            $from = $this->statementAccountLabel($payment->bankAccount);
+            $to = $this->statementAccountLabel($payment->selfAccount);
+            $details = collect([
+                $payment->voucher?->voucher_no ? 'Voucher: ' . $payment->voucher->voucher_no : null,
+                $payment->reff_no ? 'Ref: ' . $payment->reff_no : null,
+                $payment->transaction_id ? 'Txn: ' . $payment->transaction_id : null,
+                filled($payment->remarks) ? $payment->remarks : null,
+            ])->filter()->implode(' | ');
+
+            return $from . ' (-) -> ' . $to . ' (+)'
+                . ($details !== '' ? ' | ' . $details : '');
+        }
+
+        $base = $payment->supplier?->supplier_name ?: 'Supplier Payment';
+        $details = collect([
+            $payment->voucher?->voucher_no ? 'Voucher: ' . $payment->voucher->voucher_no : null,
+            $payment->reff_no ? 'Ref: ' . $payment->reff_no : null,
+            $payment->transaction_id ? 'Txn: ' . $payment->transaction_id : null,
+            filled($payment->remarks) ? $payment->remarks : null,
+        ])->filter()->implode(' | ');
+
+        return $base . ($details !== '' ? ' | ' . $details : '');
+    }
+
+    private function statementAccountLabel(BankAccount $account): string
+    {
+        $parts = collect(explode('|', (string) $account->account_title))
+            ->map(fn ($part) => trim($part))
+            ->filter();
+
+        return (string) ($parts->last() ?: $account->account_title);
+    }
+
+    private function supplierPaymentStatementReference(SupplierPayment $payment): string|int|null
+    {
+        return $payment->cheque_no
+            ?? $payment->slip?->slip_no
+            ?? $payment->cheque?->cheque_no
+            ?? $payment->transaction_id
+            ?? $payment->reff_no;
     }
 }

@@ -4,7 +4,7 @@
         let btnTypeGlobal = config.statementType || "general";
         const portal = config.portal || {};
         const step2 = document.querySelector(".step2");
-        let statementRecordRequest = null;
+        const statementRecordRequests = new WeakMap();
 
         if (config.companyData) {
             window.companyData = config.companyData;
@@ -235,6 +235,51 @@
             });
         }
 
+        function openProductionStatementModal(data) {
+            if (!data) return;
+            createModal({
+                id: "modalForm",
+                name: data.title || "Production Details",
+                details: {
+                    Date: data.date || "-",
+                    Ticket: data.ticket || "-",
+                    Article: data.article || "-",
+                    Work: data.work || "-",
+                    Worker: data.worker || "-",
+                    Rate: formatNumbersWithDigits(data.rate || 0, 1, 1),
+                    Amount: formatNumbersWithDigits(data.amount || 0, 1, 1),
+                },
+            });
+        }
+
+        function openSalaryStatementModal(data) {
+            if (!data) return;
+            createModal({
+                id: "modalForm",
+                name: data.employee || "Salary Details",
+                details: {
+                    Month: data.month || "-",
+                    Amount: formatNumbersWithDigits(data.amount || 0, 1, 1),
+                },
+            });
+        }
+
+        function openSalesReturnStatementModal(data) {
+            if (!data) return;
+            createModal({
+                id: "modalForm",
+                name: data.customer || "Sales Return Details",
+                details: {
+                    Date: data.date || "-",
+                    Type: data.type || "-",
+                    "Invoice No.": data.invoice_no || "-",
+                    Article: data.article_no || "-",
+                    Quantity: data.quantity || 0,
+                    Amount: data.amount || "-",
+                },
+            });
+        }
+
         function renderStatementRecordModal(payload) {
             if (payload?.type === "expense") {
                 openExpenseStatementModal(payload.data);
@@ -273,7 +318,12 @@
 
             if (payload?.type === "statement_adjustment") {
                 openStatementAdjustmentModal(payload.data);
+                return;
             }
+
+            if (payload?.type === "production") openProductionStatementModal(payload.data);
+            if (payload?.type === "salary") openSalaryStatementModal(payload.data);
+            if (payload?.type === "sales_return") openSalesReturnStatementModal(payload.data);
         }
 
         function setStatementRowLoading(row, isLoading) {
@@ -295,29 +345,35 @@
 
             if (!source?.type || !source?.id) return;
 
-            if (statementRecordRequest && typeof statementRecordRequest.abort === "function") {
-                statementRecordRequest.abort();
-            }
+            if (statementRecordRequests.has(row)) return;
 
             setStatementRowLoading(row, true);
 
-            statementRecordRequest = $.ajax({
+            const request = $.ajax({
                 url: config.recordDetailsUrl,
                 type: "GET",
-                data: source,
+                data: {
+                    ...source,
+                    branch_ids: config.selectedBranchIds || [],
+                },
                 success: function (response) {
                     renderStatementRecordModal(response);
                 },
                 error: function (xhr, status, error) {
                     if (status === "abort") return;
                     console.error("Error fetching statement record details:", error);
-                    appAlert("Failed to load statement record details.");
+                    if (typeof showToast === "function") {
+                        showToast("error", xhr.responseJSON?.error || "Failed to load statement record details.");
+                    }
                 },
                 complete: function () {
                     setStatementRowLoading(row, false);
-                    statementRecordRequest = null;
+                    if (statementRecordRequests.get(row) === request) {
+                        statementRecordRequests.delete(row);
+                    }
                 },
             });
+            statementRecordRequests.set(row, request);
         }
 
         window.setVoucherType = function setVoucherType(btn, btnType) {

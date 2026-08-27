@@ -164,6 +164,7 @@ class Supplier extends Model
         $applyBranchScope($expenseQuery, 'expenses');
         $applyBranchScope($inventoryExpenseQuery, 'inventory_transactions');
         $applyBranchScope($paymentsQuery, 'supplier_payments');
+        $paymentsQuery->whereNotNull('voucher_id');
         $applyBranchScope($adjustmentsQuery, 'statement_adjustments');
 
         if ($productionQuery) {
@@ -245,7 +246,8 @@ class Supplier extends Model
             ->when($hasBranchScope && Schema::hasColumn('supplier_payments', 'branch_id'), $branchScope)
             ->whereIn('method', [
                 'Cheque', 'Cash', 'Slip', 'ATM', 'Self Cheque', 'program', 'p. return', 'Adjustment'
-            ]);
+            ])
+            ->whereNotNull('voucher_id');
         $voucherQuery = Voucher::with('payments')
             ->where('supplier_id', $this->id)
             ->whereBetween(\Illuminate\Support\Facades\DB::raw('DATE(date)'), [$start, $end])
@@ -288,7 +290,7 @@ class Supplier extends Model
         };
 
         $paymentDescription = function ($p) use ($rawDate) {
-            return $rawDate($p, 'cheque_date')?->format('d-M-Y')
+            $description = $rawDate($p, 'cheque_date')?->format('d-M-Y')
                 ?? (
                     $p->slip?->customer
                         ? trim(
@@ -339,6 +341,11 @@ class Supplier extends Model
                     : null
                 )
                 ?? ($p->remarks ?? '-');
+
+            return collect([
+                $description,
+                $p->voucher?->voucher_no ? 'Voucher: ' . $p->voucher->voucher_no : null,
+            ])->filter(fn ($value) => filled($value))->implode(' | ');
         };
         $formatDetailedAdjustment = function ($adjustment) use ($rawDate) {
             $isPlus = $adjustment->direction === 'plus';
@@ -391,6 +398,10 @@ class Supplier extends Model
                 'bill' => (float) ($pr->amount ?? 0),
                 'payment' => 0,
                 'created_at' => $pr->created_at,
+                'source' => [
+                    'type' => 'production',
+                    'id' => $pr->id,
+                ],
             ]);
             $adjustments = $mapQuery($adjustmentsQuery, fn($adjustment) => [
                 'type' => $adjustment->direction === 'plus' ? 'invoice' : 'payment',
@@ -478,7 +489,7 @@ class Supplier extends Model
                     'method' => $methodLabel,
                     'payment' => (float) $v->payments->sum('amount'),
                     'bill' => 0,
-                    'description' => 'Voucher',
+                    'description' => 'Voucher: ' . $v->voucher_no,
                     'created_at' => $v->created_at,
                     'source' => [
                         'type' => 'voucher',
@@ -494,6 +505,10 @@ class Supplier extends Model
                 'bill' => (float) ($pr->amount ?? 0),
                 'payment' => 0,
                 'created_at' => $pr->created_at,
+                'source' => [
+                    'type' => 'production',
+                    'id' => $pr->id,
+                ],
             ]);
             $adjustments = $mapQuery($adjustmentsQuery, $formatDetailedAdjustment);
 
@@ -559,6 +574,10 @@ class Supplier extends Model
                 'bill' => (float) ($pr->amount ?? 0),
                 'payment' => 0,
                 'created_at' => $pr->created_at,
+                'source' => [
+                    'type' => 'production',
+                    'id' => $pr->id,
+                ],
             ]);
             $adjustments = $mapQuery($adjustmentsQuery, $formatDetailedAdjustment);
 

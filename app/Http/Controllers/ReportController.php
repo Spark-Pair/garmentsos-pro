@@ -14,6 +14,9 @@ use App\Models\Fabric;
 use App\Models\InvoiceArticles;
 use App\Models\Invoice;
 use App\Models\InventoryTransaction;
+use App\Models\Production;
+use App\Models\Salary;
+use App\Models\SalesReturn;
 use App\Models\IssuedFabric;
 use App\Models\OrderArticles;
 use App\Models\ProductionTag;
@@ -165,19 +168,23 @@ class ReportController extends Controller
         }
 
         $validated = $request->validate([
-            'type' => 'required|string|in:expense,inventory_transaction,voucher,supplier_payment,employee_payment,invoice,customer_payment,statement_adjustment',
+            'type' => 'required|string|in:expense,inventory_transaction,voucher,supplier_payment,employee_payment,invoice,customer_payment,statement_adjustment,production,salary,sales_return',
             'id' => 'required|integer|min:1',
         ]);
+        $branchContext = $this->statementBranchContext($request);
 
         $payload = match ($validated['type']) {
-            'expense' => $this->expenseStatementPayload((int) $validated['id']),
-            'inventory_transaction' => $this->inventoryTransactionStatementPayload((int) $validated['id']),
-            'voucher' => $this->voucherStatementPayload((int) $validated['id']),
-            'supplier_payment' => $this->supplierPaymentStatementPayload((int) $validated['id']),
-            'employee_payment' => $this->employeePaymentStatementPayload((int) $validated['id']),
-            'invoice' => $this->invoiceStatementPayload((int) $validated['id']),
-            'customer_payment' => $this->customerPaymentStatementPayload((int) $validated['id']),
-            'statement_adjustment' => $this->statementAdjustmentPayload((int) $validated['id']),
+            'expense' => $this->expenseStatementPayload((int) $validated['id'], $branchContext),
+            'inventory_transaction' => $this->inventoryTransactionStatementPayload((int) $validated['id'], $branchContext),
+            'voucher' => $this->voucherStatementPayload((int) $validated['id'], $branchContext),
+            'supplier_payment' => $this->supplierPaymentStatementPayload((int) $validated['id'], $branchContext),
+            'employee_payment' => $this->employeePaymentStatementPayload((int) $validated['id'], $branchContext),
+            'invoice' => $this->invoiceStatementPayload((int) $validated['id'], $branchContext),
+            'customer_payment' => $this->customerPaymentStatementPayload((int) $validated['id'], $branchContext),
+            'statement_adjustment' => $this->statementAdjustmentPayload((int) $validated['id'], $branchContext),
+            'production' => $this->productionStatementPayload((int) $validated['id'], $branchContext),
+            'salary' => $this->salaryStatementPayload((int) $validated['id'], $branchContext),
+            'sales_return' => $this->salesReturnStatementPayload((int) $validated['id'], $branchContext),
             default => null,
         };
 
@@ -1230,10 +1237,19 @@ class ReportController extends Controller
         return implode('|', array_map(fn ($part) => strtolower($this->cleanFabricReportValue($part)), $parts));
     }
 
-    private function expenseStatementPayload(int $id): ?array
+    private function statementRecordScope($query, string $table, array $branchContext)
     {
-        $expense = app(ModuleBranchService::class)
-            ->applyScope(Expense::with(['supplier:id,supplier_name', 'expenseSetups:id,title']), 'expenses')
+        return $this->applyReportBranchScope(
+            $query,
+            $table,
+            $branchContext['selected_ids'] ?? [],
+            $branchContext
+        );
+    }
+
+    private function expenseStatementPayload(int $id, array $branchContext): ?array
+    {
+        $expense = $this->statementRecordScope(Expense::with(['supplier:id,supplier_name', 'expenseSetups:id,title']), 'expenses', $branchContext)
             ->find($id);
         if (!$expense) return null;
 
@@ -1247,10 +1263,9 @@ class ReportController extends Controller
         ];
     }
 
-    private function inventoryTransactionStatementPayload(int $id): ?array
+    private function inventoryTransactionStatementPayload(int $id, array $branchContext): ?array
     {
-        $inventory = app(ModuleBranchService::class)
-            ->applyScope(InventoryTransaction::with(['supplier:id,supplier_name', 'item']), 'inventory_transactions')
+        $inventory = $this->statementRecordScope(InventoryTransaction::with(['supplier:id,supplier_name', 'item']), 'inventory_transactions', $branchContext)
             ->find($id);
         if (!$inventory) return null;
 
@@ -1264,9 +1279,9 @@ class ReportController extends Controller
         ];
     }
 
-    private function voucherStatementPayload(int $id): ?array
+    private function voucherStatementPayload(int $id, array $branchContext): ?array
     {
-        $voucher = app(ModuleBranchService::class)->applyScope(Voucher::with([
+        $voucher = $this->statementRecordScope(Voucher::with([
             'supplier:id,supplier_name',
             'payments.cheque.customer:id,customer_name,city_id',
             'payments.cheque.customer.city:id,short_title,title',
@@ -1276,7 +1291,7 @@ class ReportController extends Controller
             'payments.program.customer.city:id,short_title,title',
             'payments.bankAccount.bank:id,short_title',
             'payments.selfAccount.bank:id,short_title',
-        ]), 'vouchers')->find($id);
+        ]), 'vouchers', $branchContext)->find($id);
         if (!$voucher) return null;
 
         if ($this->isSupplierRole() && $voucher->supplier_id !== $this->currentSupplier()?->id) {
@@ -1289,9 +1304,9 @@ class ReportController extends Controller
         ];
     }
 
-    private function supplierPaymentStatementPayload(int $id): ?array
+    private function supplierPaymentStatementPayload(int $id, array $branchContext): ?array
     {
-        $payment = app(ModuleBranchService::class)->applyScope(SupplierPayment::with([
+        $payment = $this->statementRecordScope(SupplierPayment::with([
             'supplier:id,supplier_name',
             'voucher.supplier:id,supplier_name',
             'bankAccount.bank:id,short_title',
@@ -1308,7 +1323,7 @@ class ReportController extends Controller
             'slip.paymentClearRecord.bankAccount.bank',
             'slip.dr',
             'cr',
-        ]), 'supplier_payments')->find($id);
+        ]), 'supplier_payments', $branchContext)->find($id);
         if (!$payment) return null;
 
         if ($this->isSupplierRole() && $payment->supplier_id !== $this->currentSupplier()?->id) {
@@ -1321,10 +1336,9 @@ class ReportController extends Controller
         ];
     }
 
-    private function employeePaymentStatementPayload(int $id): ?array
+    private function employeePaymentStatementPayload(int $id, array $branchContext): ?array
     {
-        $payment = app(ModuleBranchService::class)
-            ->applyScope(EmployeePayment::with('employee.type'), 'employee_payments')
+        $payment = $this->statementRecordScope(EmployeePayment::with('employee.type'), 'employee_payments', $branchContext)
             ->find($id);
         if (!$payment) return null;
 
@@ -1334,16 +1348,16 @@ class ReportController extends Controller
         ];
     }
 
-    private function invoiceStatementPayload(int $id): ?array
+    private function invoiceStatementPayload(int $id, array $branchContext): ?array
     {
-        $invoice = app(ModuleBranchService::class)->applyScope(Invoice::with([
+        $invoice = $this->statementRecordScope(Invoice::with([
             'order',
             'shipment',
             'invoiceArticles.article',
             'salesReturns',
             'customer.city',
             'creator',
-        ]), 'invoices')->find($id);
+        ]), 'invoices', $branchContext)->find($id);
         if (!$invoice) return null;
 
         if ($this->isCustomerRole() && $invoice->customer_id !== $this->currentCustomer()?->id) {
@@ -1356,10 +1370,9 @@ class ReportController extends Controller
         ];
     }
 
-    private function customerPaymentStatementPayload(int $id): ?array
+    private function customerPaymentStatementPayload(int $id, array $branchContext): ?array
     {
-        $payment = app(ModuleBranchService::class)->applyScope(CustomerPayment::whereNotNull('customer_id')
-            ->with([
+        $payment = $this->statementRecordScope(CustomerPayment::with([
                 'customer.city',
                 'cheque.supplier',
                 'cheque.voucher.supplier.bankAccounts.bank',
@@ -1372,7 +1385,7 @@ class ReportController extends Controller
                 'paymentClearRecord.bankAccount.bank',
                 'paymentClearRecord.creator',
                 'dr',
-            ]), 'customer_payments')->find($id);
+            ]), 'customer_payments', $branchContext)->find($id);
         if (!$payment) return null;
 
         if ($this->isCustomerRole() && $payment->customer_id !== $this->currentCustomer()?->id) {
@@ -1385,16 +1398,70 @@ class ReportController extends Controller
         ];
     }
 
-    private function statementAdjustmentPayload(int $id): ?array
+    private function statementAdjustmentPayload(int $id, array $branchContext): ?array
     {
-        $adjustment = app(ModuleBranchService::class)
-            ->applyScope(StatementAdjustment::with('adjustable'), 'statement_adjustments')
+        $adjustment = $this->statementRecordScope(StatementAdjustment::with('adjustable'), 'statement_adjustments', $branchContext)
             ->find($id);
         if (!$adjustment) return null;
 
         return [
             'type' => 'statement_adjustment',
             'data' => $adjustment->toFormattedArray(),
+        ];
+    }
+
+    private function productionStatementPayload(int $id, array $branchContext): ?array
+    {
+        $production = $this->statementRecordScope(Production::with(['article', 'work', 'worker']), 'productions', $branchContext)
+            ->find($id);
+        if (!$production) return null;
+
+        return [
+            'type' => 'production',
+            'data' => [
+                'id' => $production->id,
+                'date' => optional($production->receive_date)->format('d-M-Y'),
+                'ticket' => $production->ticket,
+                'title' => $production->title,
+                'article' => $production->article?->article_no,
+                'work' => $production->work?->title,
+                'worker' => $production->worker?->employee_name,
+                'rate' => $production->rate,
+                'amount' => $production->amount,
+            ],
+        ];
+    }
+
+    private function salaryStatementPayload(int $id, array $branchContext): ?array
+    {
+        $salary = $this->statementRecordScope(Salary::with('employee'), 'salaries', $branchContext)
+            ->find($id);
+        if (!$salary) return null;
+
+        return [
+            'type' => 'salary',
+            'data' => [
+                'id' => $salary->id,
+                'month' => Carbon::parse($salary->month . '-01')->format('M Y'),
+                'employee' => $salary->employee?->employee_name,
+                'amount' => $salary->amount,
+            ],
+        ];
+    }
+
+    private function salesReturnStatementPayload(int $id, array $branchContext): ?array
+    {
+        $salesReturn = $this->statementRecordScope(SalesReturn::with(['article', 'invoice.customer.city']), 'sales_returns', $branchContext)
+            ->find($id);
+        if (!$salesReturn) return null;
+
+        if ($this->isCustomerRole() && $salesReturn->invoice?->customer_id !== $this->currentCustomer()?->id) {
+            abort(403, 'You are not authorized to view this statement record.');
+        }
+
+        return [
+            'type' => 'sales_return',
+            'data' => $salesReturn->toFormattedArray(),
         ];
     }
 }
