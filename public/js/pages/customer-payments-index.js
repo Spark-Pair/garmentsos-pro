@@ -181,7 +181,7 @@ function initCustomerPaymentsIndex() {
                 'hr': true,
                 ...(data.data.cheque_no && { 'Cheque No': data.data.cheque_no }),
                 ...(data.data.slip_no && { 'Slip No': data.data.slip_no }),
-                ...(data.data.transition_id && { 'Transition Id': data.data.transition_id }),
+                ...(data.data.transaction_id && { 'Transaction Id': data.data.transaction_id }),
                 ...(data.data.bank && { 'Bank': data.data.bank }),
                 ...(data.data.cheque_date && { 'Cheque Date': formatDate(data.data.cheque_date) }),
                 ...(data.data.slip_date && { 'Slip Date': formatDate(data.data.slip_date) }),

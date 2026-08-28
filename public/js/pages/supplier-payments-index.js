@@ -65,9 +65,13 @@ function initSupplierPaymentsIndex() {
             'Method': data.method,
             'Customer/Self Acc.': data.source_name || '-',
             'Source': data.source_type || '-',
-            ...(String(data.method || '').toLowerCase() === 'program' && { 'Issued': data.issued || 'Not Issued' }),
+            ...(data.bank_account && { 'Bank Account': `${data.bank_account.account_title || '-'} | ${data.bank_account.bank || '-'}` }),
+            ...(data.self_account && { 'Self Account': `${data.self_account.account_title || '-'} | ${data.self_account.bank || '-'}` }),
+            ...(data.transaction_id && { 'Transaction Id': data.transaction_id }),
+            ...(String(data.method || '').toLowerCase().includes('program') && { 'Issued': data.issued || 'Not Issued' }),
             'Reff No.': data.reff_no ?? '-',
             'Voucher / CR No.': data.voucher_no ?? '-',
+            'Remarks': data.remarks || 'No Remarks',
         };
 
         if (data.program_no || data.program_date || data.program_customer) {

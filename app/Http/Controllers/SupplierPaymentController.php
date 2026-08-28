@@ -27,6 +27,7 @@ class SupplierPaymentController extends Controller
 
         if ($request->ajax()) {
             $payments = app(ModuleBranchService::class)->applyScope(SupplierPayment::with([
+                'supplier',
                 'bankAccount.bank',
                 'selfAccount.bank',
                 'cheque.paymentClearRecord.bankAccount.bank',
@@ -35,8 +36,11 @@ class SupplierPaymentController extends Controller
                 'program.customerPayments.bankAccount.bank',
                 'program.customer.city',
                 'cheque.customer.city',
+                'cheque.dr',
                 'slip.customer.city',
+                'slip.dr',
                 'voucher',
+                'cr',
             ])->orderByDesc('id'), 'supplier_payments')->applyFilters($request);
 
             return response()->json(['data' => $payments, 'authLayout' => $authLayout]);
