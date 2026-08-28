@@ -477,9 +477,12 @@ class VoucherController extends Controller
                     ->with('program.customer.city:id,title'),
                 'expenses',
             ]),
-            'payments.cheque' => fn($q) => $q->whereDoesntHave('paymentClearRecord'),
+            // Existing voucher rows must always be hydrated on edit. Clearance
+            // affects whether a payment can be reused, not whether its saved
+            // details are visible on the voucher that already owns it.
+            'payments.cheque',
             'payments.cheque.customer.city',
-            'payments.slip' => fn($q) => $q->whereDoesntHave('paymentClearRecord'),
+            'payments.slip',
             'payments.slip.customer.city',
             'payments.program.customer.city',
             'payments.bankAccount.bank',
