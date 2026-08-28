@@ -53,6 +53,7 @@ class AppServiceProvider extends ServiceProvider
                     'winter' => ['text' => 'Winter'],
                 ],
                 'sizes' => [
+                    'zero' => ['text' => 'Zero'],
                     '1_2' => ['text' => '1-2'],
                     '2_3' => ['text' => '2-3'],
                     'ml' => ['text' => 'ML'],
