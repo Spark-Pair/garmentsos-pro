@@ -1,10 +1,19 @@
 (function () {
+    const totalAmountDom = document.querySelector('#calc-bottom > .total-Amount .text-right');
+
+    window.renderCalculation = function renderCalculation(data) {
+        if (totalAmountDom) {
+            totalAmountDom.innerText = formatNumbersWithDigits(data?.total_amount ?? 0, 1, 1);
+        }
+    };
+
     window.createRow = function createRow(data) {
         return `
             <div id="${data.id}" oncontextmenu='${htmlAttr(data.oncontextmenu || "")}' onclick='${htmlAttr(data.onclick || "")}'
-                class="item row relative group grid grid-cols-7 border-b border-[var(--h-bg-color)] items-center py-2 cursor-pointer hover:bg-[var(--h-secondary-bg-color)] transition-all fade-in ease-in-out"
+                class="item row relative group grid grid-cols-[0.5fr_1.25fr_1.8fr_1.15fr_1.15fr_0.85fr_0.9fr_1.05fr] border-b border-[var(--h-bg-color)] items-center py-2 cursor-pointer hover:bg-[var(--h-secondary-bg-color)] transition-all fade-in ease-in-out"
                 data-json='${jsonAttr(data)}'>
 
+                <span>${data.id}</span>
                 <span>${data.date}</span>
                 <span>${data.customer}</span>
                 <span>${data.article_no}</span>
@@ -46,6 +55,7 @@
             id: 'modalForm',
             name: data.article_no,
             details: {
+                ID: data.id,
                 Date: data.date,
                 Customer: data.customer,
                 'Invoice No.': data.invoice_no,

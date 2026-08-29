@@ -242,7 +242,7 @@ class FixSalesReturnBranches extends Command
                                 'amount' => $totalAmount,
                                 'reff_no' => $canonicalReff,
                                 'remarks' => $firstReturn->type === 'adjustment'
-                                    ? 'Sales adjustment'
+                                    ? 'Invoice adjustment'
                                     : 'Sales return',
                                 'branch_id' => $branchId,
                                 'creator_id' => $systemUserId,
@@ -343,7 +343,9 @@ class FixSalesReturnBranches extends Command
 
             $paymentsByGroup = [];
             foreach ($stillUnmatched as $payment) {
-                $type = $payment->remarks === 'Sales adjustment' ? 'adjustment' : 'return';
+                $type = in_array($payment->remarks, ['Sales adjustment', 'Invoice adjustment'], true)
+                    ? 'adjustment'
+                    : 'return';
                 $groupKey = $key($payment->customer_id, $payment->getRawOriginal('date'), $type);
                 $paymentsByGroup[$groupKey][] = $payment;
             }

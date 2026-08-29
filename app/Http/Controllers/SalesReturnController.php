@@ -27,10 +27,28 @@ class SalesReturnController extends Controller
         $branches = app(ModuleBranchService::class);
 
         if ($request->ajax()) {
-            $sales_returns = $branches->applyScope(SalesReturn::orderByDesc('id'), 'sales_returns')
-                ->applyFilters($request);
+            $salesReturnsQuery = $branches->applyScope(
+                SalesReturn::with(['article', 'invoice.customer.city']),
+                'sales_returns'
+            )->applyFilters($request, false, true);
 
-            return response()->json(['data' => $sales_returns, 'authLayout' => $authLayout]);
+            $totalAmount = (float) (clone $salesReturnsQuery)->sum('amount');
+
+            $salesReturnsQuery->orderByDesc('id');
+            $limit = $request->integer('limit');
+            if ($limit > 0) {
+                $salesReturnsQuery->limit($limit);
+            }
+
+            $sales_returns = $salesReturnsQuery->get()->map->toFormattedArray();
+
+            return response()->json([
+                'data' => $sales_returns,
+                'authLayout' => $authLayout,
+                'calculations' => [
+                    'total_amount' => $totalAmount,
+                ],
+            ]);
         }
 
         return view('sales-return.index', compact('authLayout'));
@@ -212,7 +230,7 @@ class SalesReturnController extends Controller
                         'amount' => $branchTotal,
                         'reff_no' => ($data['type'] === 'adjustment' ? 'ADJ-' : 'SR-')
                         . ($firstReturnIdByBranch[$branchId] ?? $salesReturn->id),
-                        'remarks' => $data['type'] === 'adjustment' ? 'Sales adjustment' : 'Sales return',
+                        'remarks' => $data['type'] === 'adjustment' ? 'Invoice adjustment' : 'Sales return',
                     ];
 
                     if ($hasCustomerPaymentBranch) {

@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 
 trait SalesReturnComputed
 {
+    use SearchFilterHelpers;
+
     public function toFormattedArray()
     {
         return [
@@ -24,6 +26,26 @@ trait SalesReturnComputed
     public function scopeApplyModelFilters($query, $key, $value)
     {
         switch ($key) {
+            case 'id':
+                $tokens = $this->searchFilterTokens($value)
+                    ->filter(fn ($token) => ctype_digit((string) $token)
+                        || $this->searchFilterRangeBounds((string) $token));
+
+                if ($tokens->isEmpty()) {
+                    return $query->whereRaw('1 = 0');
+                }
+
+                return $query->where(function ($idQuery) use ($tokens) {
+                    foreach ($tokens as $token) {
+                        $bounds = $this->searchFilterRangeBounds((string) $token);
+                        if ($bounds) {
+                            $idQuery->orWhereBetween('id', [$bounds[0], $bounds[1]]);
+                        } elseif (ctype_digit((string) $token)) {
+                            $idQuery->orWhere('id', (int) $token);
+                        }
+                    }
+                });
+
             case 'customer':
                 return $query->whereHas('invoice', function ($q) use ($value) {
                     $q->whereHas('customer', function ($q2) use ($value) {

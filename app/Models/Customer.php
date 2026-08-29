@@ -298,6 +298,8 @@ class Customer extends Model
 
         $salesReturnRow = function ($r) {
             $prefix = $r->type === 'adjustment' ? 'ADJ-' : 'SR-';
+            $label = $r->type === 'adjustment' ? 'Invoice adjustment' : 'Sales return';
+            $invoiceNo = $r->invoice?->invoice_no;
 
             return [
                 'date' => $r->date,
@@ -306,7 +308,7 @@ class Customer extends Model
                 'method' => 'return',
                 'payment' => (float) $r->amount,
                 'bill' => 0,
-                'description' => $r->type === 'adjustment' ? 'Sales adjustment' : 'Sales return',
+                'description' => $invoiceNo ? $label . ' | ' . $invoiceNo : $label,
                 'created_at' => $r->created_at,
                 'source' => [
                     'type' => 'sales_return',
@@ -420,6 +422,9 @@ class Customer extends Model
             foreach ($salesReturnGroups as $key => $group) {
                 $first = $group->sortBy('created_at')->first();
                 $last = $group->sortBy('created_at')->last();
+                $label = $first->type === 'adjustment' ? 'Invoice adjustment' : 'Sales return';
+                $invoiceNumbers = $group->pluck('invoice.invoice_no')->filter()->unique()->values();
+                $invoiceReference = $invoiceNumbers->count() === 1 ? ' | ' . $invoiceNumbers->first() : '';
                 $statement->push([
                     'date' => $first->date,
                     'reff_no' => $first->id . '-' . $last->id,
@@ -427,7 +432,7 @@ class Customer extends Model
                     'method' => 'return',
                     'payment' => (float) $group->sum('amount'),
                     'bill' => 0,
-                    'description' => ($first->type === 'adjustment' ? 'Sales adjustment' : 'Sales return') . ' | ' . $first->id . '-' . $last->id,
+                    'description' => $label . $invoiceReference . ' | ' . $first->id . '-' . $last->id,
                     'created_at' => $first->created_at,
                     'source' => [
                         'type' => 'sales_return',
