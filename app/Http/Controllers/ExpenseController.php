@@ -7,6 +7,7 @@ use App\Models\Setup;
 use App\Models\Supplier;
 use App\Services\Branches\ModuleBranchService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
@@ -184,6 +185,7 @@ class ExpenseController extends Controller
             'title' => 'Adjustment',
         ]);
 
+        $canFullyEdit = Auth::user()?->role === 'developer' || app_can('expenses', 'override');
         $supplier = $expense->supplier;
         $supplierDataPayload = [
             'id' => $supplier->id,
@@ -194,7 +196,40 @@ class ExpenseController extends Controller
             ])->values()->all(),
         ];
 
-        return view('expenses.edit', compact('expense', 'adjustmentSetup', 'supplierDataPayload'));
+        $suppliers_options = [];
+        if ($canFullyEdit) {
+            $branches = app(ModuleBranchService::class);
+            $suppliers = $branches->applyRelatedScope(Supplier::whereHas('user', function ($query) {
+                $query->where('status', 'active');
+            }), 'suppliers', 'expenses')->get();
+
+            if (!$suppliers->contains('id', $supplier->id)) {
+                $suppliers->push($supplier);
+            }
+
+            $supplierPayloads = $this->supplierOptionPayloads($suppliers, 'expenses');
+            foreach ($suppliers as $supplierOption) {
+                $categoriesIdArray = json_decode($supplierOption->categories_array, true) ?: [];
+                $supplierPayload = $supplierPayloads[(int) $supplierOption->id];
+                $supplierPayload['categories'] = Setup::whereIn('id', $categoriesIdArray)
+                    ->where('type', 'supplier_category')
+                    ->get(['id', 'title'])
+                    ->toArray();
+                $supplierPayload['categories_array'] = $supplierOption->categories_array;
+                $suppliers_options[$supplierOption->id] = [
+                    'text' => $supplierOption->supplier_name,
+                    'data_option' => $supplierPayload,
+                ];
+            }
+        }
+
+        return view('expenses.edit', compact(
+            'expense',
+            'adjustmentSetup',
+            'supplierDataPayload',
+            'suppliers_options',
+            'canFullyEdit'
+        ));
     }
 
     /**
@@ -206,7 +241,11 @@ class ExpenseController extends Controller
             return $resp;
         }
 
+        $canFullyEdit = Auth::user()?->role === 'developer' || app_can('expenses', 'override');
+
         $validator = Validator::make($request->all(), [
+            'date' => $canFullyEdit ? 'required|date' : 'nullable',
+            'supplier_id' => $canFullyEdit ? 'required|integer|exists:suppliers,id' : 'nullable',
             'expense' => 'required|exists:setups,id',
             'reff_no' => 'required|integer',
             'amount' => 'required|integer|min:0',
@@ -219,13 +258,20 @@ class ExpenseController extends Controller
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
-        $expense->update([
+        $updates = [
             'expense' => $request->expense,
             'reff_no' => $request->reff_no,
             'amount' => $request->amount,
             'lot_no' => $request->lot_no,
             'remarks' => $request->remarks,
-        ]);
+        ];
+
+        if ($canFullyEdit) {
+            $updates['date'] = $request->date;
+            $updates['supplier_id'] = $request->supplier_id;
+        }
+
+        $expense->update($updates);
 
         return redirect()->route('expenses.index')->with('success', 'Expense updated successfully.');
     }

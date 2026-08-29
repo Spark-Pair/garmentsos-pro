@@ -18,10 +18,20 @@
             <div class="step1 space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <!-- date -->
-                    <x-input label="Date" id="date" value="{{ $expense->date->format('d-M-Y, D') }}" disabled />
+                    @if ($canFullyEdit)
+                        <x-input label="Date" name="date" id="date" type="date" required
+                            value="{{ $expense->date->toDateString() }}" />
+                    @else
+                        <x-input label="Date" id="date" value="{{ $expense->date->format('d-M-Y, D') }}" disabled />
+                    @endif
 
                     <!-- supplier -->
-                    <x-input label="Supplier" id="supplier_name" value="{{ $expense->supplier->supplier_name }}" disabled />
+                    @if ($canFullyEdit)
+                        <x-select label="Supplier" name="supplier_id" id="supplier_id" :options="$suppliers_options"
+                            :value="$expense->supplier_id" required onchange="supplierSelected(this)" />
+                    @else
+                        <x-input label="Supplier" id="supplier_name" value="{{ $expense->supplier->supplier_name }}" disabled />
+                    @endif
                     <input type="hidden" id="supplier" value='@json($supplierDataPayload)' />
 
                     <!-- balance -->
@@ -62,6 +72,7 @@
             selectedExpense: @json($expense->expense),
             supplierData: @json($supplierDataPayload),
             adjustmentId: @json($adjustmentSetup?->id),
+            canFullyEdit: @json($canFullyEdit),
         };
     </script>
 @endpush
