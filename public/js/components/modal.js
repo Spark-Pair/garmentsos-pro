@@ -478,6 +478,8 @@ function createModal(data, animate = 'animate') {
             calcBottomClass = 'grid grid-cols-3';
         }
 
+        calcBottomClass = data.calcBottomClass || calcBottomClass;
+
         data.calcBottom.forEach(field => {
             fieldsHTML += `
                 <div class="final flex justify-between items-center bg-[var(--h-bg-color)] border border-gray-600 rounded-lg py-2 px-4 w-full ${field.disabled ? 'cursor-not-allowed' : ''}">

@@ -116,6 +116,7 @@ function initPaymentProgramsIndex() {
             customerName: cleanPaymentText(data?.customer_name),
             customerBalance: formatNumbersWithDigits(data?.customer_balance ?? 0, 1, 1),
             orderBalance: formatNumbersWithDigits(data?.order_balance ?? 0, 1, 1),
+            programAmount: formatNumbersWithDigits(data?.amount ?? 0, 1, 1),
             receivedTotal: formatNumbersWithDigits(receivedTotal, 1, 1),
             rows,
         };
@@ -216,13 +217,13 @@ function initPaymentProgramsIndex() {
                             min-width: 0;
                             overflow-wrap: anywhere;
                         }
-                        .pp-no { width: 6%; text-align: center; }
-                        .pp-date { width: 17%; text-align: center; white-space: nowrap; }
-                        .pp-method { width: 12%; text-align: center; font-weight: 700; text-transform: capitalize; }
-                        .pp-beneficiary { width: 15%; text-align: center; }
-                        .pp-account { width: 19%; text-align: center; }
-                        .pp-amount { width: 14%; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
-                        .pp-reference { width: 17%; text-align: left; overflow-wrap: normal; word-break: normal; }
+                        .pp-no { width: 4%; text-align: center; }
+                        .pp-date { width: 15%; text-align: center; white-space: nowrap; }
+                        .pp-method { width: 10%; text-align: center; font-weight: 700; text-transform: capitalize; }
+                        .pp-beneficiary { width: 16%; text-align: left; }
+                        .pp-account { width: 23%; text-align: left; }
+                        .pp-amount { width: 12%; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+                        .pp-reference { width: 20%; text-align: left; overflow-wrap: normal; word-break: normal; }
                         .pp-empty {
                             padding: 28px 10px;
                             text-align: center;
@@ -231,7 +232,7 @@ function initPaymentProgramsIndex() {
                         }
                         .pp-totals {
                             display: grid;
-                            grid-template-columns: repeat(3, 1fr);
+                            grid-template-columns: repeat(2, 1fr);
                             gap: 6px;
                             border-top: 1px solid #111;
                             margin-top: 5px;
@@ -282,6 +283,7 @@ function initPaymentProgramsIndex() {
                             <section class="pp-totals">
                                 <div class="pp-total"><span>Customer Bal.</span><span>${escapePaymentText(printData.customerBalance)}</span></div>
                                 <div class="pp-total"><span>Order Bal.</span><span>${escapePaymentText(printData.orderBalance)}</span></div>
+                                <div class="pp-total"><span>Program Amount</span><span>${escapePaymentText(printData.programAmount)}</span></div>
                                 <div class="pp-total"><span>Received Total</span><span>${escapePaymentText(printData.receivedTotal)}</span></div>
                             </section>
                         </section>
@@ -637,29 +639,29 @@ function initPaymentProgramsIndex() {
             totalAmount += Number(item.amount || 0);
             return [
                 {data: index+1, class: 'w-[4%] text-center text-[var(--secondary-text)]'},
-                {data: formatDate(item.date), class: 'w-[16%] whitespace-nowrap'},
+                {data: formatDate(item.date), class: 'w-[15%] whitespace-nowrap'},
                 {data: escapeCell(item.method), class: 'w-[10%] capitalize font-semibold'},
-                {data: paymentParty(item), class: 'w-[12%] capitalize text-left px-1'},
-                {data: paymentAccount(item), class: 'w-[24%] capitalize text-left px-1 leading-5'},
+                {data: paymentParty(item), class: 'w-[16%] capitalize text-left px-1'},
+                {data: paymentAccount(item), class: 'w-[23%] capitalize text-left px-1 leading-5'},
                 {data: formatNumbersWithDigits(item.amount, 1, 1), class: 'w-[12%] text-right font-semibold tabular-nums pr-2'},
-                {data: paymentReference(item), class: 'w-[22%] text-left text-[var(--secondary-text)] leading-5 pl-1'},
+                {data: paymentReference(item), class: 'w-[20%] text-left text-[var(--secondary-text)] leading-5 pl-1'},
             ];
         });
 
         let modalData = {
             id: 'modalForm',
-            class: 'max-w-4xl h-[37rem]',
+            class: 'max-w-6xl h-[37rem]',
             name: `Payment Details - ${cleanText(data.customer_name)}`,
             table: {
                 name: 'Details',
                 headers: [
                     { label: "#", class: "w-[4%] text-center" },
-                    { label: "Date", class: "w-[16%]" },
+                    { label: "Date", class: "w-[15%]" },
                     { label: "Method", class: "w-[10%]" },
-                    { label: "Beneficiary", class: "w-[12%] text-left px-1" },
-                    { label: "Account", class: "w-[24%] text-left px-1" },
+                    { label: "Beneficiary", class: "w-[16%] text-left px-1" },
+                    { label: "Account", class: "w-[23%] text-left px-1" },
                     { label: "Amount", class: "w-[12%] text-right pr-2" },
-                    { label: "Reference / Details", class: "w-[22%] text-left pl-1" },
+                    { label: "Reference / Details", class: "w-[20%] text-left pl-1" },
                 ],
                 body: tableBody,
                 scrollable: true,
@@ -669,8 +671,10 @@ function initPaymentProgramsIndex() {
             calcBottom: [
                 {label: 'Customer Bal. - Rs.', name: 'customer_balance', value: formatNumbersWithDigits(data.customer_balance, 1, 1), disabled: true},
                 {label: 'Order Bal. - Rs.', name: 'order_balance', value: formatNumbersWithDigits(data.order_balance, 1, 1), disabled: true},
+                {label: 'Program Amount - Rs.', name: 'program_amount', value: formatNumbersWithDigits(data.amount, 1, 1), disabled: true},
                 {label: 'Received Total - Rs.', name: 'total', value: formatNumbersWithDigits(totalAmount, 1, 1), disabled: true},
             ],
+            calcBottomClass: 'grid grid-cols-4',
             bottomActions: [
                 {id: 'print', text: 'Print', onclick: 'printDetails(this)'}
             ]
