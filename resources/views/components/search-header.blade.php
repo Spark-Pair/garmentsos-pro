@@ -77,15 +77,20 @@
                             </div>
                         </div>
                         <hr class="border-gray-600 my-4 w-full">
-                        <div class="flex gap-4 p-1">
+                        <div class="grid grid-cols-2 gap-2 p-1">
+                            <button type="button" onclick="showAllData()"
+                                title="Clear filters and load all records"
+                                class="col-span-2 px-4 py-2.5 bg-[var(--secondary-bg-color)] border border-gray-600 text-[var(--text-color)] font-medium rounded-lg hover:bg-[var(--h-bg-color)] transition-all duration-300 ease-in-out cursor-pointer hover:scale-[0.98]">
+                                All Data
+                            </button>
                             <button type="button" onclick="clearAllSearchFields()"
                                 title="Clear filters (Alt+C)"
-                                class="flex-1 px-4 py-2 bg-[var(--bg-error)] border border-[var(--bg-error)] text-[var(--text-error)] font-medium text-nowrap rounded-lg hover:bg-[var(--h-bg-error)] transition-all duration-300 ease-in-out cursor-pointer hover:scale-[0.95]">
+                                class="px-4 py-2.5 bg-[var(--bg-error)] border border-[var(--bg-error)] text-[var(--text-error)] font-medium rounded-lg hover:bg-[var(--h-bg-error)] transition-all duration-300 ease-in-out cursor-pointer hover:scale-[0.98]">
                                 Clear
                             </button>
                             <button type="button" onclick="applyFilters()"
                                 title="Apply filters (Alt+S)"
-                                class="flex-1 px-4 py-2 bg-[var(--secondary-bg-color)] border border-gray-600 text-[var(--secondary-text)] rounded-lg hover:bg-[var(--h-bg-color)] transition-all duration-300 ease-in-out cursor-pointer hover:scale-[0.95]">
+                                class="px-4 py-2.5 bg-[var(--primary-color)] border border-[var(--primary-color)] text-[var(--text-color)] font-medium rounded-lg hover:bg-[var(--h-primary-color)] transition-all duration-300 ease-in-out cursor-pointer hover:scale-[0.98]">
                                 Apply Filters
                             </button>
                         </div>

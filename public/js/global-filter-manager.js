@@ -115,34 +115,40 @@ const GlobalFilterManager = {
             this.applyFilters();
         };
 
+        window.showAllData = () => {
+            this.showAllData();
+        };
+
         window.clearAllSearchFields = () => {
-
-            document.querySelectorAll('[data-clearable]').forEach(field => {
-
-                field.value = '';
-
-                if (field.matches?.('[data-list-input]')) {
-                    field.dataset.listInputValues = '';
-                }
-            });
-
-            if (typeof closeAllDropdowns === 'function') {
-                closeAllDropdowns();
-            }
-
-            if (typeof window.refreshListInput === 'function') {
-                document
-                    .querySelectorAll('[data-list-input]')
-                    .forEach(input => {
-                        window.refreshListInput(input);
-                    });
-            }
-
-            this.clearSelectLabels();
-            this.clearStorage('filters');
+            this.clearFilterInputs();
 
             this.loadInitialData();
         };
+    },
+
+    clearFilterInputs() {
+        document.querySelectorAll('[data-clearable]').forEach(field => {
+            field.value = '';
+
+            if (field.matches?.('[data-list-input]')) {
+                field.dataset.listInputValues = '';
+            }
+        });
+
+        if (typeof closeAllDropdowns === 'function') {
+            closeAllDropdowns();
+        }
+
+        if (typeof window.refreshListInput === 'function') {
+            document
+                .querySelectorAll('[data-list-input]')
+                .forEach(input => {
+                    window.refreshListInput(input);
+                });
+        }
+
+        this.clearSelectLabels();
+        this.clearStorage('filters');
     },
 
     bindShortcutEvents() {
@@ -283,6 +289,47 @@ const GlobalFilterManager = {
 
         } finally {
 
+            if (requestId === this.requestSequence) {
+                this.showLoading(false);
+                this.emitRendered();
+            }
+        }
+    },
+
+    async showAllData() {
+        this.clearFilterInputs();
+
+        rootAuthLayout = this.resolveLayout();
+        this.showLoading(true);
+        this.emitLoading();
+
+        const requestId = ++this.requestSequence;
+
+        try {
+            const data = await this.fetchData(this.buildUrl());
+
+            if (requestId !== this.requestSequence) {
+                return;
+            }
+
+            rootAuthLayout = this.normalizeLayout(
+                data?.authLayout
+            ) || this.resolveLayout();
+
+            this.syncGlobalLayout();
+            this.renderData(data);
+        } catch (error) {
+            if (requestId !== this.requestSequence) {
+                return;
+            }
+
+            console.error(
+                '[GlobalFilterManager] Error loading all data:',
+                error
+            );
+
+            this.showRequestError(error);
+        } finally {
             if (requestId === this.requestSequence) {
                 this.showLoading(false);
                 this.emitRendered();
