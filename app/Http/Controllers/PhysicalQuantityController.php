@@ -9,6 +9,7 @@ use App\Services\PhysicalQuantityReportService;
 use App\Services\ArticleStockService;
 use App\Services\Branches\ModuleBranchService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 
 class PhysicalQuantityController extends Controller
