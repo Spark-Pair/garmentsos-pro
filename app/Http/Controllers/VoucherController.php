@@ -1000,26 +1000,45 @@ class VoucherController extends Controller
 
             if ($method === 'selfcheque') {
                 $chequeNo = trim((string) ($paymentDetails['cheque_no'] ?? ''));
-                if ($chequeNo !== '') {
-                    if (isset($seen['cheque_no'][$chequeNo])) {
+                $bankAccountId = (int) ($paymentDetails['bank_account_id'] ?? 0);
+
+                if ($chequeNo !== '' && $bankAccountId > 0) {
+
+                    // Same cheque number + same bank account
+                    // can only be used once within this request.
+                    $seenKey = $bankAccountId . ':' . $chequeNo;
+
+                    if (isset($seen['cheque_no'][$seenKey])) {
                         throw ValidationException::withMessages([
-                            'payment_details_array' => "Payment row {$rowNumber} mein same self cheque number dobara use hua hai.",
+                            'payment_details_array' =>
+                                "Payment row {$rowNumber} mein cheque no. {$chequeNo} "
+                                . "same bank account mein dobara use nahi ho sakta.",
                         ]);
                     }
 
-                    $seen['cheque_no'][$chequeNo] = true;
+                    $seen['cheque_no'][$seenKey] = true;
 
+                    // Check database:
+                    // Same cheque number + same bank account = duplicate.
+                    // Same cheque number in another bank account = allowed.
                     $chequeExists = SupplierPayment::query()
+                        ->where('bank_account_id', $bankAccountId)
                         ->where(function ($query) use ($chequeNo) {
                             $query->where('cheque_no', $chequeNo)
-                                ->orWhereHas('cheque', fn ($cheque) => $cheque->where('cheque_no', $chequeNo));
+                                ->orWhereHas('cheque', function ($cheque) use ($chequeNo) {
+                                    $cheque->where('cheque_no', $chequeNo);
+                                });
                         })
-                        ->when($currentVoucherId, fn($q) => $q->where('voucher_id', '!=', $currentVoucherId))
+                        ->when(
+                            $currentVoucherId,
+                            fn ($q) => $q->where('voucher_id', '!=', $currentVoucherId)
+                        )
                         ->exists();
 
                     if ($chequeExists) {
                         throw ValidationException::withMessages([
-                            'payment_details_array' => "Self cheque no. {$chequeNo} pehle se use ho chuka hai.",
+                            'payment_details_array' =>
+                                "Cheque no. {$chequeNo} is bank account mein pehle se use ho chuka hai.",
                         ]);
                     }
                 }
