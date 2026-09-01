@@ -33,6 +33,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class ReportController extends Controller
 {
@@ -71,6 +72,10 @@ class ReportController extends Controller
                 $id = $supplier->id;
             }
 
+            $dataBranchContext = $this->statementDataBranchContext($branchContext, $category);
+            $selectedBranchIds = $dataBranchContext['selected_ids'];
+            $selectedBranchLabels = $dataBranchContext['selected_labels'];
+            $statementBranding = $this->statementBranding($dataBranchContext);
 
             if ($request->withData) {
                 $dateFrom = filled($dateFrom) ? $dateFrom : '1900-01-01';
@@ -83,9 +88,9 @@ class ReportController extends Controller
                         return response()->json(['error' => 'Customer not found'], 404);
                     }
 
-                    $data = $customer->getStatement($dateFrom, $dateTo, $type, $selectedBranchIds, $branchContext['include_null_main_records'] ?? false);
+                    $data = $customer->getStatement($dateFrom, $dateTo, $type, $selectedBranchIds, $dataBranchContext['include_null_main_records'] ?? false);
                     $data['branch_scope_label'] = implode(', ', $selectedBranchLabels);
-                    $data['branch_scope_mode'] = $branchContext['mode'];
+                    $data['branch_scope_mode'] = $dataBranchContext['mode'];
 
                     return view("reports.statement", compact('data', 'statementBranches', 'selectedBranchIds', 'selectedBranchLabels', 'statementBranding'));
                 }
@@ -96,10 +101,10 @@ class ReportController extends Controller
                         return response()->json(['error' => 'Supplier not found'], 404);
                     }
 
-                    $data = $supplier->getStatement($dateFrom, $dateTo, $type, $selectedBranchIds, $branchContext['include_null_main_records'] ?? false);
+                    $data = $supplier->getStatement($dateFrom, $dateTo, $type, $selectedBranchIds, $dataBranchContext['include_null_main_records'] ?? false);
 
                     $data['branch_scope_label'] = implode(', ', $selectedBranchLabels);
-                    $data['branch_scope_mode'] = $branchContext['mode'];
+                    $data['branch_scope_mode'] = $dataBranchContext['mode'];
 
                     return view("reports.statement", compact('data', 'statementBranches', 'selectedBranchIds', 'selectedBranchLabels', 'statementBranding'));
                 }
@@ -110,10 +115,10 @@ class ReportController extends Controller
                         return response()->json(['error' => 'Employee not found'], 404);
                     }
 
-                    $data = $employee->getStatement($dateFrom, $dateTo, $type, $selectedBranchIds, $branchContext['include_null_main_records'] ?? false);
+                    $data = $employee->getStatement($dateFrom, $dateTo, $type, $selectedBranchIds, $dataBranchContext['include_null_main_records'] ?? false);
 
                     $data['branch_scope_label'] = implode(', ', $selectedBranchLabels);
-                    $data['branch_scope_mode'] = $branchContext['mode'];
+                    $data['branch_scope_mode'] = $dataBranchContext['mode'];
 
                     return view("reports.statement", compact('data', 'statementBranches', 'selectedBranchIds', 'selectedBranchLabels', 'statementBranding'));
                 }
@@ -124,10 +129,10 @@ class ReportController extends Controller
                         return response()->json(['error' => 'Bank account not found'], 404);
                     }
 
-                    $data = $bank_account->getStatement($dateFrom, $dateTo, $type, $selectedBranchIds, $branchContext['include_null_main_records'] ?? false);
+                    $data = $bank_account->getStatement($dateFrom, $dateTo, $type, $selectedBranchIds, $dataBranchContext['include_null_main_records'] ?? false);
 
                     $data['branch_scope_label'] = implode(', ', $selectedBranchLabels);
-                    $data['branch_scope_mode'] = $branchContext['mode'];
+                    $data['branch_scope_mode'] = $dataBranchContext['mode'];
 
                     return view("reports.statement", compact('data', 'statementBranches', 'selectedBranchIds', 'selectedBranchLabels', 'statementBranding'));
                 }
@@ -159,6 +164,36 @@ class ReportController extends Controller
                 ? (object) ['branch_id' => $branchContext['branding_branch']->id]
                 : null
         );
+    }
+
+    private function statementDataBranchContext(array $branchContext, ?string $category): array
+    {
+        $branches = app(ModuleBranchService::class);
+        $normalizedCategory = Str::snake(trim((string) $category));
+        $subjectModule = $normalizedCategory !== ''
+            ? $branches->canonicalModuleKey(Str::plural($normalizedCategory))
+            : null;
+
+        if (!$subjectModule
+            || !$branches->isRegisteredModule($subjectModule)
+            || !$branches->shouldFilterRecords('reports_statement')
+            || $branches->shouldFilterRecords($subjectModule)) {
+            return $branchContext;
+        }
+
+        $mainBranch = $branches->mainBranch();
+
+        return array_merge($branchContext, [
+            'mode' => 'all',
+            'branch_ids' => [],
+            'branch_names' => ['All Branches'],
+            'selected_ids' => [],
+            'selected_labels' => ['All Branches'],
+            'selected_branches' => $branchContext['branches'] ?? collect(),
+            'branding_branch' => $mainBranch,
+            'use_main_branding' => true,
+            'include_null_main_records' => true,
+        ]);
     }
 
     public function statementRecordDetails(Request $request)

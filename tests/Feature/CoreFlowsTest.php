@@ -6,6 +6,7 @@ use App\Http\Middleware\CheckActiveSession;
 use App\Http\Middleware\SubscriptionExpiry;
 use App\Http\Middleware\VerifyCsrfToken;
 use App\Models\BankAccount;
+use App\Models\CR;
 use App\Models\Customer;
 use App\Models\CustomerPayment;
 use App\Models\PaymentProgram;
@@ -13,6 +14,7 @@ use App\Models\Setup;
 use App\Models\Supplier;
 use App\Models\SupplierPayment;
 use App\Models\User;
+use App\Models\Voucher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -407,6 +409,72 @@ class CoreFlowsTest extends TestCase
         $this->assertSame(1050.0, (float) $summarized['totals']['bill']);
         $this->assertSame(0.0, (float) $summarized['totals']['payment']);
         $this->assertSame(1050.0, (float) $summarized['closing_balance']);
+    }
+
+    public function test_self_bank_account_statement_includes_cheque_paid_through_cr(): void
+    {
+        $this->actingDeveloper();
+
+        $bank = Setup::create([
+            'title' => 'CR Statement Bank',
+            'short_title' => 'CRB',
+            'type' => 'bank_name',
+        ]);
+
+        $account = BankAccount::create([
+            'category' => 'self',
+            'bank_id' => $bank->id,
+            'account_title' => 'CR Statement Account',
+            'date' => '2026-01-01',
+            'account_no' => 'CR-SELF-001',
+        ]);
+
+        CustomerPayment::create([
+            'date' => '2026-01-05',
+            'type' => 'self_account_deposit',
+            'method' => 'Cash',
+            'amount' => 1000,
+            'bank_account_id' => $account->id,
+        ]);
+
+        $voucher = Voucher::create([
+            'voucher_no' => 99001,
+            'date' => '2026-01-10',
+        ]);
+
+        $cr = CR::create([
+            'date' => '2026-01-15',
+            'c_r_no' => 'CR-99001',
+            'voucher_id' => $voucher->id,
+            'return_payments' => [],
+            'new_payments' => [],
+        ]);
+
+        $crCheque = SupplierPayment::create([
+            'date' => '2026-01-15',
+            'method' => 'Self Cheque | CR',
+            'amount' => 300,
+            'cheque_no' => 4401,
+            'bank_account_id' => $account->id,
+            'c_r_id' => $cr->id,
+        ]);
+
+        $statement = $account->getStatement('2026-01-01', '2026-01-31', 'general');
+
+        $this->assertSame(700.0, (float) $account->calculateBalance());
+        $this->assertSame(300.0, (float) $statement['totals']['payment']);
+        $this->assertSame(0.0, (float) $statement['totals']['pending_payment']);
+        $this->assertSame(700.0, (float) $statement['closing_balance']);
+        $this->assertTrue($statement['statements']->contains(fn ($row) =>
+            data_get($row, 'source.type') === 'supplier_payment'
+            && data_get($row, 'source.id') === $crCheque->id
+            && (int) ($row['reff_no'] ?? 0) === 4401
+            && (float) ($row['payment'] ?? 0) === 300.0
+        ));
+
+        $summarized = $account->getStatement('2026-01-01', '2026-01-31', 'summarized');
+        $this->assertSame(300.0, (float) $summarized['totals']['payment']);
+        $this->assertSame(700.0, (float) $summarized['closing_balance']);
     }
 
     public function test_self_cheque_voucher_keeps_both_accounts_linked_through_create_update_and_delete(): void

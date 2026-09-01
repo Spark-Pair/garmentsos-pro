@@ -171,7 +171,10 @@ class BankAccount extends Model
 
             // SupplierPayments — filter by own date
             $supplierPayments = SupplierPayment::where('bank_account_id', $this->id)
-                ->whereNotNull('voucher_id')
+                ->where(function ($query) {
+                    $query->whereNotNull('voucher_id')
+                        ->orWhereNotNull('c_r_id');
+                })
                 ->where('is_return', false);
             $applyBranchScope($supplierPayments, 'supplier_payments');
             $this->applyDateFilter($supplierPayments, 'date', $fromDate, $toDate, $includeGivenDate);
@@ -297,8 +300,12 @@ class BankAccount extends Model
             ->with('bankAccount.bank', 'selfAccount.bank', 'voucher', 'cheque', 'slip');
         $pendingPaymentTotal = (clone $supplierQuery)
             ->whereNull('voucher_id')
+            ->whereNull('c_r_id')
             ->sum('amount') ?? 0;
-        $supplierQuery->whereNotNull('voucher_id');
+        $supplierQuery->where(function ($query) {
+            $query->whereNotNull('voucher_id')
+                ->orWhereNotNull('c_r_id');
+        });
 
         $unpairedTransferQuery = SupplierPayment::where('self_account_id', $this->id)
             ->whereIn('method', ['Self Cheque', 'ATM'])
