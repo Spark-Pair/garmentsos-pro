@@ -551,6 +551,37 @@ function Backup-GarmentsLicenseState($InstallDir) {
     }
 }
 
+function Remove-ExpiredUpdateSupportBackups($InstallDir, [int]$Keep = 2) {
+    $backupRoot = Join-Path $InstallDir "backups"
+    if ($Keep -lt 1 -or -not (Test-Path -LiteralPath $backupRoot)) {
+        return
+    }
+
+    $resolvedRoot = (Resolve-Path -LiteralPath $backupRoot).Path.TrimEnd('\')
+    $groups = @(
+        @{ Pattern = 'env_*.env'; Regex = '^env_\d{8}_\d{6}\.env$'; Directories = $false },
+        @{ Pattern = 'license_state_*'; Regex = '^license_state_\d{8}_\d{6}$'; Directories = $true }
+    )
+
+    foreach ($group in $groups) {
+        $items = @(Get-ChildItem -LiteralPath $resolvedRoot -Filter $group.Pattern |
+            Where-Object {
+                $_.Name -match $group.Regex -and
+                (($group.Directories -and $_.PSIsContainer) -or (-not $group.Directories -and -not $_.PSIsContainer))
+            } |
+            Sort-Object Name -Descending)
+
+        foreach ($expired in @($items | Select-Object -Skip $Keep)) {
+            if (-not $expired.FullName.StartsWith($resolvedRoot + '\', [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw "Update backup retention refused an unsafe path: $($expired.FullName)"
+            }
+
+            Write-Host "Removing expired update support backup: $($expired.FullName)"
+            Remove-Item -LiteralPath $expired.FullName -Recurse -Force
+        }
+    }
+}
+
 function Restore-GarmentsLicenseState($InstallDir, $ArchivePath) {
     if ([string]::IsNullOrWhiteSpace($ArchivePath) -or -not (Test-Path -LiteralPath $ArchivePath)) {
         Write-Warning "No license state backup archive is available to restore."
@@ -1354,6 +1385,7 @@ try {
     Protect-GarmentsInstallFolder $InstallDir
 
     Write-UpdateLog $InstallDir "update finish version: $TargetVersion"
+    Remove-ExpiredUpdateSupportBackups $InstallDir 2
     Write-Host "Update complete. Volumes were preserved."
     Write-Host "License/device identity state was preserved in the Docker storage volume."
     Write-Host "Rollback: load the previous image tar, set GARMENTSOS_IMAGE in .env to the previous tag, then run docker compose up -d."

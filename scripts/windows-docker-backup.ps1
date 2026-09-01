@@ -32,6 +32,43 @@ function Copy-IfExists($Source, $Destination) {
     return $false
 }
 
+function Remove-NestedManagedBackups($BackupDir) {
+    $nestedBackupDir = Join-Path $BackupDir "storage-app\private\backups"
+    if (Test-Path -LiteralPath $nestedBackupDir) {
+        Remove-Item -LiteralPath $nestedBackupDir -Recurse -Force
+        Write-BackupLog "Excluded nested managed backups from the full snapshot: $nestedBackupDir"
+    }
+}
+
+function Remove-ExpiredFullBackups($BackupRoot, $CurrentBackupDir, [int]$Keep = 2) {
+    if ($Keep -lt 1 -or -not (Test-Path -LiteralPath $BackupRoot)) {
+        return
+    }
+
+    $resolvedRoot = (Resolve-Path -LiteralPath $BackupRoot).Path.TrimEnd('\')
+    $resolvedCurrent = (Resolve-Path -LiteralPath $CurrentBackupDir).Path
+    if (-not $resolvedCurrent.StartsWith($resolvedRoot + '\', [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Backup retention refused an unsafe current backup path: $resolvedCurrent"
+    }
+
+    $successfulBackups = @(Get-ChildItem -LiteralPath $resolvedRoot -Directory |
+        Where-Object {
+            $_.Name -match '^backup_\d{8}_\d{6}$' -and
+            (Test-Path -LiteralPath (Join-Path $_.FullName 'backup-metadata.json'))
+        } |
+        Sort-Object Name -Descending)
+
+    foreach ($expired in @($successfulBackups | Select-Object -Skip $Keep)) {
+        $resolvedExpired = $expired.FullName
+        if (-not $resolvedExpired.StartsWith($resolvedRoot + '\', [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Backup retention refused an unsafe expired backup path: $resolvedExpired"
+        }
+
+        Write-BackupLog "Removing expired full backup: $resolvedExpired"
+        Remove-Item -LiteralPath $resolvedExpired -Recurse -Force
+    }
+}
+
 function Get-InstalledManifestVersion($Path) {
     try {
         if (Test-Path -LiteralPath $Path) {
@@ -408,6 +445,7 @@ try {
     if (-not [string]::IsNullOrWhiteSpace($containerId)) {
         Copy-ContainerPath $InstallDir $containerId "/var/www/html/storage/app" (Join-Path $script:BackupDir "storage-app") | Out-Null
         Copy-ContainerPath $InstallDir $containerId "/var/www/html/public/uploads" (Join-Path $script:BackupDir "public-uploads") | Out-Null
+        Remove-NestedManagedBackups $script:BackupDir
     }
 
     $backupStatus = "success"
@@ -463,3 +501,4 @@ if ($backupStatus -ne "success" -and -not $Force) {
 }
 
 Write-BackupLog "Backup created: $script:BackupDir"
+Remove-ExpiredFullBackups $BackupRoot $script:BackupDir 2
