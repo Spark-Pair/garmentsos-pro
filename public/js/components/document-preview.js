@@ -27,7 +27,7 @@
     const customerTitlePhoneLine = (customer = {}) => {
         const title = String(customer?.urdu_title ?? '').trim();
         const phone = String(customer?.phone_number ?? '').trim();
-        return [title, phone].filter(Boolean).join(' | ');
+        return [phone, title].filter(Boolean).join(' | ');
     };
 
     const deliverToLine = previewData => {
