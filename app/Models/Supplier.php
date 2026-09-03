@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use App\Models\Voucher;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class Supplier extends Model
 {
@@ -230,39 +232,62 @@ class Supplier extends Model
         });
 
         $expenseQuery = $this->expenses()
-            ->whereBetween(\Illuminate\Support\Facades\DB::raw('DATE(date)'), [$start, $end])
+            ->whereBetween(DB::raw('DATE(date)'), [$start, $end])
             ->when($hasBranchScope && Schema::hasColumn('expenses', 'branch_id'), $branchScope);
         $inventoryExpenseQuery = $this->inventoryTransactions()
             ->whereBetween(
-                \Illuminate\Support\Facades\DB::raw('DATE(date)'),
+                DB::raw('DATE(date)'),
                 [$start, $end]
             )
             ->when(
                 $hasBranchScope && Schema::hasColumn('inventory_transactions', 'branch_id'),
                 $branchScope
             );
-        $paymentQuery = $this->payments()
-            ->whereBetween(\Illuminate\Support\Facades\DB::raw('DATE(date)'), [$start, $end])
+
+        $allPayments = $this->payments()
+            ->whereBetween(DB::raw('DATE(date)'), [$start, $end])
             ->when($hasBranchScope && Schema::hasColumn('supplier_payments', 'branch_id'), $branchScope)
             ->whereIn('method', [
-                'Cheque', 'Cash', 'Slip', 'ATM', 'Self Cheque', 'program', 'p. return', 'Adjustment'
-            ])
+                'Cheque',
+                'Cash',
+                'Slip',
+                'ATM',
+                'Self Cheque',
+                'program',
+                'p. return',
+                'Adjustment'
+            ]);
+
+        $paymentQuery = (clone $allPayments)
             ->whereNotNull('voucher_id');
+
         $voucherQuery = Voucher::with('payments')
             ->where('supplier_id', $this->id)
-            ->whereBetween(\Illuminate\Support\Facades\DB::raw('DATE(date)'), [$start, $end])
-            ->when($hasBranchScope && Schema::hasColumn('vouchers', 'branch_id'), $branchScope);
+            ->whereBetween(DB::raw('DATE(date)'), [$start, $end])
+            ->when(
+                $hasBranchScope && Schema::hasColumn('vouchers', 'branch_id'),
+                $branchScope
+            );
+
         $adjustmentsQuery = $this->statementAdjustments()
-            ->whereBetween(\Illuminate\Support\Facades\DB::raw('DATE(date)'), [$start, $end])
-            ->when($hasBranchScope && Schema::hasColumn('statement_adjustments', 'branch_id'), $branchScope);
+            ->whereBetween(DB::raw('DATE(date)'), [$start, $end])
+            ->when(
+                $hasBranchScope && Schema::hasColumn('statement_adjustments', 'branch_id'),
+                $branchScope
+            );
+
         $productionQuery = $this->worker
-            ? $this->worker->productions()->whereBetween(\Illuminate\Support\Facades\DB::raw('DATE(receive_date)'), [$start, $end])
-                ->when($hasBranchScope && Schema::hasColumn('productions', 'branch_id'), $branchScope)
+            ? $this->worker->productions()
+                ->whereBetween(DB::raw('DATE(receive_date)'), [$start, $end])
+                ->when(
+                    $hasBranchScope && Schema::hasColumn('productions', 'branch_id'),
+                    $branchScope
+                )
             : null;
-        $pendingPaymentTotal = (clone $paymentQuery)
+
+        $pendingPaymentTotal = (clone $allPayments)
             ->whereNull('voucher_id')
             ->sum('amount') ?? 0;
-
         $normalizeDateValue = function ($value) {
             if ($value instanceof \DateTimeInterface) {
                 return Carbon::instance($value);
