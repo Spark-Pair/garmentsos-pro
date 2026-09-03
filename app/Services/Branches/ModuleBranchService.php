@@ -1517,25 +1517,42 @@ class ModuleBranchService
             return $this->shouldFilterRecordsCache[$cacheKey] = false;
         }
 
-        $setting = null;
         $selectedBranchId = $this->selectedBranchIdForModule($moduleKey, $user);
-        if ($selectedBranchId) {
-            $setting = $this->branchSetting($moduleKey, $selectedBranchId);
-        }
-        $setting ??= $this->setting($moduleKey);
         $config = $this->runtimeModuleConfig($moduleKey, $selectedBranchId);
-        $metadata = is_array($setting?->metadata) ? $setting->metadata : [];
-        $recordFilteringEnabled = array_key_exists('record_filtering_enabled', $metadata)
-            ? (bool) $metadata['record_filtering_enabled']
-            : (bool) ($config['can_filter_records'] ?? false);
 
         return $this->shouldFilterRecordsCache[$cacheKey] = (bool) (
-            $user
-            && $this->isEnabled($moduleKey)
-            && $selectedBranchId
-            && $recordFilteringEnabled
+            $this->isRecordFilteringEnabled($moduleKey, $user)
             && ($config['has_branch_id_support'] ?? false)
         );
+    }
+
+    /**
+     * Whether the Developer enabled record filtering for this module/branch.
+     *
+     * This intentionally does not require the module's own table to have a
+     * branch_id column. Reports can use this policy to decide whether related
+     * transactional records should be merged or scoped branch-wise.
+     */
+    public function isRecordFilteringEnabled(string $moduleKey, ?User $user = null): bool
+    {
+        $moduleKey = $this->canonicalModuleKey($moduleKey);
+        $user ??= Auth::user();
+
+        if (!$user || !$this->branchTablesReadyForSelectors() || !$this->isRegisteredModule($moduleKey)) {
+            return false;
+        }
+
+        $selectedBranchId = $this->selectedBranchIdForModule($moduleKey, $user);
+        if (!$selectedBranchId || !$this->isEnabled($moduleKey)) {
+            return false;
+        }
+
+        $setting = $this->branchSetting($moduleKey, $selectedBranchId) ?? $this->setting($moduleKey);
+        $metadata = is_array($setting?->metadata) ? $setting->metadata : [];
+
+        return array_key_exists('record_filtering_enabled', $metadata)
+            ? (bool) $metadata['record_filtering_enabled']
+            : (bool) ($this->runtimeModuleConfig($moduleKey, $selectedBranchId)['can_filter_records'] ?? false);
     }
 
     public function shouldFilterRelatedRecords(?string $currentModuleKey, string $relatedModuleKey, ?User $user = null): bool

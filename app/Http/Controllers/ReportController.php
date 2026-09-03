@@ -177,7 +177,7 @@ class ReportController extends Controller
         if (!$subjectModule
             || !$branches->isRegisteredModule($subjectModule)
             || !$branches->shouldFilterRecords('reports_statement')
-            || $branches->shouldFilterRecords($subjectModule)) {
+            || $branches->isRecordFilteringEnabled($subjectModule)) {
             return $branchContext;
         }
 
