@@ -38,7 +38,6 @@
                 'label' => 'Materials',
                 'id' => 'materials',
                 'placeholder' => 'Select Materials',
-                'required' => true,
                 'autocomplete' => 'off',
                 'attributes' => $materialsAttrs,
             ])->render() . '<input type="hidden" name="materials" value="" />',
