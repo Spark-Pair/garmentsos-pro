@@ -34,7 +34,19 @@
                     'ordered_quantity' => (int) $line->invoice_pcs,
                 ];
             })->values()
-            : collect();
+            : ($invoiceType === 'manual'
+                ? $invoice->invoiceArticles->map(function ($line) {
+                    $article = $line->article;
+
+                    return [
+                        'article_id' => $line->article_id,
+                        'article' => $article,
+                        'description' => $line->description,
+                        'invoice_pcs' => (int) $line->invoice_pcs,
+                        'rate' => (float) ($article?->sales_rate ?? 0),
+                    ];
+                })->values()
+                : collect());
     @endphp
 
     @php
@@ -63,7 +75,7 @@
 
     <!-- Form -->
     <form id="form" action="{{ route('invoices.update', ['invoice' => $invoice->id]) }}" method="post"
-        class="bg-[var(--secondary-bg-color)] text-sm rounded-xl shadow-lg p-8 border border-[var(--glass-border-color)]/20 pt-14 max-w-4xl mx-auto relative overflow-hidden">
+        class="bg-[var(--secondary-bg-color)] text-sm rounded-xl shadow-lg p-8 border border-[var(--glass-border-color)]/20 pt-14 {{ $invoiceType === 'manual' ? 'max-w-5xl' : 'max-w-4xl' }} mx-auto relative overflow-hidden">
         @csrf
         @method('PUT')
         <x-form-title-bar title="Edit Invoice" />
@@ -75,7 +87,7 @@
                 @if ($relatedRecords['has_bilty'])
                     <div>
                         Bilty #{{ $relatedRecords['bilty']['bilty_no'] }} ({{ $relatedRecords['bilty']['date'] }})
-                        — articles, order/shipment, aur customer lock hain, sirf date editable hai.
+                        - is invoice mein jo linked details change hongi woh bilty display mein bhi update ho jayengi.
                     </div>
                 @endif
 
@@ -141,6 +153,9 @@
                     <x-input label="Customer" id="customer_display"
                         value="{{ $invoice->customer?->customer_name }} | {{ $invoice->customer?->city?->title ?? '-' }}"
                         disabled />
+                    @if ($invoiceType === 'manual')
+                        <input type="hidden" name="customer_id" value="{{ old('customer_id', $invoice->customer_id) }}">
+                    @endif
                 @endif
             </div>
         </div>
@@ -190,7 +205,7 @@
                 </div>
 
                 <input type="hidden" name="articles_in_invoice" id="articles_in_invoice" value="">
-            @else
+            @elseif ($invoiceType === 'shipment')
                 <div class="flex justify-between gap-4">
                     <div class="grow grid grid-cols-1 md:grid-cols-2 gap-4">
                         {{--
@@ -204,7 +219,7 @@
                                 required showDefault />
                         @else
                             <x-input label="Shipment Number" name="shipment_no" id="shipment_no"
-                                value="old('shipment_no', $invoice->shipment_no)"
+                                value="{{ old('shipment_no', $invoice->shipment_no) }}"
                                 required readonly />
                         @endif
                         
@@ -229,6 +244,29 @@
                         <div class="text-center bg-[var(--h-bg-color)] rounded-lg py-3 px-4">No Rates Added</div>
                     </div>
                 </div>
+            @else
+                <div class="flex justify-end">
+                    <button id="manualSelectArticlesBtn" type="button" class="bg-[var(--primary-color)] text-[#e2e8f0] px-4 py-2 rounded-lg hover:bg-[var(--h-primary-color)] hover:scale-95 transition-all duration-300 ease-in-out flex items-center gap-1 cursor-pointer">
+                        <i class="fas fa-plus"></i>
+                        <div>Select Articles</div>
+                    </button>
+                </div>
+
+                <div id="order-table" class="w-full text-left text-sm">
+                    <div class="flex justify-between items-center bg-[var(--h-bg-color)] rounded-lg py-2 px-4 mb-4">
+                        <div class="w-[10%]">Article</div>
+                        <div class="w-1/6">Qty.</div>
+                        <div class="grow">Decs.</div>
+                        <div class="w-1/6">Rate/Pc</div>
+                        <div class="w-1/5">Amount</div>
+                        <div class="w-[10%] text-center">Action</div>
+                    </div>
+                    <div id="manual_article_list" class="h-[19rem] overflow-y-auto my-scrollbar-2">
+                        <div class="text-center bg-[var(--h-bg-color)] rounded-lg py-3 px-4">No Articles Yet</div>
+                    </div>
+                </div>
+
+                <input type="hidden" name="articles_in_invoice" id="articles_in_invoice" value="">
             @endif
 
             <div class="flex w-full grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-nowrap">
@@ -288,6 +326,7 @@
             deliverTo: @json($invoice->deliver_to ?? ''),
             articles: @json($initialArticles),
             shipmentArticles: @json($invoice->shipment?->articles ?? []),
+            manualArticles: @json($manualArticles ?? []),
             errorAlertTemplate: @json($errorAlertTemplate),
         };
     </script>

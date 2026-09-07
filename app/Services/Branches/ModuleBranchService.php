@@ -1989,6 +1989,8 @@ class ModuleBranchService
             return;
         }
 
+        $this->selectRecordBranchForReadRoute($record, $moduleKey, $branchColumn);
+
         $recordBranchId = data_get($record, $branchColumn);
         $selectedIds = collect($this->selectedBranchIdsForModule($moduleKey))
             ->filter(fn ($id) => is_numeric($id))
@@ -2011,6 +2013,63 @@ class ModuleBranchService
         }
 
         abort(403, 'This record does not belong to the selected branch.');
+    }
+
+    public function selectRecordBranchForReadRoute(object $record, string $moduleKey, string $branchColumn = 'branch_id'): bool
+    {
+        $route = request()->route();
+        $method = strtoupper((string) request()->method());
+        $action = strtolower((string) ($route?->getActionMethod() ?? ''));
+        $routeName = (string) ($route?->getName() ?? '');
+
+        if ($method !== 'GET' || (!in_array($action, ['edit', 'show'], true) && !Str::endsWith($routeName, ['.edit', '.show']))) {
+            return false;
+        }
+
+        if (!$this->shouldFilterRecords($moduleKey)) {
+            return false;
+        }
+
+        $table = method_exists($record, 'getTable') ? $record->getTable() : null;
+        if (!$table || !$this->schemaHasColumn($table, $branchColumn)) {
+            return false;
+        }
+
+        $user = Auth::user();
+        if (!$user) {
+            return false;
+        }
+
+        $recordBranchId = data_get($record, $branchColumn) ?: $this->mainBranch()?->id;
+        if (!$recordBranchId) {
+            return false;
+        }
+
+        $recordBranchId = (int) $recordBranchId;
+        if ((int) ($this->selectedBranchIdForModule($moduleKey, $user) ?? 0) === $recordBranchId) {
+            return false;
+        }
+
+        $availableIds = $this->availableBranchesForModule($moduleKey, $user)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id);
+
+        if (!$availableIds->contains($recordBranchId) || !$this->canView($recordBranchId, $moduleKey, $user)) {
+            return false;
+        }
+
+        UserModuleBranchPreference::query()->updateOrCreate(
+            ['user_id' => $user->id, 'module_key' => $this->canonicalModuleKey($moduleKey)],
+            [
+                'branch_id' => $recordBranchId,
+                'selection_mode' => 'single',
+                'branch_ids' => [$recordBranchId],
+            ],
+        );
+
+        unset($this->selectedBranchCache[$moduleKey . ':' . $user->id], $this->selectedBranchIdsCache[$moduleKey . ':' . $user->id]);
+
+        return true;
     }
 
     public function canSwitch(int $branchId, string $moduleKey, User $user): bool

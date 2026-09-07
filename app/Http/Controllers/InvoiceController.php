@@ -1047,23 +1047,22 @@ class InvoiceController extends Controller
         }
     }
 
+    protected function invoiceUpdatedMessage(Invoice $invoice): string
+    {
+        return $invoice->bilty
+            ? 'Invoice updated successfully. Linked bilty data will now show the updated invoice details.'
+            : 'Invoice updated successfully.';
+    }
+
     /**
-     * Block field changes that would corrupt a bilty (goods already physically
-     * dispatched against this invoice's current articles/quantities/customer).
-     * Only 'date' remains editable once a bilty exists.
+     * Bilty records read their customer/carton/article display data from the
+     * invoice, so invoice edits naturally sync to the bilty. Keep this hook for
+     * a single warning point instead of blocking valid invoice edits.
      */
     protected function guardAgainstBiltyMismatch(Invoice $invoice, array $relatedRecords, bool $customerChanged, bool $articlesOrCartonChanged, bool $orderOrShipmentChanged): void
     {
         if (!$relatedRecords['has_bilty']) {
             return;
-        }
-
-        if ($customerChanged || $articlesOrCartonChanged || $orderOrShipmentChanged) {
-            $bilty = $relatedRecords['bilty'];
-
-            throw ValidationException::withMessages([
-                'articles' => "Cannot change articles, quantities, order/shipment, or customer — Bilty #{$bilty['bilty_no']} (dated {$bilty['date']}) was issued against this invoice. Only the date can be edited.",
-            ]);
         }
     }
 
@@ -1110,7 +1109,7 @@ class InvoiceController extends Controller
     
         // Detect the real invoice type from what's actually stored on the record,
         // instead of assuming "order" like the old code did.
-        $invoiceType = $invoice->shipment_no ? 'shipment' : 'order';
+        $invoiceType = $invoice->shipment_no ? 'shipment' : ($invoice->order_no ? 'order' : 'manual');
         $isDeveloper = Auth::user()?->role === 'developer' || app_can('orders', 'override');
     
         $branches = app(ModuleBranchService::class);
@@ -1137,6 +1136,7 @@ class InvoiceController extends Controller
         $ordersOptions = [];
         $shipmentsOptions = [];
         $articles = [];
+        $manualArticles = collect();
     
         if ($invoiceType === 'order') {
             $ordersOptions = $branches->applyRelatedScope(Order::query(), 'orders', 'invoices')
@@ -1173,7 +1173,7 @@ class InvoiceController extends Controller
                     ],
                 ])
                 ->all();
-        } else {
+        } elseif ($invoiceType === 'shipment') {
             // Shipment invoice: only offer shipments that are still open for
             // invoicing, or the invoice's own current shipment.
             $shipmentsOptions = $branches->applyRelatedScope(Shipment::query(), 'shipments', 'invoices')
@@ -1184,6 +1184,29 @@ class InvoiceController extends Controller
                 ->pluck('shipment_no', 'shipment_no')
                 ->map(fn ($shipmentNo) => ['text' => $shipmentNo])
                 ->toArray();
+        } else {
+            $manualArticleIds = $invoice->invoiceArticles->pluck('article_id')->unique()->values();
+            $manualArticles = $branches->applyRelatedScope(Article::query(), 'articles', 'invoices')
+                ->where(function ($query) use ($manualArticleIds) {
+                    $query->where('sales_rate', '>', 0);
+
+                    if ($manualArticleIds->isNotEmpty()) {
+                        $query->orWhereIn('id', $manualArticleIds);
+                    }
+                })
+                ->orderBy('article_no')
+                ->get();
+
+            $manualArticles->each(function (Article $article) {
+                $article->current_stock = null;
+                $article->orderable_quantity = 999999999;
+                $article->category = ucfirst(str_replace('_', ' ', (string) $article->category));
+                $article->season = ucfirst(str_replace('_', ' ', (string) $article->season));
+                $article->size = ucfirst(str_replace('_', '-', (string) $article->size));
+                if (!$article->image || !is_file(public_path('storage/uploads/images/' . $article->image))) {
+                    $article->image = 'no_image_icon.png';
+                }
+            });
         }
 
         $relatedRecords = $this->relatedRecordsSummary($invoice);
@@ -1199,7 +1222,8 @@ class InvoiceController extends Controller
             'shipmentsOptions',
             'invoiceType',
             'isDeveloper',
-            'relatedRecords'
+            'relatedRecords',
+            'manualArticles'
         ));
     }
     
@@ -1225,11 +1249,13 @@ class InvoiceController extends Controller
         $relatedRecords = $this->relatedRecordsSummary($invoice);
 
         $isDeveloper = Auth::user()?->role === 'developer' || app_can('invoices', 'override');;
-        $invoiceType = $invoice->shipment_no ? 'shipment' : 'order';
+        $invoiceType = $invoice->shipment_no ? 'shipment' : ($invoice->order_no ? 'order' : 'manual');
 
-        return $invoiceType === 'order'
-            ? $this->updateOrderInvoice($request, $invoice, $isDeveloper, $relatedRecords)
-            : $this->updateShipmentInvoice($request, $invoice, $isDeveloper, $relatedRecords);
+        return match ($invoiceType) {
+            'shipment' => $this->updateShipmentInvoice($request, $invoice, $isDeveloper, $relatedRecords),
+            'manual' => $this->updateManualInvoice($request, $invoice, $isDeveloper, $relatedRecords),
+            default => $this->updateOrderInvoice($request, $invoice, $isDeveloper, $relatedRecords),
+        };
     }
     
     /**
@@ -1374,7 +1400,95 @@ class InvoiceController extends Controller
                 ->with('error', $e->getMessage());
         }
 
-        return redirect()->route('invoices.index')->with('success', 'Invoice updated successfully.');
+        return redirect()->route('invoices.index')->with('success', $this->invoiceUpdatedMessage($invoice->fresh('bilty')));
+    }
+
+    /**
+     * Update a manual invoice. Manual invoices are not tied to an order or a
+     * shipment, so their article rows can be replaced directly.
+     */
+    protected function updateManualInvoice(Request $request, invoice $invoice, bool $isDeveloper, array $relatedRecords = [])
+    {
+        $relatedRecords = $relatedRecords ?: $this->relatedRecordsSummary($invoice);
+
+        $rawArticles = json_decode((string) $request->input('articles_in_invoice'), true) ?: [];
+
+        $request->merge([
+            'articles' => array_map(fn ($row) => [
+                'article_id' => $row['article_id'] ?? $row['id'] ?? null,
+                'description' => $row['description'] ?? null,
+                'invoice_pcs' => $row['invoice_pcs'] ?? $row['quantity'] ?? null,
+            ], $rawArticles),
+        ]);
+
+        $rules = [
+            'date' => ['required', 'date'],
+            'netAmount' => ['required'],
+            'customer_id' => ['required', 'integer', 'exists:customers,id'],
+            'articles' => ['required', 'array', 'min:1'],
+            'articles.*.article_id' => ['required', 'integer', 'exists:articles,id'],
+            'articles.*.description' => ['nullable', 'string', 'max:255'],
+            'articles.*.invoice_pcs' => ['required', 'integer', 'min:1'],
+        ];
+
+        if ($isDeveloper) {
+            $rules['invoice_no'] = ['required', 'string', 'max:255'];
+        }
+
+        $validated = $request->validate($rules);
+
+        try {
+            DB::transaction(function () use ($invoice, $validated, $isDeveloper, $relatedRecords) {
+                $submittedQtyByArticle = collect($validated['articles'])
+                    ->groupBy('article_id')
+                    ->map(fn ($group) => (int) $group->sum('invoice_pcs'));
+
+                $this->guardAgainstBiltyMismatch(
+                    $invoice,
+                    $relatedRecords,
+                    (int) $validated['customer_id'] !== (int) $invoice->customer_id,
+                    true,
+                    false
+                );
+
+                $this->guardAgainstSalesReturnMismatch($relatedRecords, $submittedQtyByArticle);
+
+                $updateData = [
+                    'order_no' => null,
+                    'shipment_no' => null,
+                    'date' => $validated['date'],
+                    'netAmount' => (int) str_replace(',', '', (string) $validated['netAmount']),
+                    'customer_id' => (int) $validated['customer_id'],
+                    'carton_count' => null,
+                ];
+
+                if ($isDeveloper) {
+                    $updateData['invoice_no'] = $validated['invoice_no'];
+                }
+
+                $invoice->update($updateData);
+
+                $invoice->invoiceArticles()->delete();
+                foreach ($validated['articles'] as $line) {
+                    $invoice->invoiceArticles()->create([
+                        'article_id' => (int) $line['article_id'],
+                        'description' => $line['description'] ?? '',
+                        'invoice_pcs' => (int) $line['invoice_pcs'],
+                    ]);
+                }
+            });
+
+            $this->syncCargoSnapshotsForInvoice($invoice->fresh());
+        } catch (\Throwable $e) {
+            report($e);
+
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('invoices.index')->with('success', $this->invoiceUpdatedMessage($invoice->fresh('bilty')));
     }
     
     /**
@@ -1505,7 +1619,7 @@ class InvoiceController extends Controller
                 ->with('error', $e->getMessage());
         }
 
-        return redirect()->route('invoices.index')->with('success', 'Invoice updated successfully.');
+        return redirect()->route('invoices.index')->with('success', $this->invoiceUpdatedMessage($invoice->fresh('bilty')));
     }
 
     /**

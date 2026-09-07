@@ -9,6 +9,23 @@ use Illuminate\Support\Facades\Schema;
 
 class BranchSerialService
 {
+    private const SERIAL_COLUMNS = [
+        'orders' => 'order_no',
+        'invoices' => 'invoice_no',
+        'vouchers' => 'voucher_no',
+        'productions' => 'ticket',
+        'payment_programs' => 'program_no',
+        'bilties' => 'bilty_no',
+        'cargos' => 'cargo_no',
+        'cargo' => 'cargo_no',
+        'shipments' => 'shipment_no',
+        'cr' => 'c_r_no',
+        'dr' => 'd_r_no',
+        'bank_accounts' => 'account_no',
+        'daily_ledger' => 'reff_no',
+        'utility_bills' => 'bill_no',
+    ];
+
     private const DOCUMENT_IDENTITIES = [
         'orders' => 'O',
         'invoices' => 'I',
@@ -98,6 +115,20 @@ class BranchSerialService
 
         // Warna sirf branch prefix lagao
         return "{$branchPrefix}-{$baseNumber}";
+    }
+
+    public function serialColumnForModule(string $moduleKey): ?string
+    {
+        $moduleKey = $this->branches->canonicalModuleKey($moduleKey);
+
+        return self::SERIAL_COLUMNS[$moduleKey] ?? null;
+    }
+
+    public function reformatForBranch(?string $documentNumber, string $moduleKey, ?Branch $branch): string
+    {
+        $baseNumber = $this->stripKnownDocumentPrefix((string) $documentNumber, null, null);
+
+        return $this->formatBranchDocumentNumber($baseNumber, $moduleKey, $branch);
     }
 
     private function nextBaseNumber(string $moduleKey, string $modelClass, string $column, int $pad, ?int $branchId): string

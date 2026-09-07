@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Services\Branches\ModuleBranchService;
+use App\Services\Branches\BranchSerialService;
+use App\Models\Branch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Model;
@@ -99,6 +101,17 @@ class ModuleBranchPreferenceController extends Controller
 
         if ((int) ($record->getAttribute('branch_id') ?? 0) === $branchId) {
             return false;
+        }
+
+        $serials = app(BranchSerialService::class);
+        $serialColumn = $serials->serialColumnForModule($moduleKey);
+        $targetBranch = Branch::query()->find($branchId);
+
+        if ($serialColumn && Schema::hasColumn($record->getTable(), $serialColumn)) {
+            $record->setAttribute(
+                $serialColumn,
+                $serials->reformatForBranch((string) $record->getAttribute($serialColumn), $moduleKey, $targetBranch)
+            );
         }
 
         $record->setAttribute('branch_id', $branchId);

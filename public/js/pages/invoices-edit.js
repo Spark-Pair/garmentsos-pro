@@ -487,6 +487,212 @@
     }
 
     // -----------------------------------------------------------------------
+    // MANUAL invoice edit flow
+    // -----------------------------------------------------------------------
+
+    function initManualInvoiceEdit(config) {
+        const companyData = config.companyData || {};
+        const companyLogoBase = config.companyLogoBase || "";
+        const invoiceNoDom = document.getElementById("invoice_no");
+        const dateDom = document.getElementById("date");
+        const customerValue = document.querySelector('.dbInput[data-for="customer_id"]');
+        const linesInput = document.getElementById("articles_in_invoice");
+        const linesContainer = document.getElementById("manual_article_list");
+        const totalQuantityInFormDom = document.getElementById("totalQuantityInForm");
+        const manualTotalAmountDom = document.getElementById("manualTotalAmount") || document.getElementById("totalAmountInForm");
+        const netAmountInFormDom = document.getElementById("netAmountInForm");
+        const previewDom = document.getElementById("preview-container");
+
+        const availableArticles = Array.isArray(config.manualArticles) ? config.manualArticles : [];
+        const customers = Object.values(config.customers || {}).map((row) => row.data_option || row);
+        const selectedLines = (Array.isArray(config.articles) ? config.articles : []).map((line) => ({
+            article_id: Number(line.article_id),
+            article: line.article,
+            description: line.description || "",
+            invoice_pcs: Number(line.invoice_pcs || 0),
+            rate: Number(line.rate || line.article?.sales_rate || 0),
+        })).filter((line) => line.article_id > 0 && line.invoice_pcs > 0);
+
+        function descriptionFor(article) {
+            return [article.size, article.category, article.season, article.fabric_type]
+                .filter(Boolean)
+                .map((value) => String(value).replaceAll("_", " "))
+                .join(" | ");
+        }
+
+        function selectedCustomer() {
+            const id = Number(customerValue?.value || config.customer?.id || 0);
+            return customers.find((customer) => Number(customer.id) === id) || config.customer || null;
+        }
+
+        function syncLinesInput() {
+            if (!linesInput) return;
+
+            linesInput.value = JSON.stringify(selectedLines.map((line) => ({
+                article_id: line.article_id,
+                description: line.description,
+                invoice_pcs: line.invoice_pcs,
+            })));
+        }
+
+        function renderManualLines() {
+            const totalPcs = selectedLines.reduce((sum, line) => sum + line.invoice_pcs, 0);
+            const totalAmount = selectedLines.reduce((sum, line) => sum + (line.invoice_pcs * line.rate), 0);
+
+            if (totalQuantityInFormDom) totalQuantityInFormDom.textContent = formatNumbersDigitLess(totalPcs);
+            if (manualTotalAmountDom) manualTotalAmountDom.textContent = formatNumbersWithDigits(totalAmount, 1, 1);
+            if (netAmountInFormDom) netAmountInFormDom.value = formatNumbersWithDigits(totalAmount, 1, 1);
+
+            syncLinesInput();
+
+            if (!linesContainer) return;
+
+            selectedLines.sort((left, right) => articleSortValue(left).localeCompare(articleSortValue(right), undefined, {
+                numeric: true,
+                sensitivity: "base",
+            }));
+
+            linesContainer.innerHTML = selectedLines.length ? selectedLines.map((line, index) => `
+                <div class="flex justify-between items-center border-t border-gray-600 py-3 px-4">
+                    <div class="w-[10%]">${line.article?.article_no ?? ""}</div>
+                    <div class="w-1/6">${formatNumbersDigitLess(line.invoice_pcs)} pcs</div>
+                    <div class="grow capitalize">${line.description}</div>
+                    <div class="w-1/6">${formatNumbersWithDigits(line.rate, 1, 1)}</div>
+                    <div class="w-1/5">${formatNumbersWithDigits(line.invoice_pcs * line.rate, 1, 1)}</div>
+                    <div class="w-[10%] text-center">
+                        <button type="button" data-remove-manual-line="${index}" class="text-[var(--danger-color)] text-xs px-2 py-1 rounded-lg hover:text-[var(--h-danger-color)] transition-all duration-300 ease-in-out cursor-pointer">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join("") : `<div class="text-center bg-[var(--h-bg-color)] rounded-lg py-2 px-4">No Articles Yet</div>`;
+        }
+
+        window.manualInvoiceArticleSearch = function manualInvoiceArticleSearch(value) {
+            document.querySelectorAll("#modalForm .card").forEach((card) => {
+                const row = JSON.parse(card.dataset.json || "{}");
+                card.classList.toggle("hidden", !String(row.name || "").toLowerCase().includes(String(value || "").toLowerCase()));
+            });
+        };
+
+        window.generateManualInvoiceArticlesModal = function generateManualInvoiceArticlesModal() {
+            const cards = availableArticles.map((article) => ({
+                id: article.id,
+                name: article.article_no,
+                image: article.image === "no_image_icon.png" ? "/images/no_image_icon.png" : `/storage/uploads/images/${article.image}`,
+                details: { Category: article.category, Season: article.season, Size: article.size },
+                data: article,
+                onclick: "generateManualInvoiceQuantityModal(this)",
+            }));
+
+            createModal({
+                id: "modalForm",
+                class: "h-[80%] w-full",
+                cards: { name: "Articles", count: 3, data: cards },
+                basicSearch: true,
+                onBasicSearch: "manualInvoiceArticleSearch(this.value)",
+                info: `Selected: ${selectedLines.length}/500`,
+                flex_col: true,
+            });
+        };
+
+        window.generateManualInvoiceQuantityModal = function generateManualInvoiceQuantityModal(elem) {
+            const article = JSON.parse(elem.dataset.json).data;
+            const existing = selectedLines.find((line) => line.article_id === Number(article.id));
+
+            createModal({
+                id: "QuantityModalForm",
+                name: "Enter Quantity",
+                class: "h-auto",
+                fields: [
+                    { category: "input", value: `${article.article_no} | ${article.season || "-"} | ${article.size || "-"} | ${article.category || "-"} | ${article.fabric_type || "-"} | ${formatMoney(article.sales_rate)} - Rs.`, disabled: true, full: true },
+                    { category: "input", name: "quantity", id: "quantity", type: "number", label: "Quantity - Pcs.", required: true },
+                ],
+                fieldsGridCount: "2",
+                bottomActions: [{ id: "setQuantityBtn", text: "Set Quantity", onclick: `setManualInvoiceQuantity(${article.id})` }],
+            });
+
+            const quantityDom = document.getElementById("quantity");
+            if (quantityDom) {
+                quantityDom.value = existing?.invoice_pcs || "";
+                quantityDom.focus();
+            }
+        };
+
+        window.setManualInvoiceQuantity = function setManualInvoiceQuantity(articleId) {
+            const article = availableArticles.find((item) => Number(item.id) === Number(articleId));
+            const pcs = Number.parseInt(document.getElementById("quantity")?.value || "0", 10);
+
+            if (!article || pcs <= 0) return;
+
+            const existing = selectedLines.find((line) => line.article_id === Number(article.id));
+            if (existing) {
+                existing.invoice_pcs = pcs;
+                existing.rate = Number(article.sales_rate || 0);
+                existing.description = existing.description || descriptionFor(article);
+            } else {
+                selectedLines.push({
+                    article_id: Number(article.id),
+                    article,
+                    description: descriptionFor(article),
+                    invoice_pcs: pcs,
+                    rate: Number(article.sales_rate || 0),
+                });
+            }
+
+            closeModal("QuantityModalForm");
+            renderManualLines();
+        };
+
+        document.getElementById("manualSelectArticlesBtn")?.addEventListener("click", window.generateManualInvoiceArticlesModal);
+
+        linesContainer?.addEventListener("click", (event) => {
+            const button = event.target.closest("[data-remove-manual-line]");
+            if (!button) return;
+
+            selectedLines.splice(Number(button.dataset.removeManualLine), 1);
+            renderManualLines();
+        });
+
+        window.validateForNextStep = function validateForNextStep() {
+            const customer = selectedCustomer();
+
+            if (!customer || selectedLines.length === 0) {
+                renderError(config, !customer ? "Please select a customer." : "Please add at least one article.");
+                return false;
+            }
+
+            const totalAmount = selectedLines.reduce((sum, line) => sum + line.invoice_pcs * line.rate, 0);
+            const data = {
+                customer,
+                date: dateDom?.value || config.invoiceDate,
+                invoice_no: (invoiceNoDom?.value || config.invoiceNo || "").trim(),
+                order_no: null,
+                carton_count: 0,
+                discount: 0,
+                netAmount: totalAmount,
+                branch_branding: companyData,
+                invoice_articles: selectedLines.map((line) => ({
+                    article: line.article,
+                    description: line.description,
+                    invoice_pcs: line.invoice_pcs,
+                })),
+            };
+
+            previewDom.className = "h-auto mx-auto relative flex flex-col";
+            previewDom.innerHTML = [
+                buildA5InvoicePreviewPages(data, "Customer", data.invoice_articles, companyData, companyLogoBase),
+                buildA5InvoicePreviewPages(data, "Office", data.invoice_articles, companyData, companyLogoBase),
+            ].join("");
+
+            syncLinesInput();
+            return true;
+        };
+
+        renderManualLines();
+    }
+
+    // -----------------------------------------------------------------------
     // SHIPMENT invoice edit flow
     // -----------------------------------------------------------------------
 
@@ -730,6 +936,8 @@
 
         if (invoiceType === 'shipment') {
             initShipmentInvoiceEdit(config);
+        } else if (invoiceType === 'manual') {
+            initManualInvoiceEdit(config);
         } else {
             initOrderInvoiceEdit(config);
         }
