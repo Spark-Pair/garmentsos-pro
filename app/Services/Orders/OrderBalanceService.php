@@ -4,6 +4,7 @@ namespace App\Services\Orders;
 
 use App\Models\Customer;
 use App\Models\Order;
+use App\Models\OrderArticles;
 use App\Services\Branches\ModuleBranchService;
 use Illuminate\Support\Facades\Schema;
 
@@ -51,9 +52,14 @@ class OrderBalanceService
 
     public function pendingForOrder(Order $order): float
     {
-        $order->loadMissing('invoices');
+        $order->loadMissing('articles.article');
 
-        return max(0, $this->orderAmount($order) - $this->invoicedAmount($order));
+        $grossPendingAmount = (float) $order->articles->sum(
+            fn (OrderArticles $line) => $this->pendingLineAmount($line)
+        );
+        $discount = max(0, min(100, (float) ($order->discount ?? 0)));
+
+        return max(0, $grossPendingAmount - ($grossPendingAmount * $discount / 100));
     }
 
     public function pendingForCustomer(Customer|int|null $customer, ?array $branchIds = null, bool $includeNullBranchRecords = false): float
@@ -81,7 +87,7 @@ class OrderBalanceService
             return $this->customerBalanceCache[$cacheKey];
         }
 
-        $orders = Order::with('invoices')
+        $orders = Order::with('articles.article')
             ->where('customer_id', $customerId)
             ->when($branchIds !== [] && Schema::hasColumn('orders', 'branch_id'), function ($query) use ($branchIds, $includeNullBranchRecords) {
                 $query->where(function ($nested) use ($branchIds, $includeNullBranchRecords) {
@@ -98,27 +104,12 @@ class OrderBalanceService
         );
     }
 
-    private function orderAmount(Order $order): float
+    private function pendingLineAmount(OrderArticles $line): float
     {
-        return (float) (
-            $order->netAmount
-            ?? $order->net_amount
-            ?? $order->total_amount
-            ?? $order->amount
-            ?? 0
-        );
-    }
+        $orderedPcs = max(0, (int) ($line->ordered_pcs ?? 0));
+        $dispatchedPcs = max(0, (int) ($line->dispatched_pcs ?? 0));
+        $pendingPcs = max(0, $orderedPcs - $dispatchedPcs);
 
-    private function invoicedAmount(Order $order): float
-    {
-        return (float) $order->invoices->sum(
-            fn ($invoice) => (float) (
-                $invoice->netAmount
-                ?? $invoice->net_amount
-                ?? $invoice->total_amount
-                ?? $invoice->amount
-                ?? 0
-            )
-        );
+        return $pendingPcs * (float) ($line->article?->sales_rate ?? 0);
     }
 }
