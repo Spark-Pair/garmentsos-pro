@@ -160,6 +160,8 @@
                         'employee' => $data['totals']['balance'] ?? 0,
                         default => $data['totals']['pending_payment'] ?? 0,
                     };
+                    $footerBillTotal = ($data['totals']['bill'] ?? 0) + $topSummaryValue;
+                    $footerBalanceTotal = ($data['closing_balance'] ?? 0) + $topSummaryValue;
                     $statementPartyCity = data_get($data, 'customer.city.title');
                     $statementPartyAddress = data_get($data, 'customer.address');
                     $datedStatementRows = $statements
@@ -331,23 +333,23 @@
                                                     <hr class="w-full my-1.5 border-gray-700 border-dashed">
                                                     <div class="tr flex justify-between w-full px-2.5 gap-1 text-center font-bold">
                                                         <div class="td w-[2.5%]"></div>
+                                                        <div class="td flex-1 text-left">{{ $topSummaryLabel }}</div>
+                                                        <div class="td w-[11%]">{{ \App\Support\Money::format($topSummaryValue) }}</div>
+                                                        <div class="td w-[11%]"></div>
+                                                        <div class="td w-[11%]"></div>
+                                                    </div>
+                                                    <hr class="w-full my-1.5 border-gray-700 border-dashed">
+                                                    <div class="tr flex justify-between w-full px-2.5 gap-1 text-center font-bold">
+                                                        <div class="td w-[2.5%]"></div>
                                                         <div class="td w-[11.5%] text-left">Total</div>
                                                         @if(in_array($statementType, ['detailed', 'general']))
                                                             <div class="td w-[10%]"></div>
                                                             <div class="td w-[10%]"></div>
                                                             <div class="td w-[30%]"></div>
                                                         @endif
-                                                        <div class="td w-[11%]">{{ \App\Support\Money::format($data['totals']['bill']) }}</div>
+                                                        <div class="td w-[11%]">{{ \App\Support\Money::format($footerBillTotal) }}</div>
                                                         <div class="td w-[11%]">{{ \App\Support\Money::format($data['totals']['payment']) }}</div>
-                                                        <div class="td w-[11%]">{{ \App\Support\Money::format($data['closing_balance']) }}</div>
-                                                    </div>
-                                                    <hr class="w-full my-1.5 border-gray-700 border-dashed">
-                                                    <div class="tr flex justify-between w-full px-2.5 gap-1 text-center font-bold">
-                                                        <div class="td w-[2.5%]"></div>
-                                                        <div class="td flex-1 text-left">{{ $topSummaryLabel }}</div>
-                                                        <div class="td w-[11%]"></div>
-                                                        <div class="td w-[11%]"></div>
-                                                        <div class="td w-[11%]">{{ \App\Support\Money::format($topSummaryValue) }}</div>
+                                                        <div class="td w-[11%]">{{ \App\Support\Money::format($footerBalanceTotal) }}</div>
                                                     </div>
                                                 @endif
                                             </div>
@@ -472,23 +474,23 @@
                                                         <hr class="w-full my-1.5 border-gray-700 border-dashed">
                                                         <div class="tr flex justify-between w-full px-2.5 gap-1 text-center font-bold">
                                                             <div class="td w-[2.5%]"></div>
+                                                            <div class="td flex-1 text-left">{{ $topSummaryLabel }}</div>
+                                                            <div class="td w-[11%]">{{ \App\Support\Money::format($topSummaryValue) }}</div>
+                                                            <div class="td w-[11%]"></div>
+                                                            <div class="td w-[11%]"></div>
+                                                        </div>
+                                                        <hr class="w-full my-1.5 border-gray-700 border-dashed">
+                                                        <div class="tr flex justify-between w-full px-2.5 gap-1 text-center font-bold">
+                                                            <div class="td w-[2.5%]"></div>
                                                             <div class="td w-[11.5%] text-left">Total</div>
                                                             @if(in_array($statementType, ['detailed', 'general']))
                                                                 <div class="td w-[10%]"></div>
                                                                 <div class="td w-[10%]"></div>
                                                                 <div class="td w-[30%]"></div>
                                                             @endif
-                                                        <div class="td w-[11%]">{{ \App\Support\Money::format($data['totals']['bill']) }}</div>
+                                                        <div class="td w-[11%]">{{ \App\Support\Money::format($footerBillTotal) }}</div>
                                                         <div class="td w-[11%]">{{ \App\Support\Money::format($data['totals']['payment']) }}</div>
-                                                        <div class="td w-[11%]">{{ \App\Support\Money::format($data['closing_balance']) }}</div>
-                                                    </div>
-                                                    <hr class="w-full my-1.5 border-gray-700 border-dashed">
-                                                    <div class="tr flex justify-between w-full px-2.5 gap-1 text-center font-bold">
-                                                        <div class="td w-[2.5%]"></div>
-                                                        <div class="td flex-1 text-left">{{ $topSummaryLabel }}</div>
-                                                        <div class="td w-[11%]"></div>
-                                                        <div class="td w-[11%]"></div>
-                                                        <div class="td w-[11%]">{{ \App\Support\Money::format($topSummaryValue) }}</div>
+                                                        <div class="td w-[11%]">{{ \App\Support\Money::format($footerBalanceTotal) }}</div>
                                                     </div>
                                                 @endif
                                                 </div>
