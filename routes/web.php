@@ -188,6 +188,8 @@ Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensur
 
     Route::resource('customer-payments', CustomerPaymentController::class);
     Route::post('customer-payments/{id}/clear', [CustomerPaymentController::class, 'clear'])->name('customer-payments.clear');
+    Route::put('customer-payments/{payment}/clears/{paymentClear}', [CustomerPaymentController::class, 'updateClear'])->name('customer-payments.clears.update');
+    Route::delete('customer-payments/{payment}/clears/{paymentClear}', [CustomerPaymentController::class, 'destroyClear'])->name('customer-payments.clears.destroy');
     Route::post('customer-payments/{payment}/split', [CustomerPaymentController::class, 'split'])->name('customer-payments.split');
 
     Route::resource('supplier-payments', SupplierPaymentController::class);

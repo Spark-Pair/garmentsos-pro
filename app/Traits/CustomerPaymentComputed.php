@@ -296,8 +296,12 @@ trait CustomerPaymentComputed
         $amount = (float) ($record?->amount ?? 0);
 
         return [
+            'id' => $record?->id,
+            'date_raw' => $record?->clear_date?->format('Y-m-d'),
             'date' => $record?->clear_date?->format('d-M-Y, D') ?? '-',
+            'method_raw' => $record?->method,
             'method' => $record?->method ? ucfirst($record->method) : '-',
+            'bank_account_id' => $record?->bank_account_id,
             'account_title' => $record?->bankAccount?->account_title ?? '-',
             'bank' => $record?->bankAccount?->bank?->short_title ?? '-',
             'amount' => \App\Support\Money::format($amount),

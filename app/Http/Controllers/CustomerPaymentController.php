@@ -224,7 +224,18 @@ class CustomerPaymentController extends Controller
         //     }
         // }
 
-        return view("customer-payments.index", compact( "authLayout"));
+        $canUpdate = app_menu_can(
+            'customer_payments',
+            ['developer', 'owner', 'admin', 'accountant'],
+            'update'
+        );
+        $canDelete = app_menu_can(
+            'customer_payments',
+            ['developer', 'owner', 'admin', 'accountant'],
+            'delete'
+        );
+
+        return view("customer-payments.index", compact("authLayout", "canUpdate", "canDelete"));
     }
 
     /**
@@ -830,6 +841,89 @@ class CustomerPaymentController extends Controller
         return redirect()->back()->with('success', 'Payment partial cleared successfully.');
     }
 
+    public function updateClear(Request $request, CustomerPayment $payment, PaymentClear $paymentClear)
+    {
+        if (!app_menu_can('customer_payments', ['developer', 'owner', 'admin', 'accountant'], 'update')) {
+            return redirect(route('home'))->with('error', 'You do not have permission to edit payment clearing records.');
+        }
+
+        abort_unless((int) $paymentClear->payment_id === (int) $payment->id, 404);
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($payment, 'customer_payments');
+
+        $validated = $request->validate([
+            'clear_date' => 'required|date|after_or_equal:' . $payment->date->format('Y-m-d') . '|before_or_equal:today',
+            'method_select' => ['required', Rule::in(['cash', 'online'])],
+            'bank_account_id' => 'nullable|integer|exists:bank_accounts,id',
+            'amount' => 'required|integer|min:1',
+            'reff_no' => 'nullable|string',
+            'remarks' => 'nullable|string',
+        ]);
+
+        if ($validated['method_select'] === 'online' && empty($validated['bank_account_id'])) {
+            throw ValidationException::withMessages([
+                'bank_account_id' => 'Please select a bank account for an online clearing entry.',
+            ]);
+        }
+
+        DB::transaction(function () use ($validated, $payment, $paymentClear) {
+            $lockedPayment = CustomerPayment::query()->lockForUpdate()->findOrFail($payment->id);
+            $lockedClear = PaymentClear::query()
+                ->where('payment_id', $lockedPayment->id)
+                ->lockForUpdate()
+                ->findOrFail($paymentClear->id);
+
+            $otherClearedAmount = (float) PaymentClear::query()
+                ->where('payment_id', $lockedPayment->id)
+                ->whereKeyNot($lockedClear->id)
+                ->sum('amount');
+
+            $maximumAmount = (float) $lockedPayment->amount - $otherClearedAmount;
+            if ((float) $validated['amount'] > $maximumAmount) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Clear amount cannot be greater than the remaining outstanding amount.',
+                ]);
+            }
+
+            $lockedClear->update([
+                'clear_date' => $validated['clear_date'],
+                'method' => $validated['method_select'],
+                'bank_account_id' => $validated['method_select'] === 'cash'
+                    ? null
+                    : $validated['bank_account_id'],
+                'amount' => $validated['amount'],
+                'reff_no' => $validated['reff_no'] ?: '-',
+                'remarks' => $validated['remarks'] ?? null,
+            ]);
+
+            $this->syncPaymentClearDate($lockedPayment);
+        });
+
+        return redirect()->back()->with('success', 'Payment clearing entry updated successfully.');
+    }
+
+    public function destroyClear(CustomerPayment $payment, PaymentClear $paymentClear)
+    {
+        if (!app_menu_can('customer_payments', ['developer', 'owner', 'admin', 'accountant'], 'delete')) {
+            return redirect(route('home'))->with('error', 'You do not have permission to delete payment clearing records.');
+        }
+
+        abort_unless((int) $paymentClear->payment_id === (int) $payment->id, 404);
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($payment, 'customer_payments');
+
+        DB::transaction(function () use ($payment, $paymentClear) {
+            $lockedPayment = CustomerPayment::query()->lockForUpdate()->findOrFail($payment->id);
+            $lockedClear = PaymentClear::query()
+                ->where('payment_id', $lockedPayment->id)
+                ->lockForUpdate()
+                ->findOrFail($paymentClear->id);
+
+            $lockedClear->delete();
+            $this->syncPaymentClearDate($lockedPayment);
+        });
+
+        return redirect()->back()->with('success', 'Payment clearing entry deleted successfully.');
+    }
+
     // public function split(Request $request, CustomerPayment $payment)
     // {
     //     if (!$this->checkRole(['developer', 'owner', 'admin', 'accountant'])) {
@@ -1200,6 +1294,17 @@ class CustomerPaymentController extends Controller
         }
 
         PaymentProgram::where('id', $programId)->update(['status' => $status]);
+    }
+
+    private function syncPaymentClearDate(CustomerPayment $payment): void
+    {
+        $clearRecords = $payment->paymentClearRecord();
+        $totalCleared = (float) (clone $clearRecords)->sum('amount');
+
+        $payment->clear_date = $totalCleared >= (float) $payment->amount
+            ? (clone $clearRecords)->max('clear_date')
+            : null;
+        $payment->save();
     }
 
     private function findLegacyRelatedSupplierPayment(CustomerPayment $payment, bool $lock = false): ?SupplierPayment

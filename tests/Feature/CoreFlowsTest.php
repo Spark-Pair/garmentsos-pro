@@ -10,6 +10,7 @@ use App\Models\CR;
 use App\Models\Customer;
 use App\Models\CustomerPayment;
 use App\Models\PaymentProgram;
+use App\Models\PaymentClear;
 use App\Models\Setup;
 use App\Models\Supplier;
 use App\Models\SupplierPayment;
@@ -315,6 +316,59 @@ class CoreFlowsTest extends TestCase
         ]);
 
         $response->assertSessionHas('error', 'Clear amount cannot be greater than the remaining outstanding amount.');
+    }
+
+    public function test_customer_payment_clear_entry_can_be_edited_and_deleted(): void
+    {
+        $user = $this->actingDeveloper();
+
+        $payment = CustomerPayment::create([
+            'date' => '2026-02-26',
+            'type' => 'cheque',
+            'method' => 'cheque',
+            'amount' => 1000,
+            'cheque_no' => 'CHQ-EDIT-001',
+            'cheque_date' => '2026-02-26',
+            'clear_date' => '2026-02-27',
+        ]);
+
+        $clear = PaymentClear::create([
+            'payment_id' => $payment->id,
+            'clear_date' => '2026-02-27',
+            'method' => 'online',
+            'amount' => 1000,
+            'reff_no' => 'OLD-CLEAR-REF',
+            'remarks' => 'Old remarks',
+            'creator_id' => $user->id,
+        ]);
+
+        $this->put(route('customer-payments.clears.update', [$payment, $clear]), [
+            'clear_date' => '2026-02-28',
+            'method_select' => 'cash',
+            'amount' => 800,
+            'reff_no' => 'NEW-CLEAR-REF',
+            'remarks' => 'Updated remarks',
+        ])->assertRedirect()
+            ->assertSessionHas('success', 'Payment clearing entry updated successfully.');
+
+        $this->assertDatabaseHas('payment_clears', [
+            'id' => $clear->id,
+            'payment_id' => $payment->id,
+            'clear_date' => '2026-02-28 00:00:00',
+            'method' => 'cash',
+            'bank_account_id' => null,
+            'amount' => 800,
+            'reff_no' => 'NEW-CLEAR-REF',
+            'remarks' => 'Updated remarks',
+        ]);
+        $this->assertNull($payment->fresh()->clear_date);
+
+        $this->delete(route('customer-payments.clears.destroy', [$payment, $clear]))
+            ->assertRedirect()
+            ->assertSessionHas('success', 'Payment clearing entry deleted successfully.');
+
+        $this->assertDatabaseMissing('payment_clears', ['id' => $clear->id]);
+        $this->assertNull($payment->fresh()->clear_date);
     }
 
     public function test_self_bank_account_statement_excludes_returns_and_unvouchered_withdrawals_and_reconciles_with_balance(): void

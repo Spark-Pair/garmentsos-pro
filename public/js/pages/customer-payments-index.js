@@ -5,6 +5,9 @@ function initCustomerPaymentsIndex() {
     const config = window.__customerPaymentsIndex || {};
     let companyData = config.companyData || {};
     let authLayout = config.authLayout || 'table';
+    const canUpdate = Boolean(config.canUpdate);
+    const canDelete = Boolean(config.canDelete);
+    let activePaymentDetails = null;
 
     function createRow(data) {
         return `
@@ -49,47 +52,7 @@ function initCustomerPaymentsIndex() {
             name: 'Clear Payment',
             method: 'POST',
             action: `/customer-payments/${data.id}/clear`,
-            fields: [
-                {
-                    category: 'input',
-                    label: 'Method',
-                    value: data.customer.customer_name + ' | ' + data.customer.city.short_title + ' | ' + data.method.charAt(0).toUpperCase() + data.method.slice(1) + (data.method === 'cheque' ? ` | Cheque No. ${data.cheque_no}` : data.method === 'slip' ? ` | Slip No. ${data.slip_no}` : '') + ' | ' + formatNumbersWithDigits(data.amount, 1, 1) + ' - Rs.',
-                    disabled: true,
-                    full: true,
-                },
-                {
-                    category: 'input',
-                    name: 'clear_date',
-                    label: 'Clear Date',
-                    type: 'date',
-                    min: (data.date)?.split('T')[0],
-                    max: localDateString(),
-                    required: true,
-                },
-                {
-                    category: 'explicitHtml',
-                    html: config.methodSelectHtml,
-                },
-                {
-                    category: 'explicitHtml',
-                    html: config.bankAccountSelectHtml,
-                },
-                {
-                    category: 'explicitHtml',
-                    html: config.amountInputHtml,
-                },
-                {
-                    category: 'explicitHtml',
-                    html: config.reffNoInputHtml,
-                },
-                {
-                    category: 'input',
-                    name: 'remarks',
-                    label: 'Remarks',
-                    type: 'text',
-                    placeholder: 'Enter remarks',
-                },
-            ],
+            fields: clearPaymentFields(data),
             fieldsGridCount: '2',
             bottomActions: [
                 {id: 'clear', text: 'Clear', type: 'submit'},
@@ -97,21 +60,8 @@ function initCustomerPaymentsIndex() {
         };
         createModal(modalData);
 
-        let bankAccounts = data.bank_account ? [data.bank_account] : data.cheque?.voucher?.supplier?.bank_accounts ? data.cheque?.voucher?.supplier?.bank_accounts : data.slip?.voucher?.supplier?.bank_accounts ? data.slip?.voucher?.supplier?.bank_accounts : data.cheque?.cr?.voucher?.supplier?.bank_accounts ? data.cheque?.cr?.voucher?.supplier?.bank_accounts : data.slip?.cr?.voucher?.supplier?.bank_accounts ? data.slip?.cr?.voucher?.supplier?.bank_accounts : [];
-        let form = document.querySelector('#clearModal');
-        let bankAccountInpDom = form.querySelector('input[id="bank_account_id"]');
-        let bankAccountDom = form.querySelector('ul[data-for="bank_account_id"]');
-
-        bankAccountInpDom.disabled = true;
-        bankAccountDom.innerHTML = `
-            <li data-for="bank_account_id" data-value=" " onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg transition hover:bg-[var(--h-bg-color)] text-nowrap overflow-x-auto scrollbar-hidden"">-- Select bank account --</li>
-        `;
-
-        bankAccounts.forEach(bankAccount => {
-            bankAccountDom.innerHTML += `
-                <li data-for="bank_account_id" data-value="${bankAccount.id}" onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg transition hover:bg-[var(--h-bg-color)] text-nowrap overflow-x-auto scrollbar-hidden">${bankAccount.account_title} | ${bankAccount.bank?.short_title}</li>
-            `;
-        });
+        const form = document.querySelector('#clearModal');
+        prepareClearPaymentComponents(form, data);
     }
 
     window.generateContextMenu = function(e) {
@@ -156,6 +106,7 @@ function initCustomerPaymentsIndex() {
 
     window.generateModal = function(item) {
         let data = JSON.parse(item.dataset.json);
+        activePaymentDetails = data;
         const clearDetails = Array.isArray(data.clear_details) ? data.clear_details : [];
 
         const clearTableBody = clearDetails.map((row, index) => ([
@@ -166,6 +117,16 @@ function initCustomerPaymentsIndex() {
             { data: row.amount || formatNumbersWithDigits(row.amount_numeric || 0, 1, 1), class: 'w-[12%]' },
             { data: row.reff_no || '-', class: 'w-[12%]' },
             { data: row.remarks || '-', class: 'grow' },
+            ...((canUpdate || canDelete) ? [{
+                rawHTML: `<div class="w-[12%] flex justify-end gap-1">
+                    ${canUpdate ? `<button type="button" onclick="event.stopPropagation(); generateEditClearModal(${Number(row.id)})" class="flex size-8 items-center justify-center rounded-lg text-[var(--secondary-text)] transition-all duration-300 ease-in-out hover:text-[var(--text-color)]" title="Edit" aria-label="Edit">
+                        <i class="fas fa-pen text-xs"></i>
+                    </button>` : ''}
+                    ${canDelete ? `<button type="button" onclick="event.stopPropagation(); submitResourceDelete('${config.routes.deleteClear.replace(':paymentId', data.id).replace(':clearId', row.id)}')" class="flex size-8 items-center justify-center rounded-lg text-[var(--border-error)] transition-all duration-300 ease-in-out hover:text-[var(--text-error)]" title="Delete" aria-label="Delete">
+                        <i class="fas fa-trash text-xs"></i>
+                    </button>` : ''}
+                </div>`,
+            }] : []),
         ]));
 
         let modalData = {
@@ -205,6 +166,7 @@ function initCustomerPaymentsIndex() {
                         { label: 'Amount', class: 'w-[12%]' },
                         { label: 'Reff. No.', class: 'w-[12%]' },
                         { label: 'Remarks', class: 'grow' },
+                        ...((canUpdate || canDelete) ? [{ label: 'Actions', class: 'w-[12%] text-right' }] : []),
                     ],
                     body: clearTableBody,
                     scrollable: true,
@@ -238,6 +200,133 @@ function initCustomerPaymentsIndex() {
         }
 
         createModal(modalData);
+    }
+
+    window.generateEditClearModal = function(clearId) {
+        const payment = activePaymentDetails;
+        const clearRecord = payment?.clear_details?.find(row => Number(row.id) === Number(clearId));
+        if (!payment || !clearRecord) return;
+
+        createModal({
+            id: 'editPaymentClearModal',
+            class: 'h-auto',
+            method: 'POST',
+            action: config.routes.updateClear
+                .replace(':paymentId', payment.id)
+                .replace(':clearId', clearRecord.id),
+            name: 'Edit Clearing Entry',
+            fieldsGridCount: '2',
+            fields: [
+                { category: 'input', type: 'hidden', name: '_method', value: 'PUT' },
+                ...clearPaymentFields(payment.data),
+            ],
+            bottomActions: [
+                { id: 'update-clear-entry', text: 'Update', type: 'submit' },
+            ],
+        });
+
+        const form = document.querySelector('#editPaymentClearModal');
+        prepareClearPaymentComponents(form, payment.data, clearRecord);
+    }
+
+    function clearPaymentFields(data) {
+        return [
+            {
+                category: 'input',
+                label: 'Method',
+                value: data.customer.customer_name + ' | ' + data.customer.city.short_title + ' | ' + data.method.charAt(0).toUpperCase() + data.method.slice(1) + (data.method === 'cheque' ? ` | Cheque No. ${data.cheque_no}` : data.method === 'slip' ? ` | Slip No. ${data.slip_no}` : '') + ' | ' + formatNumbersWithDigits(data.amount, 1, 1) + ' - Rs.',
+                disabled: true,
+                full: true,
+            },
+            { category: 'explicitHtml', html: config.clearDateInputHtml },
+            { category: 'explicitHtml', html: config.methodSelectHtml },
+            { category: 'explicitHtml', html: config.bankAccountSelectHtml },
+            { category: 'explicitHtml', html: config.amountInputHtml },
+            { category: 'explicitHtml', html: config.reffNoInputHtml },
+            { category: 'explicitHtml', html: config.remarksInputHtml },
+        ];
+    }
+
+    function prepareClearPaymentComponents(form, paymentData, clearRecord = null) {
+        if (!form) return;
+
+        const clearDate = form.querySelector('#clear_date');
+        if (clearDate) {
+            clearDate.min = String(paymentData.date || '').split('T')[0];
+            clearDate.max = localDateString();
+            clearDate.value = clearRecord?.date_raw || '';
+        }
+
+        const bankAccounts = paymentBankAccounts({ data: paymentData }, clearRecord || {});
+        populateBankAccountOptions(form, bankAccounts);
+
+        if (clearRecord) {
+            setComponentSelectValue(form, 'method_select', clearRecord.method_raw, clearRecord.method);
+        }
+
+        const methodValue = form.querySelector('input.dbInput[name="method_select"]');
+        if (methodValue) trackMethodState(methodValue);
+
+        if (clearRecord) {
+            setComponentSelectValue(
+                form,
+                'bank_account_id',
+                clearRecord.bank_account_id,
+                `${clearRecord.account_title || '-'} | ${clearRecord.bank || '-'}`
+            );
+
+            const amount = form.querySelector('#amount');
+            const reffNo = form.querySelector('#reff_no');
+            const remarks = form.querySelector('#remarks');
+            if (amount) amount.value = clearRecord.amount_numeric ?? '';
+            if (reffNo) reffNo.value = clearRecord.reff_no === '-' ? '' : clearRecord.reff_no;
+            if (remarks) remarks.value = clearRecord.remarks === '-' ? '' : clearRecord.remarks;
+        }
+    }
+
+    function populateBankAccountOptions(form, bankAccounts) {
+        const bankInput = form.querySelector('#bank_account_id');
+        const bankList = form.querySelector('ul[data-for="bank_account_id"]');
+        if (!bankInput || !bankList) return;
+
+        bankInput.disabled = true;
+        bankList.innerHTML = `
+            <li data-for="bank_account_id" data-value="" onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg transition hover:bg-[var(--h-bg-color)] text-nowrap overflow-x-auto scrollbar-hidden">-- Select bank account --</li>
+        `;
+
+        bankAccounts.forEach(bankAccount => {
+            const bankName = bankAccount.bank?.short_title || bankAccount.bank || '-';
+            bankList.innerHTML += `
+                <li data-for="bank_account_id" data-value="${bankAccount.id}" onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg transition hover:bg-[var(--h-bg-color)] text-nowrap overflow-x-auto scrollbar-hidden">${bankAccount.account_title} | ${bankName}</li>
+            `;
+        });
+    }
+
+    function setComponentSelectValue(form, id, value, text) {
+        const visibleInput = form.querySelector(`#${id}`);
+        const hiddenInput = form.querySelector(`input.dbInput[name="${id}"]`);
+        if (visibleInput) visibleInput.value = value ? text : '';
+        if (hiddenInput) hiddenInput.value = value || '';
+    }
+
+    function paymentBankAccounts(payment, clearRecord) {
+        const candidates = [
+            payment.data?.bank_account,
+            ...(payment.data?.cheque?.voucher?.supplier?.bank_accounts || []),
+            ...(payment.data?.slip?.voucher?.supplier?.bank_accounts || []),
+            ...(payment.data?.cheque?.cr?.voucher?.supplier?.bank_accounts || []),
+            ...(payment.data?.slip?.cr?.voucher?.supplier?.bank_accounts || []),
+        ].filter(Boolean);
+
+        if (clearRecord.bank_account_id && !candidates.some(account => Number(account.id) === Number(clearRecord.bank_account_id))) {
+            candidates.push({
+                id: clearRecord.bank_account_id,
+                account_title: clearRecord.account_title,
+                bank: { short_title: clearRecord.bank },
+            });
+        }
+
+        return [...new Map(candidates.map(account => [Number(account.id), account])).values()];
     }
 
     function generateReffNos(rawReffNo, hasPipe, maxSuffix) {

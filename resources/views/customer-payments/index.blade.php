@@ -214,6 +214,15 @@
                 'required' => true,
             ])->render();
 
+            $clearDateInputHtml = view('components.input', [
+                'label' => 'Clear Date',
+                'name' => 'clear_date',
+                'id' => 'clear_date',
+                'type' => 'date',
+                'max' => now()->toDateString(),
+                'required' => true,
+            ])->render();
+
             $reffInputHtml = view('components.input', [
                 'label' => 'Reff. No.',
                 'name' => 'reff_no',
@@ -222,17 +231,30 @@
                 'required' => true,
                 'disabled' => true,
             ])->render();
+
+            $remarksInputHtml = view('components.input', [
+                'label' => 'Remarks',
+                'name' => 'remarks',
+                'id' => 'remarks',
+                'placeholder' => 'Enter remarks',
+            ])->render();
         @endphp
 
         window.__customerPaymentsIndex = {
             companyData: @json($client_company),
             authLayout: @json($authLayout),
+            canUpdate: @json($canUpdate),
+            canDelete: @json($canDelete),
             methodSelectHtml: @json($methodSelectHtml),
             bankAccountSelectHtml: @json($bankAccountSelectHtml),
             amountInputHtml: @json($amountInputHtml),
+            clearDateInputHtml: @json($clearDateInputHtml),
             reffNoInputHtml: @json($reffInputHtml),
+            remarksInputHtml: @json($remarksInputHtml),
             routes: {
                 splitPayment: @json(url('customer-payments') . '/:id/split'),
+                updateClear: @json(url('customer-payments') . '/:paymentId/clears/:clearId'),
+                deleteClear: @json(url('customer-payments') . '/:paymentId/clears/:clearId'),
             },
         };
     </script>
