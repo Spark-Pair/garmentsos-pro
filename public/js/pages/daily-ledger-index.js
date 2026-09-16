@@ -3,6 +3,7 @@ function initDailyLedgerIndex() {
     const config = window.__dailyLedgerIndex || {};
     const csrfToken = config.csrfToken || document.querySelector('meta[name="csrf-token"]')?.content || "";
     const isDeveloper = isDeveloperUser('daily_ledger');
+    const canUpdate = Boolean(config.canUpdate);
     let totalDepositAmount = 0;
     let totalUseAmount = 0;
     let authLayout = 'table';
@@ -42,12 +43,15 @@ function initDailyLedgerIndex() {
         }
 
         const bottomActions = [];
-        if (isDeveloper) {
+        if (canUpdate) {
             bottomActions.push({
                 id: "daily-ledger-change",
                 text: "Edit",
                 link: `/daily-ledger/${data.id}/edit?type=${encodeURIComponent(data.ledger_type)}`,
             });
+        }
+
+        if (isDeveloper) {
             bottomActions.push({
                 id: "delete-daily-ledger",
                 text: "Delete",
@@ -73,12 +77,15 @@ function initDailyLedgerIndex() {
 
         const data = JSON.parse(item.dataset.json);
         const actions = [];
-        if (isDeveloper) {
+        if (canUpdate) {
             actions.push({
                 id: "daily-ledger-change",
                 text: "Edit",
                 link: `/daily-ledger/${data.id}/edit?type=${encodeURIComponent(data.ledger_type)}`,
             });
+        }
+
+        if (isDeveloper) {
             actions.push({
                 id: "delete-daily-ledger",
                 text: "Delete",

@@ -97,6 +97,7 @@
     window.__dailyLedgerIndex = {
         csrfToken: @json(csrf_token()),
         currentUserRole: @json(Auth::user()->role),
+        canUpdate: @json($canUpdate),
     };
 </script>
 @endpush

@@ -165,7 +165,13 @@ class DailyLedgerController extends Controller
             ]);
         }
 
-        return view('daily-ledger.index', compact('authLayout'));
+        $canUpdate = app_menu_can(
+            'daily_ledger',
+            ['developer', 'owner', 'admin', 'accountant'],
+            'update'
+        );
+
+        return view('daily-ledger.index', compact('authLayout', 'canUpdate'));
     }
 
     public function summary(Request $request)
@@ -525,8 +531,8 @@ class DailyLedgerController extends Controller
      */
     public function edit(Request $request, string $dailyLedger)
     {
-        if ($resp = $this->denyIfNoRole(['developer'])) {
-            return $resp;
+        if (!app_menu_can('daily_ledger', ['developer', 'owner', 'admin', 'accountant'], 'update')) {
+            return redirect(route('home'))->with('error', 'You do not have permission to edit daily ledger records.');
         }
 
         [$ledgerEntry, $entryType] = $this->findLedgerEntryOrFail($dailyLedger, $request->query('type'));
@@ -547,8 +553,8 @@ class DailyLedgerController extends Controller
      */
     public function update(Request $request, string $dailyLedger)
     {
-        if ($resp = $this->denyIfNoRole(['developer'])) {
-            return $resp;
+        if (!app_menu_can('daily_ledger', ['developer', 'owner', 'admin', 'accountant'], 'update')) {
+            return redirect(route('home'))->with('error', 'You do not have permission to edit daily ledger records.');
         }
 
         [$ledgerEntry, $entryType] = $this->findLedgerEntryOrFail($dailyLedger, $request->input('ledger_type', $request->query('type')));
