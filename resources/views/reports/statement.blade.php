@@ -160,8 +160,10 @@
                         'employee' => $data['totals']['balance'] ?? 0,
                         default => $data['totals']['pending_payment'] ?? 0,
                     };
-                    $footerBillTotal = ($data['totals']['bill'] ?? 0) + $topSummaryValue;
-                    $footerBalanceTotal = ($data['closing_balance'] ?? 0) + $topSummaryValue;
+                    $isSupplierStatement = ($data['category'] ?? null) === 'supplier';
+                    $footerBillTotal = ($data['totals']['bill'] ?? 0) + ($isSupplierStatement ? 0 : $topSummaryValue);
+                    $footerPaymentTotal = ($data['totals']['payment'] ?? 0) + ($isSupplierStatement ? $topSummaryValue : 0);
+                    $footerBalanceTotal = ($data['closing_balance'] ?? 0) + ($isSupplierStatement ? -$topSummaryValue : $topSummaryValue);
                     $statementPartyCity = data_get($data, 'customer.city.title');
                     $statementPartyAddress = data_get($data, 'customer.address');
                     $datedStatementRows = $statements
@@ -175,13 +177,46 @@
                         : $data['date'];
                     $balance = $data['opening_balance'];
 
-                    // Pehle page ke liye 30 rows lo
-                    $firstPage = $statementRows->take(30);
+                    $firstPageLimit = 31;
+                    $otherPageLimit = 33;
+                    $footerRowCount = 2;
+                    $minimumLastPageDataRows = 4;
+                    $firstPageFinalLimit = $firstPageLimit - $footerRowCount;
+                    $otherPageFinalLimit = $otherPageLimit - $footerRowCount;
 
-                    $otherPages = $statementRows->skip(30)->chunk(33);
+                    if ($statementRows->count() <= $firstPageFinalLimit) {
+                        $firstPage = $statementRows;
+                        $otherPages = collect();
+                    } else {
+                        $firstPageTakeCount = $statementRows->count() <= $firstPageLimit
+                            ? $firstPageFinalLimit
+                            : $firstPageLimit;
+                        $firstPage = $statementRows->take($firstPageTakeCount);
+                        $remainingStatementRows = $statementRows->skip($firstPageTakeCount)->values();
+                        $otherPages = collect();
+
+                        while ($remainingStatementRows->count() > 0) {
+                            $remainingCount = $remainingStatementRows->count();
+                            if ($remainingCount <= $otherPageFinalLimit) {
+                                $takeCount = $remainingCount;
+                            } elseif ($remainingCount > $otherPageLimit) {
+                                $takeCount = $otherPageLimit;
+                                $lastPageRowCount = $remainingCount - $takeCount;
+
+                                if ($lastPageRowCount > 0 && $lastPageRowCount < $minimumLastPageDataRows) {
+                                    $takeCount -= ($minimumLastPageDataRows - $lastPageRowCount);
+                                }
+                            } else {
+                                $takeCount = $otherPageFinalLimit;
+                            }
+
+                            $otherPages->push($remainingStatementRows->take($takeCount));
+                            $remainingStatementRows = $remainingStatementRows->skip($takeCount)->values();
+                        }
+                    }
                 @endphp
 
-                {{-- First Page (30 rows) --}}
+                {{-- First Page --}}
                 <div class="statement-preview-toolbar sticky top-0 z-20 mb-2 hidden justify-end gap-2 bg-white/95 p-2 text-black shadow-sm md:hidden">
                     <button type="button" class="statement-zoom-btn rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold" data-statement-zoom="out">-</button>
                     <button type="button" class="statement-zoom-btn rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold" data-statement-zoom="reset">100%</button>
@@ -334,8 +369,8 @@
                                                     <div class="tr flex justify-between w-full px-2.5 gap-1 text-center font-bold">
                                                         <div class="td w-[2.5%]"></div>
                                                         <div class="td flex-1 text-left">{{ $topSummaryLabel }}</div>
-                                                        <div class="td w-[11%]">{{ \App\Support\Money::format($topSummaryValue) }}</div>
-                                                        <div class="td w-[11%]"></div>
+                                                        <div class="td w-[11%]">{{ $isSupplierStatement ? '' : \App\Support\Money::format($topSummaryValue) }}</div>
+                                                        <div class="td w-[11%]">{{ $isSupplierStatement ? \App\Support\Money::format($topSummaryValue) : '' }}</div>
                                                         <div class="td w-[11%]"></div>
                                                     </div>
                                                     <hr class="w-full my-1.5 border-gray-700 border-dashed">
@@ -348,7 +383,7 @@
                                                             <div class="td w-[30%]"></div>
                                                         @endif
                                                         <div class="td w-[11%]">{{ \App\Support\Money::format($footerBillTotal) }}</div>
-                                                        <div class="td w-[11%]">{{ \App\Support\Money::format($data['totals']['payment']) }}</div>
+                                                        <div class="td w-[11%]">{{ \App\Support\Money::format($footerPaymentTotal) }}</div>
                                                         <div class="td w-[11%]">{{ \App\Support\Money::format($footerBalanceTotal) }}</div>
                                                     </div>
                                                 @endif
@@ -368,8 +403,11 @@
                         </div>
                     </div>
 
-                    {{-- Other Pages (33 rows each) --}}
+                    {{-- Other Pages --}}
                     @foreach ($otherPages as $pageIndex => $chunk)
+                        @php
+                            $rowNumberOffset = $firstPage->count() + $otherPages->take($pageIndex)->sum(fn ($page) => $page->count());
+                        @endphp
                         <hr class="w-full my-2 border-gray-500">
                         <div class="preview-page w-[210mm] h-[297mm] mx-auto overflow-hidden relative bg-white rounded-md p-2">
                             <div id="preview" class="preview flex flex-col h-full">
@@ -457,7 +495,7 @@
                                                                     tabindex="0"
                                                                 @endif
                                                             >
-                                                                <div class="td font-semibold w-[2.5%]">{{ $loop->iteration + 30 + ($pageIndex * 33) }}.</div>
+                                                                <div class="td font-semibold w-[2.5%]">{{ $loop->iteration + $rowNumberOffset }}.</div>
                                                                 <div class="td font-medium w-[11.5%]">{{ $isOpeningBalanceRow ? ($statementType === 'summarized' ? 'Opening Balance' : '-') : $statement['date']->format('d-M-Y') }}</div>
                                                                 @if(in_array($statementType, ['detailed', 'general']))
                                                                     <div class="td font-medium w-[10%]">{{ $statement['reff_no'] }}</div>
@@ -475,8 +513,8 @@
                                                         <div class="tr flex justify-between w-full px-2.5 gap-1 text-center font-bold">
                                                             <div class="td w-[2.5%]"></div>
                                                             <div class="td flex-1 text-left">{{ $topSummaryLabel }}</div>
-                                                            <div class="td w-[11%]">{{ \App\Support\Money::format($topSummaryValue) }}</div>
-                                                            <div class="td w-[11%]"></div>
+                                                            <div class="td w-[11%]">{{ $isSupplierStatement ? '' : \App\Support\Money::format($topSummaryValue) }}</div>
+                                                            <div class="td w-[11%]">{{ $isSupplierStatement ? \App\Support\Money::format($topSummaryValue) : '' }}</div>
                                                             <div class="td w-[11%]"></div>
                                                         </div>
                                                         <hr class="w-full my-1.5 border-gray-700 border-dashed">
@@ -489,7 +527,7 @@
                                                                 <div class="td w-[30%]"></div>
                                                             @endif
                                                         <div class="td w-[11%]">{{ \App\Support\Money::format($footerBillTotal) }}</div>
-                                                        <div class="td w-[11%]">{{ \App\Support\Money::format($data['totals']['payment']) }}</div>
+                                                        <div class="td w-[11%]">{{ \App\Support\Money::format($footerPaymentTotal) }}</div>
                                                         <div class="td w-[11%]">{{ \App\Support\Money::format($footerBalanceTotal) }}</div>
                                                     </div>
                                                 @endif
