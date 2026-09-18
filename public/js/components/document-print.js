@@ -223,7 +223,10 @@
             extraStyle: options.extraStyle || '',
         });
 
-        printIframe.onload = () => {
+        const runPrint = () => {
+            if (printIframe.dataset.printStarted === '1') return;
+            printIframe.dataset.printStarted = '1';
+
             printDocument.querySelectorAll('.preview').forEach(page => page.classList.remove('py-6'));
             printDocument.querySelectorAll('#banner').forEach(banner => banner.classList.remove('mt-8'));
             printDocument.querySelectorAll('.footer').forEach(footer => footer.classList.remove('mb-4'));
@@ -239,6 +242,12 @@
                 printIframe.contentWindow.print();
             }, options.delay ?? 500);
         };
+
+        printIframe.onload = runPrint;
+
+        if (printDocument.readyState === 'complete') {
+            setTimeout(runPrint, 0);
+        }
 
         return printIframe;
     }

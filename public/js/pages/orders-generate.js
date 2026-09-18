@@ -123,6 +123,7 @@
         };
         renderCardsInModal(modalData);
         applyHistoryLabels();
+        renderSelectedArticleQuantities();
     };
 
     if (generateOrderBtn) {
@@ -236,28 +237,8 @@
         totalQuantityDOM = document.querySelector('#modalForm #totalShipmentedQty');
         totalAmountDOM = document.querySelector('#modalForm #totalShipmentAmount');
 
-        document.querySelectorAll('.card .quantity-label').forEach(previousQuantityLabel => {
-            previousQuantityLabel.remove();
-        });
-
         applyHistoryLabels();
-
-        if (selectedArticles.length > 0) {
-            selectedArticles.forEach(selectedArticle => {
-                const card = document.getElementById(selectedArticle.id);
-                const quantityLabelDom = card?.querySelector('.quantity-label');
-                if (card && !quantityLabelDom) {
-                    card.innerHTML += `
-                            <div
-                                class="quantity-label absolute text-xs text-[var(--border-success)] top-2 right-2 min-h-[1rem] rounded-md bg-[var(--secondary-bg-color)]/90 px-1.5 py-0.5">
-                                ${selectedArticle.orderedQuantity} Pcs
-                            </div>
-                        `;
-                } else if (quantityLabelDom) {
-                    quantityLabelDom.textContent = `${selectedArticle.orderedQuantity} Pcs`;
-                }
-            });
-        }
+        renderSelectedArticleQuantities();
 
         calculateTotalOrderedQuantity();
         calculateTotalOrderAmount();
@@ -268,6 +249,24 @@
         generateOrder();
         renderFinals();
     };
+
+    function renderSelectedArticleQuantities() {
+        document.querySelectorAll('#modalForm .card .quantity-label').forEach(previousQuantityLabel => {
+            previousQuantityLabel.remove();
+        });
+
+        selectedArticles.forEach(selectedArticle => {
+            const card = document.getElementById(selectedArticle.id);
+            if (!card) return;
+
+            card.innerHTML += `
+                    <div
+                        class="quantity-label absolute text-xs text-[var(--border-success)] top-2 right-2 min-h-[1rem] rounded-md bg-[var(--secondary-bg-color)]/90 px-1.5 py-0.5">
+                        ${selectedArticle.orderedQuantity} Pcs
+                    </div>
+                `;
+        });
+    }
 
     window.generateQuantityModal = function generateQuantityModal(elem) {
         const data = JSON.parse(elem.dataset.json).data;
@@ -366,9 +365,11 @@
             createModal(modalData);
 
             const quantityLabel = document.getElementById(data.id)?.querySelector('.quantity-label');
+            const selectedArticle = selectedArticles.find(article => article.id == data.id);
+            const currentQuantity = Number(selectedArticle?.orderedQuantity || quantityLabel?.textContent?.replace(/\D/g, '') || 0);
 
-            if (quantityLabel) {
-                initializeArticleQuantityPair(data.pcs_per_packet, data.orderable_quantity, parseInt(quantityLabel.textContent.replace(/\D/g, '')));
+            if (currentQuantity > 0) {
+                initializeArticleQuantityPair(data.pcs_per_packet, data.orderable_quantity, currentQuantity);
             }
             syncArticleQuantityPair('pcs', data.pcs_per_packet, data.orderable_quantity);
 
@@ -390,8 +391,10 @@
 
     window.setQuantity = function setQuantity(cardId) {
         const targetCard = document.getElementById(cardId);
-        if (!targetCard) return;
-        const cardData = JSON.parse(targetCard.dataset.json).data;
+        const cardData = targetCard
+            ? JSON.parse(targetCard.dataset.json).data
+            : selectedArticles.find(article => article.id == cardId);
+        if (!cardData) return;
         const alreadySelected = isArticleAlreadySelected(cardData.id);
 
         if (limitOfArticles > 0 || alreadySelected) {
@@ -404,12 +407,12 @@
 
             closeModal('QuantityModalForm');
             const quantity = quantityInputDOM.value;
-            const quantityLabel = targetCard.querySelector('.quantity-label');
+            const quantityLabel = targetCard?.querySelector('.quantity-label');
 
             if (quantity > 0) {
                 if (quantityLabel) {
                     quantityLabel.textContent = `${quantity} Pcs`;
-                } else {
+                } else if (targetCard) {
                     targetCard.innerHTML += `
                             <div class="quantity-label absolute text-xs text-[var(--border-success)] top-2 right-2 min-h-[1rem] rounded-md bg-[var(--secondary-bg-color)]/90 px-1.5 py-0.5">
                                 ${quantity} Pcs
@@ -424,8 +427,8 @@
                 } else {
                     selectedArticles.push(cardData);
                 }
-            } else if (quantityLabel) {
-                quantityLabel.remove();
+            } else {
+                quantityLabel?.remove();
                 const index = selectedArticles.findIndex(c => c.id === cardData.id);
                 deselectArticleAtIndex(index);
             }
@@ -441,6 +444,17 @@
             messageBox.innerHTML = window.__ordersGenerate?.maxArticlesAlertHtml || '';
             messageBoxAnimation();
         }
+    };
+
+    window.editSelectedArticleQuantity = function editSelectedArticleQuantity(index) {
+        const selectedArticle = selectedArticles[index];
+        if (!selectedArticle) return;
+
+        generateQuantityModal({
+            dataset: {
+                json: JSON.stringify({ data: selectedArticle }),
+            },
+        });
     };
 
     function updateInfo() {
@@ -547,7 +561,10 @@
                             <div class="grow capitalize">${selectedArticle.description}</div>
                             <div class="w-1/6">${formatNumbersWithDigits(selectedArticle.sales_rate, 1, 1)}</div>
                             <div class="w-1/5">${formatNumbersWithDigits(selectedArticle.sales_rate * selectedArticle.orderedQuantity, 1, 1)}</div>
-                            <div class="w-[10%] text-center">
+                            <div class="w-[10%] text-center flex items-center justify-center gap-2">
+                                <button onclick="editSelectedArticleQuantity(${selectedIndex})" type="button" class="text-[var(--primary-color)] text-xs px-2 py-1 rounded-lg hover:text-[var(--h-primary-color)] transition-all duration-300 ease-in-out cursor-pointer">
+                                    <i class="fas fa-pen"></i>
+                                </button>
                                 <button onclick="deselectThisArticle(${selectedIndex})" type="button" class="text-[var(--danger-color)] text-xs px-2 py-1 rounded-lg hover:text-[var(--h-danger-color)] transition-all duration-300 ease-in-out cursor-pointer">
                                     <i class="fas fa-trash"></i>
                                 </button>
@@ -716,6 +733,42 @@
         });
     }
 
+    function printCreatedOrderAfterSave(orderData, attempt = 0) {
+        if (!orderData) return;
+
+        const previewContainer = document.getElementById('preview-container');
+        if (!previewContainer || !window.DocumentPreview || !window.DocumentPrint) {
+            if (attempt < 20) {
+                window.setTimeout(() => printCreatedOrderAfterSave(orderData, attempt + 1), 50);
+            }
+            return;
+        }
+
+        previewContainer.className = 'h-auto mx-auto relative flex flex-col';
+        previewContainer.innerHTML = window.DocumentPreview.render({
+            preview: {
+                type: 'order',
+                size: 'A5',
+                document: 'Sales Order',
+                data: orderData,
+            },
+        }, {
+            companyData: orderData.branch_branding || companyData,
+            companyLogoBase: window.__ordersGenerate?.companyLogoBase,
+        });
+
+        window.DocumentPrint.printPreview({
+            title: 'Print Order',
+            preview: previewContainer,
+            delay: 500,
+            beforePrint: printDocument => {
+                printDocument.querySelectorAll('#preview-container .preview-copy').forEach(orderCopy => {
+                    orderCopy.textContent = 'Order Copy: Office';
+                });
+            },
+        });
+    }
+
     window.reRenderSelectedState = function reRenderSelectedState() {
         const selectedIds = selectedArticles.map(card => card.id);
 
@@ -746,6 +799,7 @@
         applyDefaultOrderDiscount(data?.defaultOrderDiscountPercent);
         renderList();
         addListenerToPrintAndSaveBtn();
+        printCreatedOrderAfterSave(data?.printCreatedOrder);
     }
 
     window.initOrdersGenerate = initOrdersGenerate;

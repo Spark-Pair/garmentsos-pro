@@ -389,6 +389,8 @@
         const maxOrderQuantity = quantityState.maxOrderQuantity;
 
         if (limitOfArticles > 0 || alreadySelected) {
+            const currentStock = Number(data.current_stock || 0);
+            const bcQuantity = Number(data.b_c_quantity || 0);
             const modalData = {
                 id: 'QuantityModalForm',
                 name: 'Enter Quantity',
@@ -409,7 +411,7 @@
                     {
                         category: 'input',
                         label: 'Invoiceable Quantity (Current Stock)',
-                        value: `${formatPcsAndPackets(data.current_stock, data.pcs_per_packet)}`,
+                        value: `${formatPcsAndPackets(currentStock, data.pcs_per_packet)}`,
                         disabled: true,
                     },
                     {
@@ -421,7 +423,7 @@
                     {
                         category: 'input',
                         label: 'B. C.',
-                        value: `${formatPcsAndPackets(data.b_c_quantity, data.pcs_per_packet, '-')}`,
+                        value: `${formatPcsAndPackets(bcQuantity, data.pcs_per_packet, '-')}`,
                         disabled: true,
                     },
                     {
@@ -488,8 +490,10 @@
 
     window.setQuantity = function setQuantity(cardId) {
         const targetCard = document.getElementById(cardId);
-        if (!targetCard) return;
-        const cardData = JSON.parse(targetCard.dataset.json).data;
+        const cardData = targetCard
+            ? JSON.parse(targetCard.dataset.json).data
+            : selectedArticles.find(article => article.id == cardId);
+        if (!cardData) return;
         const alreadySelected = isArticleAlreadySelected(cardData.id);
 
         if (limitOfArticles > 0 || alreadySelected) {
@@ -543,6 +547,24 @@
             messageBox.innerHTML = window.__ordersEdit?.maxArticlesAlertHtml || '';
             messageBoxAnimation();
         }
+    };
+
+    window.editSelectedArticleQuantity = function editSelectedArticleQuantity(index) {
+        const selectedArticle = selectedArticles[index];
+        if (!selectedArticle) return;
+        const modalArticleData = cardData.find(item => item.id == selectedArticle.id)?.data;
+        const quantityArticle = {
+            ...(modalArticleData || {}),
+            ...selectedArticle,
+            current_stock: modalArticleData?.current_stock ?? selectedArticle.current_stock ?? selectedArticle.dispatched_pcs ?? 0,
+            b_c_quantity: modalArticleData?.b_c_quantity ?? selectedArticle.b_c_quantity ?? 0,
+        };
+
+        generateQuantityModal({
+            dataset: {
+                json: JSON.stringify({ data: quantityArticle }),
+            },
+        });
     };
 
     function updateInfo() {
@@ -652,7 +674,10 @@
                             <div class="grow capitalize">${selectedArticle.description}</div>
                             <div class="w-1/6">${formatNumbersWithDigits(selectedArticle.sales_rate, 1, 1)}</div>
                             <div class="w-1/5">${formatNumbersWithDigits(selectedArticle.sales_rate * selectedArticle.ordered_pcs, 1, 1)}</div>
-                            <div class="w-[10%] text-center">
+                            <div class="w-[10%] text-center flex items-center justify-center gap-2">
+                                <button onclick="editSelectedArticleQuantity(${index})" type="button" class="text-[var(--primary-color)] text-xs px-2 py-1 rounded-lg hover:text-[var(--h-primary-color)] transition-all duration-300 ease-in-out cursor-pointer">
+                                    <i class="fas fa-pen"></i>
+                                </button>
                                 <button onclick="deselectThisArticle(${index})" type="button" class="text-[var(--danger-color)] text-xs px-2 py-1 rounded-lg hover:text-[var(--h-danger-color)] transition-all duration-300 ease-in-out cursor-pointer">
                                     <i class="fas fa-trash"></i>
                                 </button>

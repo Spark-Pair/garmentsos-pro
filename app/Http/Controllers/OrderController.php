@@ -348,10 +348,14 @@ class OrderController extends Controller
         //     return redirect()->route('invoices.create')->with('orderNumber', $order->order_no);
         // } else {
             if ($request->boolean('printAfterSave')) {
-                return redirect()->route('orders.index', [
-                    'open_order' => $createdOrder->id,
-                    'print_order' => 1,
-                ])->with('success', 'Order generated successfully. Order No. : ' . $createdOrder->order_no);
+                $printOrder = $createdOrder
+                    ->fresh(['customer.city', 'articles.article', 'creator'])
+                    ->toFormattedArray()['data'];
+
+                return redirect()
+                    ->route('orders.create')
+                    ->with('success', 'Order generated successfully. Order No. : ' . $createdOrder->order_no)
+                    ->with('print_created_order', $printOrder);
             }
 
             return redirect()->route('orders.create')->with('success', 'Order generated successfully. Order No. : ' . $createdOrder->order_no);
