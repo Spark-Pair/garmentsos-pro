@@ -2001,6 +2001,10 @@ class ModuleBranchService
             abort(403, 'No branch is selected for this module.');
         }
 
+        if ($this->pendingEditBranchMatches($record, $moduleKey, $branchColumn)) {
+            return;
+        }
+
         if ($recordBranchId && $selectedIds->contains((int) $recordBranchId)) {
             return;
         }
@@ -2046,7 +2050,10 @@ class ModuleBranchService
         }
 
         $recordBranchId = (int) $recordBranchId;
-        if ((int) ($this->selectedBranchIdForModule($moduleKey, $user) ?? 0) === $recordBranchId) {
+        if (
+            (int) ($this->selectedBranchIdForModule($moduleKey, $user) ?? 0) === $recordBranchId
+            || $this->pendingEditBranchMatches($record, $moduleKey, $branchColumn)
+        ) {
             return false;
         }
 
@@ -2070,6 +2077,33 @@ class ModuleBranchService
         unset($this->selectedBranchCache[$moduleKey . ':' . $user->id], $this->selectedBranchIdsCache[$moduleKey . ':' . $user->id]);
 
         return true;
+    }
+
+    public function pendingEditBranchMatches(object $record, string $moduleKey, string $branchColumn = 'branch_id'): bool
+    {
+        $moduleKey = $this->canonicalModuleKey($moduleKey);
+        $pending = session('pending_edit_branch.' . $moduleKey);
+
+        if (!is_array($pending) || (int) ($pending['expires_at'] ?? 0) < now()->timestamp) {
+            session()->forget('pending_edit_branch.' . $moduleKey);
+            return false;
+        }
+
+        $recordClass = get_class($record);
+        $recordId = method_exists($record, 'getKey') ? $record->getKey() : null;
+        $targetBranchId = (int) ($pending['target_branch_id'] ?? 0);
+        $selectedBranchId = (int) ($this->selectedBranchIdForModule($moduleKey) ?? 0);
+
+        return ($pending['model'] ?? null) === $recordClass
+            && (string) ($pending['id'] ?? '') === (string) $recordId
+            && $targetBranchId > 0
+            && $selectedBranchId === $targetBranchId
+            && (!method_exists($record, 'getTable') || $this->schemaHasColumn($record->getTable(), $branchColumn));
+    }
+
+    public function clearPendingEditBranch(string $moduleKey): void
+    {
+        session()->forget('pending_edit_branch.' . $this->canonicalModuleKey($moduleKey));
     }
 
     public function canSwitch(int $branchId, string $moduleKey, User $user): bool

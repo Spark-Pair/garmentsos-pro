@@ -3,7 +3,11 @@
 namespace App\Providers;
 
 use App\Services\Settings\BrandingSettingsService;
+use App\Services\Branches\BranchSerialService;
+use App\Services\Branches\ModuleBranchService;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -139,5 +143,65 @@ class AppServiceProvider extends ServiceProvider
         // Share Pusher enabled flag
         View::share('pusherEnabled', app('pusher.enabled'));
         View::share('pusherFrontend', app('pusher.frontend'));
+
+        Model::saving(function (Model $model) {
+            $request = request();
+            $route = $request->route();
+
+            if (!$route || !in_array(strtoupper($request->method()), ['PUT', 'PATCH'], true)) {
+                return;
+            }
+
+            $action = strtolower((string) ($route->getActionMethod() ?? ''));
+            $routeName = (string) ($route->getName() ?? '');
+            if ($action !== 'update' && !str_ends_with($routeName, '.update')) {
+                return;
+            }
+
+            $routeRecord = collect($route->parameters())
+                ->first(fn ($parameter) => $parameter instanceof Model
+                    && get_class($parameter) === get_class($model)
+                    && (string) $parameter->getKey() === (string) $model->getKey());
+
+            if (!$routeRecord) {
+                return;
+            }
+
+            $table = $model->getTable();
+            if (!Schema::hasColumn($table, 'branch_id')) {
+                return;
+            }
+
+            $branches = app(ModuleBranchService::class);
+            $moduleKey = $branches->currentModuleKey();
+            if (!$moduleKey || !$branches->shouldFilterRecords($moduleKey)) {
+                return;
+            }
+
+            $targetBranch = $branches->selectedBranchForModule($moduleKey);
+            if (!$targetBranch) {
+                return;
+            }
+
+            $currentBranchId = (int) ($model->getAttribute('branch_id') ?? 0);
+            $targetBranchId = (int) $targetBranch->id;
+            if ($currentBranchId === $targetBranchId) {
+                $branches->clearPendingEditBranch($moduleKey);
+                return;
+            }
+
+            $serials = app(BranchSerialService::class);
+            $serialColumn = $serials->serialColumnForModule($moduleKey);
+
+            if ($serialColumn && Schema::hasColumn($table, $serialColumn)) {
+                $model->setAttribute(
+                    $serialColumn,
+                    $serials->reformatForBranch((string) $model->getAttribute($serialColumn), $moduleKey, $targetBranch)
+                );
+            }
+
+            $model->setAttribute('branch_id', $targetBranchId);
+            $branches->clearPendingEditBranch($moduleKey);
+        });
     }
 }

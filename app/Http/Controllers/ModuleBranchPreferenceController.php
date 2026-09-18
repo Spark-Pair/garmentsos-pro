@@ -3,8 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Services\Branches\ModuleBranchService;
-use App\Services\Branches\BranchSerialService;
-use App\Models\Branch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Model;
@@ -30,11 +28,13 @@ class ModuleBranchPreferenceController extends Controller
             'edit_record_token' => ['nullable', 'string', 'max:4096'],
         ]);
 
+        $editBranchQueued = false;
+
         if (($validated['selection_mode'] ?? 'single') === 'multiple') {
             $branches->setMultiPreference($validated['module_key'], $validated['branch_ids'] ?? [], $request->user());
         } else {
             $request->validate(['branch_id' => ['required', 'integer', 'exists:branches,id']]);
-            $recordMoved = $this->moveEditRecordIfRequested(
+            $editBranchQueued = $this->rememberEditRecordBranchIfRequested(
                 $validated['edit_record_token'] ?? null,
                 $validated['module_key'],
                 (int) $validated['branch_id'],
@@ -49,15 +49,17 @@ class ModuleBranchPreferenceController extends Controller
             is_string($redirectTo)
             && (str_starts_with($redirectTo, url('/')) || str_starts_with($redirectTo, $request->getSchemeAndHttpHost()))
         ) {
-            return redirect()->to($redirectTo)->with('success', !empty($recordMoved)
-                ? 'Record moved to the selected branch successfully.'
+            return redirect()->to($redirectTo)->with('success', !empty($editBranchQueued)
+                ? 'Record branch will be updated when you save this record.'
                 : 'Branch selection updated for this module.');
         }
 
-        return redirect()->back()->with('success', 'Branch selection updated for this module.');
+        return redirect()->back()->with('success', !empty($editBranchQueued)
+            ? 'Record branch will be updated when you save this record.'
+            : 'Branch selection updated for this module.');
     }
 
-    private function moveEditRecordIfRequested(?string $token, string $moduleKey, int $branchId, Request $request, ModuleBranchService $branches): bool
+    private function rememberEditRecordBranchIfRequested(?string $token, string $moduleKey, int $branchId, Request $request, ModuleBranchService $branches): bool
     {
         if (!$token) {
             return false;
@@ -100,22 +102,18 @@ class ModuleBranchPreferenceController extends Controller
         }
 
         if ((int) ($record->getAttribute('branch_id') ?? 0) === $branchId) {
+            $request->session()->forget('pending_edit_branch.' . $moduleKey);
             return false;
         }
 
-        $serials = app(BranchSerialService::class);
-        $serialColumn = $serials->serialColumnForModule($moduleKey);
-        $targetBranch = Branch::query()->find($branchId);
-
-        if ($serialColumn && Schema::hasColumn($record->getTable(), $serialColumn)) {
-            $record->setAttribute(
-                $serialColumn,
-                $serials->reformatForBranch((string) $record->getAttribute($serialColumn), $moduleKey, $targetBranch)
-            );
-        }
-
-        $record->setAttribute('branch_id', $branchId);
-        $record->save();
+        $request->session()->put('pending_edit_branch.' . $moduleKey, [
+            'module_key' => $moduleKey,
+            'model' => $modelClass,
+            'id' => $record->getKey(),
+            'original_branch_id' => $originalBranchId,
+            'target_branch_id' => $branchId,
+            'expires_at' => now()->addHours(4)->timestamp,
+        ]);
 
         return true;
     }

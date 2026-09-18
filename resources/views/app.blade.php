@@ -88,6 +88,9 @@
                         && \Illuminate\Support\Facades\Schema::hasColumn($parameter->getTable(), 'branch_id'));
 
                 if ($routeRecord) {
+                    app(\App\Services\Branches\ModuleBranchService::class)
+                        ->selectRecordBranchForReadRoute($routeRecord, $currentBranchModuleKey);
+
                     $branchEditRecordToken = \Illuminate\Support\Facades\Crypt::encryptString(json_encode([
                         'module_key' => $currentBranchModuleKey,
                         'model' => get_class($routeRecord),
