@@ -20,25 +20,43 @@ class PhysicalQuantityReportService
     public function getIndexRows(Request|array $filters = [], ?int $limit = null, ?array $branchIds = null, bool $includeNullBranchRecords = false): Collection
     {
         $branches = app(ModuleBranchService::class);
-        $query = PhysicalQuantity::query()->orderByDesc('id');
+        $articleQuery = Article::query()->orderByDesc('id');
+
+        if ($branchIds !== null && !empty($branchIds) && Schema::hasColumn('articles', 'branch_id')) {
+            $articleQuery->where(function ($scope) use ($branchIds, $includeNullBranchRecords) {
+                $scope->whereIn('articles.branch_id', $branchIds);
+                if ($includeNullBranchRecords) {
+                    $scope->orWhereNull('articles.branch_id');
+                }
+            });
+        } else {
+            $articleQuery = $branches->applyRelatedScope($articleQuery, 'articles', 'physical_quantities');
+        }
+
+        $this->applyArticleFilters($articleQuery, $filters);
+        $articles = $articleQuery->get();
+
+        if ($articles->isEmpty()) {
+            return collect();
+        }
+
+        $physicalQuery = PhysicalQuantity::query()
+            ->whereIn('article_id', $articles->pluck('id'))
+            ->orderByDesc('id');
+
         if ($branchIds !== null && !empty($branchIds) && Schema::hasColumn('physical_quantities', 'branch_id')) {
-            $query->where(function ($scope) use ($branchIds, $includeNullBranchRecords) {
+            $physicalQuery->where(function ($scope) use ($branchIds, $includeNullBranchRecords) {
                 $scope->whereIn('branch_id', $branchIds);
                 if ($includeNullBranchRecords) {
                     $scope->orWhereNull('branch_id');
                 }
             });
         } else {
-            $query = $branches->applyScope($query, 'physical_quantities');
+            $physicalQuery = $branches->applyScope($physicalQuery, 'physical_quantities');
         }
 
-        $articleScope = $this->articleBranchScope($branchIds, $includeNullBranchRecords);
-        $query->whereHas('article', $articleScope)
-            ->with(['article' => $articleScope]);
-
-        $this->applyFilters($query, $filters);
-        $rows = $query->get()->filter(fn (PhysicalQuantity $row) => $row->article);
-        $groupedRows = $this->mapArticleRows($rows, $branchIds, $includeNullBranchRecords);
+        $rows = $physicalQuery->get();
+        $groupedRows = $this->mapArticleRows($articles, $rows, $branchIds, $includeNullBranchRecords);
 
         if ($limit) {
             return $groupedRows->take($limit)->values();
@@ -156,45 +174,88 @@ class PhysicalQuantityReportService
             : [];
     }
 
-    protected function applyFilters(Builder $query, Request|array $filters): void
+    protected function applyArticleFilters(Builder $query, Request|array $filters): void
     {
         if ($filters instanceof Request) {
-            $query->applyFilters($filters, false, true);
-            return;
+            $filters = $filters->except(['_token', 'limit', 'page']);
         }
 
-        if (!empty($filters['article_id'])) {
-            $query->where('article_id', (int) $filters['article_id']);
-        }
+        foreach ($filters as $key => $value) {
+            if (empty($value) && $value !== '0') {
+                continue;
+            }
 
-        if (!empty($filters['article_no'])) {
-            $articleNo = $filters['article_no'];
-            $query->whereHas('article', fn (Builder $articleQuery) => $articleQuery->where('article_no', 'like', "%{$articleNo}%"));
-        }
+            if ($key === 'article_no') {
+                $this->applyArticleNoFilter($query, (string) $value);
+                continue;
+            }
 
-        if (!empty($filters['processed_by'])) {
-            $processedBy = mb_strtolower(trim((string) $filters['processed_by']));
-            $query->whereHas('article', function (Builder $articleQuery) use ($processedBy) {
-                $articleQuery->whereRaw('LOWER(processed_by) LIKE ?', ["%{$processedBy}%"]);
-            });
-        }
+            if ($key === 'article_id') {
+                $query->whereKey((int) $value);
+                continue;
+            }
 
-        if (!empty($filters['shipment']) && in_array($filters['shipment'], ['karachi', 'other', 'all'], true)) {
-            $shipment = $filters['shipment'];
+            if ($key === 'processed_by') {
+                $processedBy = mb_strtolower(trim((string) $value));
+                $query->whereRaw('LOWER(processed_by) LIKE ?', ["%{$processedBy}%"]);
+                continue;
+            }
 
-            $query->whereHas('article.shipmentArticles.shipment', function (Builder $shipmentQuery) use ($shipment) {
-                if ($shipment === 'karachi') {
-                    $shipmentQuery->where('city', 'karachi');
-                } elseif ($shipment === 'other') {
-                    $shipmentQuery->where('city', '!=', 'karachi');
-                }
-            });
+            if ($key === 'shipment' && in_array($value, ['karachi', 'other', 'all'], true)) {
+                $this->applyShipmentFilter($query, (string) $value);
+            }
         }
     }
 
-    protected function mapArticleRows(Collection $rows, ?array $branchIds = null, bool $includeNullBranchRecords = false): Collection
+    protected function applyArticleNoFilter(Builder $query, string $value): void
     {
-        $articleIds = $rows->pluck('article_id')->unique()->values();
+        $value = trim($value);
+        if ($value === '') {
+            return;
+        }
+
+        if (preg_match('/^\d+\s*-\s*\d+$/', $value)) {
+            [$start, $end] = array_pad(array_map('trim', explode('-', $value, 2)), 2, '');
+            if ($start !== '' && $end !== '') {
+                $startNumber = (int) $start;
+                $endNumber = (int) $end;
+                $query->where(function (Builder $rangeQuery) use ($start, $end, $startNumber, $endNumber) {
+                    $rangeQuery->whereBetween('article_no', [$start, $end]);
+
+                    $driver = $rangeQuery->getConnection()->getDriverName();
+                    if (in_array($driver, ['mysql', 'mariadb'], true)) {
+                        $rangeQuery->orWhereRaw(
+                            "CAST(SUBSTRING_INDEX(article_no, '|', -1) AS UNSIGNED) BETWEEN ? AND ?",
+                            [$startNumber, $endNumber]
+                        );
+                    } elseif ($driver === 'sqlite') {
+                        $rangeQuery->orWhereRaw(
+                            "CAST(CASE WHEN instr(article_no, '|') > 0 THEN substr(article_no, instr(article_no, '|') + 1) ELSE article_no END AS INTEGER) BETWEEN ? AND ?",
+                            [$startNumber, $endNumber]
+                        );
+                    }
+                });
+                return;
+            }
+        }
+
+        $query->where('article_no', 'like', "%{$value}%");
+    }
+
+    protected function applyShipmentFilter(Builder $query, string $shipment): void
+    {
+        $query->whereHas('shipmentArticles.shipment', function (Builder $shipmentQuery) use ($shipment) {
+            if ($shipment === 'karachi') {
+                $shipmentQuery->where('city', 'karachi');
+            } elseif ($shipment === 'other') {
+                $shipmentQuery->where('city', '!=', 'karachi');
+            }
+        });
+    }
+
+    protected function mapArticleRows(Collection $articles, Collection $rows, ?array $branchIds = null, bool $includeNullBranchRecords = false): Collection
+    {
+        $articleIds = $articles->pluck('id')->unique()->values();
 
         if ($articleIds->isEmpty()) {
             return collect();
@@ -229,14 +290,30 @@ class PhysicalQuantityReportService
             $branchIds ?? ($branches->shouldFilterRecords('physical_quantities') ? $branches->selectedBranchIdForModule('physical_quantities') : null),
             $includeNullBranchRecords
         );
+        $fallbackStockMap = $this->stockService->summaries($articleIds);
 
-        return $rows
-            ->groupBy('article_id')
-            ->map(function (Collection $items) use ($shipmentCitiesMap, $stockMap) {
-                /** @var \App\Models\PhysicalQuantity $model */
+        $rowsByArticle = $rows->groupBy('article_id');
+
+        return $articles
+            ->map(function (Article $article) use ($rowsByArticle, $shipmentCitiesMap, $stockMap, $fallbackStockMap) {
+                $items = $rowsByArticle->get($article->id, collect());
+                /** @var \App\Models\PhysicalQuantity|null $model */
                 $model = $items->first();
-                $article = $model->article;
-                $stock = $stockMap->get($model->article_id, []);
+                $stock = $stockMap->get($article->id, []);
+                $fallbackStock = $fallbackStockMap->get($article->id, []);
+                $unit = (float) ($stock['unit'] ?? $fallbackStock['unit'] ?? $article->pcs_per_packet ?? 0);
+                $scopedHasQuantity = collect([
+                    $stock['total_quantity_pcs'] ?? 0,
+                    $stock['orderable_quantity_pcs'] ?? 0,
+                    $stock['ordered_quantity_pcs'] ?? 0,
+                    $stock['current_stock_pcs'] ?? 0,
+                    $stock['received_quantity_pcs'] ?? 0,
+                ])->contains(fn ($value) => (float) $value > 0);
+
+                if ($items->isEmpty() && !$scopedHasQuantity && !empty($fallbackStock)) {
+                    $stock = $fallbackStock;
+                }
+
                 $totalPcs = (float) ($stock['total_quantity_pcs'] ?? 0);
                 $totalPackets = (float) ($stock['total_quantity_packets'] ?? 0);
                 $orderablePackets = (float) ($stock['orderable_quantity_packets'] ?? 0);
@@ -248,7 +325,16 @@ class PhysicalQuantityReportService
                 $adjustmentPackets = (float) ($stock['adjustment_quantity_packets'] ?? 0);
                 $currentStockPackets = (float) ($stock['current_stock_packets'] ?? 0);
                 $remainingPackets = (float) ($stock['remaining_quantity_packets'] ?? 0);
-                $shipment = $this->resolveShipment($shipmentCitiesMap->get($model->article_id, collect()));
+                $orderablePcs = (float) ($stock['orderable_quantity_pcs'] ?? 0);
+                $orderedPcs = (float) ($stock['ordered_quantity_pcs'] ?? 0);
+                $receivedPcs = (float) ($stock['received_quantity_pcs'] ?? 0);
+                $invoicedPcs = (float) ($stock['invoiced_quantity_pcs'] ?? 0);
+                $shipmentInvoicedPcs = (float) ($stock['shipment_invoiced_quantity_pcs'] ?? 0);
+                $returnPcs = (float) ($stock['return_quantity_pcs'] ?? 0);
+                $adjustmentPcs = (float) ($stock['adjustment_quantity_pcs'] ?? 0);
+                $currentStockPcs = (float) ($stock['current_stock_pcs'] ?? 0);
+                $remainingPcs = (float) ($stock['remaining_quantity_pcs'] ?? 0);
+                $shipment = $this->resolveShipment($shipmentCitiesMap->get($article->id, collect()));
                 $partialRecords = $items
                     ->sortByDesc('id')
                     ->map(function (PhysicalQuantity $item) {
@@ -270,27 +356,35 @@ class PhysicalQuantityReportService
                     ->all();
 
                 return [
-                    'id' => $model->id,
-                    'article_id' => $model->article_id,
+                    'id' => $model?->id ?? 'article-' . $article->id,
+                    'article_id' => $article->id,
                     'article_no' => $article->article_no,
                     'size' => $article->size,
-                    'processed_by' => $article->processed_by,
+                    'processed_by' => filled($article->processed_by) ? $article->processed_by : '-',
                     'unit' => $article->pcs_per_packet,
-                    'total_quantity' => floor($totalPcs / 12) . ' Dz. | ' . $totalPackets,
-                    'orderable_quantity' => $this->formatPacketQuantity($orderablePackets),
-                    'ordered_quantity' => $this->formatPacketQuantity($orderedPackets),
-                    'received_quantity' => $this->formatPacketQuantity($receivedPackets),
-                    'invoiced_quantity' => $this->formatPacketQuantity($invoicedPackets),
-                    'shipment_invoiced_quantity' => $this->formatPacketQuantity($shipmentinvoicedPackets),
-                    'return_quantity' => $this->formatPacketQuantity($returnPackets),
-                    'adjustment_quantity' => $this->formatPacketQuantity($adjustmentPackets),
-                    'current_stock' => $this->formatPacketQuantity($currentStockPackets),
-                    'a_category' => $this->formatPacketQuantity((float) ($stock['a_category_packets'] ?? 0)),
-                    'b_category' => $this->formatPacketQuantity((float) ($stock['b_category_packets'] ?? 0)),
-                    'c_category' => $this->formatPacketQuantity((float) ($stock['c_category_packets'] ?? 0)),
-                    'remaining_quantity' => $this->formatPacketQuantity($remainingPackets),
+                    'total_quantity' => $unit > 0
+                        ? floor($totalPcs / 12) . ' Dz. | ' . $this->formatPacketQuantity($totalPackets)
+                        : $this->formatPcsQuantity($totalPcs),
+                    'orderable_quantity' => $this->formatStockQuantity($orderablePackets, $orderablePcs, $unit),
+                    'ordered_quantity' => $this->formatStockQuantity($orderedPackets, $orderedPcs, $unit),
+                    'received_quantity' => $this->formatStockQuantity($receivedPackets, $receivedPcs, $unit),
+                    'invoiced_quantity' => $this->formatStockQuantity($invoicedPackets, $invoicedPcs, $unit),
+                    'shipment_invoiced_quantity' => $this->formatStockQuantity($shipmentinvoicedPackets, $shipmentInvoicedPcs, $unit),
+                    'return_quantity' => $this->formatStockQuantity($returnPackets, $returnPcs, $unit),
+                    'adjustment_quantity' => $this->formatStockQuantity($adjustmentPackets, $adjustmentPcs, $unit),
+                    'current_stock' => $this->formatStockQuantity($currentStockPackets, $currentStockPcs, $unit),
+                    'a_category' => $this->formatStockQuantity((float) ($stock['a_category_packets'] ?? 0), (float) ($stock['a_category_pcs'] ?? 0), $unit),
+                    'b_category' => $this->formatStockQuantity((float) ($stock['b_category_packets'] ?? 0), (float) ($stock['b_category_pcs'] ?? 0), $unit),
+                    'c_category' => $this->formatStockQuantity((float) ($stock['c_category_packets'] ?? 0), (float) ($stock['c_category_pcs'] ?? 0), $unit),
+                    'remaining_quantity' => $this->formatStockQuantity($remainingPackets, $remainingPcs, $unit),
                     'shipment' => $shipment,
+                    'total_pcs_numeric' => $totalPcs,
+                    'orderable_pcs_numeric' => $orderablePcs,
+                    'ordered_pcs_numeric' => $orderedPcs,
+                    'received_pcs_numeric' => $receivedPcs,
+                    'current_stock_pcs_numeric' => $currentStockPcs,
                     'total_packets_numeric' => $totalPackets,
+                    'orderable_packets_numeric' => $orderablePackets,
                     'ordered_packets_numeric' => $orderedPackets,
                     'received_packets_numeric' => $receivedPackets,
                     'invoiced_packets_numeric' => $invoicedPackets,
@@ -303,6 +397,15 @@ class PhysicalQuantityReportService
                     'oncontextmenu' => 'generateContextMenu(event)',
                 ];
             })
+            ->filter(fn (array $item) => !empty($item['partial_records'])
+                || (float) ($item['total_packets_numeric'] ?? 0) > 0
+                || (float) ($item['orderable_packets_numeric'] ?? 0) > 0
+                || (float) ($item['ordered_packets_numeric'] ?? 0) > 0
+                || (float) ($item['current_stock_packets_numeric'] ?? 0) > 0
+                || (float) ($item['total_pcs_numeric'] ?? 0) > 0
+                || (float) ($item['orderable_pcs_numeric'] ?? 0) > 0
+                || (float) ($item['ordered_pcs_numeric'] ?? 0) > 0
+                || (float) ($item['current_stock_pcs_numeric'] ?? 0) > 0)
             ->values()
             ->sortBy(fn($item) => (float) $item['article_no'])
             ->values();
@@ -344,5 +447,26 @@ class PhysicalQuantityReportService
         $formatted = rtrim(rtrim($formatted, '0'), '.');
 
         return $formatted;
+    }
+
+    protected function formatStockQuantity(float|int $packets, float|int $pcs, float|int $unit): string
+    {
+        if ((float) $unit > 0) {
+            return $this->formatPacketQuantity($packets);
+        }
+
+        return $this->formatPcsQuantity($pcs);
+    }
+
+    protected function formatPcsQuantity(float|int $value): string
+    {
+        $formatted = number_format((float) $value, 2, '.', '');
+        $formatted = rtrim(rtrim($formatted, '0'), '.');
+
+        if ((float) $formatted === 0.0) {
+            return '0';
+        }
+
+        return $formatted . ' - PCs';
     }
 }

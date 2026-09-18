@@ -34,9 +34,10 @@
             const item = e.target.closest(".item");
             if (!item) return;
             const data = JSON.parse(item.dataset.json);
+            const hasPhysicalQuantityRecord = /^\d+$/.test(String(data.id || ""));
 
             const actions = [];
-            if (isDeveloperUser()) {
+            if (isDeveloperUser() && hasPhysicalQuantityRecord) {
                 actions.push({
                     id: "edit-physical-quantity",
                     text: "Edit",
@@ -48,6 +49,8 @@
                     onclick: `submitResourceDelete('/physical-quantities/${data.id}')`,
                 });
             }
+
+            if (!actions.length) return;
 
             createContextMenu({
                 item,
