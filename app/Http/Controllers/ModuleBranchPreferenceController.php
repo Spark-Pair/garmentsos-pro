@@ -114,6 +114,10 @@ class ModuleBranchPreferenceController extends Controller
             'target_branch_id' => $branchId,
             'expires_at' => now()->addHours(4)->timestamp,
         ]);
+        $request->session()->flash('pending_edit_branch_redirect.' . $moduleKey, [
+            'model' => $modelClass,
+            'id' => $record->getKey(),
+        ]);
 
         return true;
     }

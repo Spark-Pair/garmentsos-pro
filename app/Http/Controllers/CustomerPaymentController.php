@@ -658,6 +658,11 @@ class CustomerPaymentController extends Controller
 
         $canFullyEdit = Auth::user()?->role === 'developer' || app_can('customer_payments', 'override');
         $payload = $this->buildCustomerPaymentPayload($request, $customerPayment);
+        $pendingBranchId = app(ModuleBranchService::class)
+            ->pendingEditBranchTargetId($customerPayment, 'customer_payments');
+        if ($pendingBranchId) {
+            $payload['branch_id'] = $pendingBranchId;
+        }
         if (!$canFullyEdit) {
             $payload['customer_id'] = $customerPayment->customer_id;
             $payload['date'] = $customerPayment->date?->format('Y-m-d');
@@ -679,6 +684,7 @@ class CustomerPaymentController extends Controller
                 ?? $this->findLegacyRelatedSupplierPayment($customerPayment, true);
             $payload['is_return'] = $customerPayment->is_return; // Preserve return status
             $customerPayment->update($payload);
+            $payload['branch_id'] = $customerPayment->fresh()->branch_id;
 
             if ($program && $payload['method'] === 'program' && $program->category === 'supplier') {
                 $supplierPayload = array_merge($payload, [

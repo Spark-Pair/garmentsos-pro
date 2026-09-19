@@ -163,7 +163,13 @@ class AppServiceProvider extends ServiceProvider
                     && get_class($parameter) === get_class($model)
                     && (string) $parameter->getKey() === (string) $model->getKey());
 
-            if (!$routeRecord) {
+            $routeRecordMatchesModel = $routeRecord instanceof Model
+                || collect($route->parameters())->contains(function ($parameter) use ($model) {
+                    return is_scalar($parameter)
+                        && (string) $parameter === (string) $model->getKey();
+                });
+
+            if (!$routeRecordMatchesModel) {
                 return;
             }
 
@@ -174,17 +180,26 @@ class AppServiceProvider extends ServiceProvider
 
             $branches = app(ModuleBranchService::class);
             $moduleKey = $branches->currentModuleKey();
-            if (!$moduleKey || !$branches->shouldFilterRecords($moduleKey)) {
+            if (!$moduleKey) {
                 return;
             }
 
-            $targetBranch = $branches->selectedBranchForModule($moduleKey);
+            $targetBranchId = $branches->pendingEditBranchTargetId($model, $moduleKey)
+                ?: (int) ($branches->selectedBranchForModule($moduleKey)?->id ?? 0);
+            if (!$targetBranchId) {
+                return;
+            }
+
+            if (!$branches->pendingEditBranchTargetId($model, $moduleKey) && !$branches->shouldFilterRecords($moduleKey)) {
+                return;
+            }
+
+            $targetBranch = \App\Models\Branch::query()->find($targetBranchId);
             if (!$targetBranch) {
                 return;
             }
 
             $currentBranchId = (int) ($model->getAttribute('branch_id') ?? 0);
-            $targetBranchId = (int) $targetBranch->id;
             if ($currentBranchId === $targetBranchId) {
                 $branches->clearPendingEditBranch($moduleKey);
                 return;
