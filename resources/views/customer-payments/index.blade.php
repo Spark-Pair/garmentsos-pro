@@ -3,22 +3,6 @@
 @section('content')
 @php
     $searchFields = [
-        "Date Range" => [
-            "id" => "date_range_start",
-            "type" => "date",
-            // "value" => now()->startOfMonth()->toDateString(),
-            "id2" => "date_range_end",
-            "type2" => "date",
-            // "value2" => now()->toDateString(),
-            "dataFilterPath" => "date",
-        ],
-        "Created Date Range" => [
-            "id" => "created_range_start",
-            "type" => "date",
-            "id2" => "created_range_end",
-            "type2" => "date",
-            "dataFilterPath" => "created_at",
-        ],
         "Reff. No." => [
             "id" => "reff_no",
             "type" => "text",
@@ -111,6 +95,22 @@
             "id" => "amount",
             "placeholder" => "Enter Amount",
             "dataFilterPath" => "amount",
+        ],
+        "Date Range" => [
+            "id" => "date_range_start",
+            "type" => "date",
+            // "value" => now()->startOfMonth()->toDateString(),
+            "id2" => "date_range_end",
+            "type2" => "date",
+            // "value2" => now()->toDateString(),
+            "dataFilterPath" => "date",
+        ],
+        "Created Date Range" => [
+            "id" => "created_range_start",
+            "type" => "date",
+            "id2" => "created_range_end",
+            "type2" => "date",
+            "dataFilterPath" => "created_at",
         ],
     ];
 @endphp

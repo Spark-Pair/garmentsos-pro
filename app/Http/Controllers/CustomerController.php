@@ -125,13 +125,14 @@ class CustomerController extends Controller
 
         if (!$user) {
             // Upload the image if provided
+            $data['image'] = "default_avatar.png";
+
             if ($request->hasFile('image_upload')) {
-                $image = $request->file('image_upload');
-                $image_name = time() . '.' . $image->getClientOriginalExtension();
-                $image->move(public_path('uploads/suppliers'), $image_name);
-                $data['image'] = $image_name;
-            } else {
-                $data['image'] = "default_avatar.png";
+                $file = $request->file('image_upload');
+                $fileName = time() . '_' . $file->getClientOriginalName();
+                $file->storeAs('uploads/images', $fileName, 'public');
+
+                $data['image'] = $fileName;
             }
 
             $user = User::create([
@@ -254,19 +255,16 @@ class CustomerController extends Controller
         $user = User::where('username', $customer->user->username)->first();
 
         if ($user) {
-            $profileImage = "default_avatar.png";
             if ($request->hasFile('image_upload')) {
                 $file = $request->file('image_upload');
                 $fileName = time() . '_' . $file->getClientOriginalName();
-                $filePath = $file->storeAs('uploads/images', $fileName, 'public'); // Store in public disk
+                $file->storeAs('uploads/images', $fileName, 'public'); // Store in public disk
 
-                $profileImage = $fileName; // Save the file path in the database
+                // Update the user image only when a new file is selected.
+                $user->update([
+                    'profile_picture' => $fileName,
+                ]);
             }
-
-            // Update the user
-            $user->update([
-                'profile_picture' => $profileImage,
-            ]);
         } else {
             return redirect()->back()->with('error', 'This user does not exist.')->withInput();
         }

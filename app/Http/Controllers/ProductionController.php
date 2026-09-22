@@ -508,6 +508,9 @@ class ProductionController extends Controller
 
                 $data['parts'] = $partQuantities->pluck('part')->values()->all();
                 $data['ticket'] = 'TEMP';
+                if ($request->receive_date && $flowService->isCutting($work)) {
+                    $data['amount'] = round((float) $request->rate * (float) $article->quantity, 2);
+                }
                 $production = Production::create($data);
 
                 $workPrefix = explode('|', $work->short_title ?: $work->title)[0];
@@ -555,6 +558,10 @@ class ProductionController extends Controller
             }
 
             $work = Setup::find($request->work_id);
+
+            if ($request->receive_date && $flowService->isCutting($work)) {
+                $data['amount'] = round((float) $request->rate * (float) Article::findOrFail($request->article_id)->quantity, 2);
+            }
 
             $data['ticket'] = 'TEMP';
             $production = Production::create($data);

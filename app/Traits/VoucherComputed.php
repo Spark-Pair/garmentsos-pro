@@ -38,7 +38,7 @@ trait VoucherComputed
             return [
                 'id' => $payment->id,
                 'method' => $payment->method,
-                'date' => $payment->date?->format('Y-m-d'),
+                'date' => $payment->cheque ? $payment->cheque->cheque_date?->format('Y-m-d') : ($payment->slip ? $payment->slip->slip_date?->format('Y-m-d') : $payment->date?->format('Y-m-d')),
                 'amount' => (float) $payment->amount,
                 'voucher_no' => $this->voucher_no,
                 'cheque_no' => $payment->cheque_no ?? $payment->cheque?->cheque_no,

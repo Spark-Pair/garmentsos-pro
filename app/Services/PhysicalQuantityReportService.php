@@ -6,6 +6,7 @@ use App\Models\Article;
 use App\Models\PhysicalQuantity;
 use App\Models\ShipmentArticles;
 use App\Services\Branches\ModuleBranchService;
+use App\Traits\SearchFilterHelpers;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -13,6 +14,8 @@ use Illuminate\Support\Collection;
 
 class PhysicalQuantityReportService
 {
+    use SearchFilterHelpers;
+
     public function __construct(private readonly ArticleStockService $stockService)
     {
     }
@@ -209,17 +212,23 @@ class PhysicalQuantityReportService
 
     protected function applyArticleNoFilter(Builder $query, string $value): void
     {
-        $value = trim($value);
-        if ($value === '') {
+        $tokens = $this->searchFilterTokens($value);
+        if ($tokens->isEmpty()) {
             return;
         }
 
-        if (preg_match('/^\d+\s*-\s*\d+$/', $value)) {
-            [$start, $end] = array_pad(array_map('trim', explode('-', $value, 2)), 2, '');
-            if ($start !== '' && $end !== '') {
-                $startNumber = (int) $start;
-                $endNumber = (int) $end;
-                $query->where(function (Builder $rangeQuery) use ($start, $end, $startNumber, $endNumber) {
+        $query->where(function (Builder $articleQuery) use ($tokens) {
+            foreach ($tokens as $token) {
+                $bounds = $this->searchFilterRangeBounds($token);
+                if (!$bounds) {
+                    $articleQuery->orWhere('article_no', 'like', "%{$token}%");
+                    continue;
+                }
+
+                [$startNumber, $endNumber, $width] = $bounds;
+                $start = str_pad((string) $startNumber, $width, '0', STR_PAD_LEFT);
+                $end = str_pad((string) $endNumber, $width, '0', STR_PAD_LEFT);
+                $articleQuery->orWhere(function (Builder $rangeQuery) use ($start, $end, $startNumber, $endNumber) {
                     $rangeQuery->whereBetween('article_no', [$start, $end]);
 
                     $driver = $rangeQuery->getConnection()->getDriverName();
@@ -235,11 +244,8 @@ class PhysicalQuantityReportService
                         );
                     }
                 });
-                return;
             }
-        }
-
-        $query->where('article_no', 'like', "%{$value}%");
+        });
     }
 
     protected function applyShipmentFilter(Builder $query, string $shipment): void

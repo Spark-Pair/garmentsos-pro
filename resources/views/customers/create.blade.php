@@ -141,8 +141,8 @@
         <!-- Step 2: Production Details -->
         <div class="step2 hidden space-y-4">
             <x-file-upload
-                id="profile_picture"
-                name="profile_picture"
+                id="image_upload"
+                name="image_upload"
                 placeholder="{{ asset('images/image_icon.png') }}"
                 uploadText="Upload Customer's Picture"
             />

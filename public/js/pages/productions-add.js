@@ -1445,7 +1445,10 @@
 
             window.calculateAmount = function calculateAmount() {
                 validateInput(document.getElementById("article_quantity"));
-                let quantity = parseFloat(document.getElementById("article_quantity").value);
+                const isCuttingReceive = cleanWorkTitle(workOptions[selectedDbValue("work")]?.text) === "cutting";
+                const quantity = isCuttingReceive
+                    ? Number(selectedArticle?.quantity || 0)
+                    : parseFloat(document.getElementById("article_quantity").value);
                 let rate = parseFloat(document.getElementById("rate").value);
                 document.getElementById("amount").value = (rate * quantity).toFixed(2);
             };

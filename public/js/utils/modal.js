@@ -28,8 +28,11 @@ function closeModal(modalId, animate = 'animate') {
     if (!modal) return;
 
     const modalForm = modal.querySelector('form');
+    let closed = false;
 
     const finishClose = () => {
+        if (closed || !modal.isConnected) return;
+        closed = true;
         modal.remove();
 
         // Previous/active modal ke search input par focus
@@ -42,15 +45,20 @@ function closeModal(modalId, animate = 'animate') {
     }
 
     if (animate === 'animate') {
-        modalForm.classList.add('scale-out');
+        if (modalForm.classList.contains('scale-out')) {
+            finishClose();
+        } else {
+            modalForm.classList.add('scale-out');
 
-        modalForm.addEventListener('animationend', () => {
-            modal.classList.add('fade-out');
+            modalForm.addEventListener('animationend', () => {
+                modal.classList.add('fade-out');
 
-            modal.addEventListener('animationend', () => {
-                finishClose();
+                modal.addEventListener('animationend', () => {
+                    finishClose();
+                }, { once: true });
             }, { once: true });
-        }, { once: true });
+            setTimeout(finishClose, 900);
+        }
     } else {
         finishClose();
     }

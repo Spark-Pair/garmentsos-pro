@@ -50,7 +50,14 @@ class OrderController extends Controller
 
             $orders = $ordersQuery->applyFilters($request);
 
-            return response()->json(['data' => $orders, 'authLayout' => $authLayout]);
+            return response()->json([
+                'data' => $orders,
+                'authLayout' => $authLayout,
+                'calculations' => [
+                    'net_amount' => $orders->sum(fn ($order) => (float) ($order['net_amount'] ?? 0)),
+                    'balance_order' => $orders->sum(fn ($order) => (int) ($order['balance_order'] ?? 0)),
+                ],
+            ]);
         }
 
         // $orders = Order::with('customer.city', 'articles.article')->get();

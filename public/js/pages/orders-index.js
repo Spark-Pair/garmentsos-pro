@@ -4,6 +4,21 @@
     const canEditOrderRoles = ['developer', 'owner', 'admin', 'accountant'];
     const isDeveloper = () => isDeveloperUser('orders');
 
+    window.renderCalculation = function renderCalculation(data) {
+        document.querySelector('#calc-bottom > .total-Amount .text-right').innerText =
+            formatNumbersWithDigits(data.net_amount ?? 0, 1, 1);
+        document.querySelector('#calc-bottom > .balance-order .text-right').innerText =
+            formatNumbersWithDigits(data.balance_order ?? 0, 0, 0);
+    };
+
+    window.onFilter = function onFilter() {
+        const rows = window.visibleData || [];
+        window.renderCalculation({
+            net_amount: rows.reduce((sum, order) => sum + Number(order.net_amount || 0), 0),
+            balance_order: rows.reduce((sum, order) => sum + Number(order.balance_order || 0), 0),
+        });
+    };
+
     function setAuthLayout(data) {
         if (data?.authLayout) {
             window.authLayout = data.authLayout;

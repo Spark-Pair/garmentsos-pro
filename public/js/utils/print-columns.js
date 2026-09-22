@@ -72,8 +72,14 @@
     function formattedRows() {
         const searchContainer = document.querySelector('.search_container');
         return visibleRows(searchContainer)
-            .map(row => Array.from(row.querySelectorAll('span')).map(cell => cell.textContent.trim()))
+            .map(row => rowCells(row))
             .filter(row => row.some(Boolean));
+    }
+
+    function rowCells(row) {
+        return Array.from(row.children)
+            .filter(cell => cell.matches('span, div, td'))
+            .map(cell => cell.textContent.trim());
     }
 
     function rawRows() {
@@ -757,7 +763,6 @@
         }
 
         readPrintSettings();
-        closeModal('printColumnModal');
         executePrintWithColumns(selectedColumns);
     };
 
@@ -902,8 +907,8 @@
         const totalWeight = processedColumns.reduce((total, col) => total + (WIDTH_WEIGHTS[col.printWidth] || 1), 0) || 1;
         const columnWidths = processedColumns.map(col => `${(((WIDTH_WEIGHTS[col.printWidth] || 1) / totalWeight) * 100).toFixed(2)}%`);
 
-        const rowRecords = Array.from(body.children).map(row => {
-            const sourceCells = Array.from(row.querySelectorAll('span')).map(cell => cell.textContent.trim());
+        const rowRecords = visibleRows(body).map(row => {
+            const sourceCells = rowCells(row);
             const cells = processedColumns.map(col => {
                 if (col.isMerged) {
                     return col.originalIndices.map(idx => sourceCells[idx] || '').filter(Boolean).join(' / ');
