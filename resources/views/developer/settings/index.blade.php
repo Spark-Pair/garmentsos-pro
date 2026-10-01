@@ -51,7 +51,7 @@
         </section>
 
         <section id="branding" class="{{ $panel }}">
-            <x-developer-panel-title title="Branding" description="Text and color values use current config defaults when no override exists.">
+            <x-developer-panel-title title="Branding" description="Saved settings override config defaults and supply branding values to document previews.">
                 <span class="{{ $badge }} border-[var(--border-success)] bg-[var(--bg-success)] text-[var(--text-success)]">Safe text/color only</span>
             </x-developer-panel-title>
 
@@ -60,11 +60,13 @@
                     @foreach ($branding as $item)
                         @php
                             $isColor = str_contains($item['key'], 'color');
+                            $isPhone = $item['key'] === 'phone';
+                            $settingTitle = $isPhone ? 'Company phone number' : str_replace('_', ' ', $item['key']);
                         @endphp
                         <div class="{{ $softPanel }}">
                             <div class="mb-3 flex items-start justify-between gap-3">
                                 <div>
-                                    <h3 class="font-semibold capitalize">{{ str_replace('_', ' ', $item['key']) }}</h3>
+                                    <h3 class="font-semibold capitalize">{{ $settingTitle }}</h3>
                                     <p class="font-mono text-xs text-[var(--secondary-text)]">{{ $item['key'] }}</p>
                                 </div>
                                 <span class="{{ $badge }} border-gray-600 bg-[var(--secondary-bg-color)] text-[var(--secondary-text)]">{{ str_replace('_', ' ', $item['source']) }}</span>
@@ -91,7 +93,7 @@
                                     @csrf
                                     <input type="hidden" name="key" value="{{ $item['key'] }}">
                                     <input
-                                        type="{{ $isColor ? 'color' : 'text' }}"
+                                        type="{{ $isColor ? 'color' : ($isPhone ? 'tel' : 'text') }}"
                                         name="value"
                                         value="{{ $item['value'] }}"
                                         maxlength="120"
@@ -114,6 +116,7 @@
                     <div class="mt-4 rounded-lg border border-gray-600 bg-[var(--secondary-bg-color)] p-4">
                         <div class="font-semibold">{{ $branding['app_name']['effective_value'] ?? 'GarmentsOS PRO' }}</div>
                         <div class="text-sm text-[var(--secondary-text)]">{{ $branding['company_name']['effective_value'] ?? $client_company->name }}</div>
+                        <div class="mt-1 text-sm text-[var(--secondary-text)]">{{ $branding['phone']['effective_value'] ?? '' }}</div>
                         <div class="mt-4 flex gap-2">
                             <span class="inline-block h-6 w-6 rounded-lg border border-gray-600" style="background: {{ $branding['theme_primary_color']['effective_value'] ?? '#2563eb' }}"></span>
                             <span class="inline-block h-6 w-6 rounded-lg border border-gray-600" style="background: {{ $branding['theme_secondary_color']['effective_value'] ?? '#1f2937' }}"></span>

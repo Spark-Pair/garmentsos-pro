@@ -167,13 +167,13 @@
                             <div class="left">
                                 <div class="company-logo">
                                     <img src="${companyLogoBase}/${companyData.logo}" alt="garmentsos-pro"
-                                        class="w-[12rem]" />
+                                        class="h-[3rem] max-h-[3rem] w-[12rem] object-contain object-left" />
                                 </div>
+                                ${companyData.phone_number ? `<div class="mt-1 text-sm text-left">${window.htmlAttr(companyData.phone_number)}</div>` : ''}
                             </div>
                             <div class="right">
                                 <div>
                                     <h1 class="text-2xl font-medium text-[var(--primary-color)] pr-2">Cargo List</h1>
-                                    <div class='mt-1'>${companyData.phone_number}</div>
                                 </div>
                             </div>
                         </div>

@@ -614,11 +614,17 @@ class Controller extends BaseController
             ->get();
 
         $Customers = $Allcustomers->filter(function ($customer) use ($shipment) {
-            // Check if any of the customer's invoices match the shipment number
             return !$customer->invoices->contains(function ($invoice) use ($shipment) {
-                return
-                $invoice->shipment_no == $shipment->shipment_no ||
-                ($invoice->shipment && $invoice->shipment->date == $shipment->date);
+                if ($invoice->shipment_no == $shipment->shipment_no) {
+                    return true;
+                }
+
+                $invoicedShipment = $invoice->shipment;
+                if (!$invoicedShipment || $invoicedShipment->date?->toDateString() !== $shipment->date?->toDateString()) {
+                    return false;
+                }
+
+                return (string) ($invoicedShipment->branch_id ?? '') === (string) ($shipment->branch_id ?? '');
             });
         })->values()->map(fn ($customer) => $this->formatInvoiceCustomerPayload($customer))->toArray();
 

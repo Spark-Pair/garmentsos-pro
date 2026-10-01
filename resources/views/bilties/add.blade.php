@@ -63,7 +63,7 @@
 @endsection
 
 @push('page-scripts')
-<script defer src="{{ asset('js/pages/bilties-add.js') }}"></script>
+<script defer src="{{ asset('js/pages/bilties-add.js') }}?v={{ filemtime(public_path('js/pages/bilties-add.js')) }}"></script>
 <script>
         window.__biltiesAdd = {
             invoices: @json($invoices),

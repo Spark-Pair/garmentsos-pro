@@ -208,8 +208,8 @@
                             ` : ""}
                         </div>
                         <div class="right text-right">
-                            <h1 class="text-xl font-medium text-[var(--primary-color)] pr-2">${escapeHtml(title)}</h1>
-                            <div class="mt-1 text-[13px]">${escapeHtml(company.phone_number || "")}</div>
+                            <h1 class="text-sm font-medium text-[var(--primary-color)] pr-2">${escapeHtml(title)}</h1>
+                            <div class="mt-1 text-sm">${escapeHtml(company.phone_number || "")}</div>
                         </div>
                     </div>
 

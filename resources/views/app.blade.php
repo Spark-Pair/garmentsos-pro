@@ -827,7 +827,7 @@
 
     <script defer src="{{ asset('js/components/card.js') }}"></script>
     <script defer src="{{ asset('js/components/document-print.js') }}?v={{ $assetVersion }}"></script>
-    <script defer src="{{ asset('js/components/document-preview.js') }}?v={{ $assetVersion }}"></script>
+    <script defer src="{{ asset('js/components/document-preview.js') }}?v={{ $assetVersion }}-{{ filemtime(public_path('js/components/document-preview.js')) }}"></script>
     <script defer src="{{ asset('js/components/modal.js') }}?v={{ $assetVersion }}.inputs-3"></script>
     <script defer src="{{ asset('js/components/context-menu.js') }}?v={{ $assetVersion }}"></script>
     <script defer src="{{ asset('js/global-filter-manager.js') }}?v={{ $assetVersion }}.skeleton-5"></script>

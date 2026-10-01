@@ -771,7 +771,7 @@
                                 <!-- Top Row: Image + Logo Text -->
                                 <div class="flex items-center gap-3">
                                     ${previewCompanyLogoUrl ? `
-                                        <div class="h-[3.50rem] w-[13.5rem] flex items-center justify-center gap-2.5">
+                                        <div class="h-[3rem] w-[13.5rem] flex items-center justify-center gap-2.5">
                                             <img
                                                 src="${previewCompanyLogoUrl}"
                                                 alt="garmentsos-pro"
@@ -785,6 +785,7 @@
                                         </div>
                                     ` : ''}
                                 </div>
+                                ${previewCompany.phone_number ? `<div class='company-phone mt-1 text-sm text-left'>${previewText(previewCompany.phone_number)}</div>` : ''}
                             </div>
                         </div>
                         <div class="right">
@@ -792,7 +793,6 @@
                                 <h1 class="text-2xl font-medium text-[var(--h-primary-color)]">${data.preview.document}</h1>
                                 ${documentNo ? `<div class="document-number mt-1 text-right">${documentNoLabel}: ${documentNo}</div>` : ''}
                                 ${!['invoice', 'order', 'shipment'].includes(data.preview.type) && previewData.order_no ? '<div class="mt-1 text-right">Order No.: ' + previewData.order_no + '</div>' : ''}
-                                ${data.preview.type == 'form' ? `<div class='mt-1 text-sm'>${previewCompany.phone_number || ''}</div>` : ''}
                             </div>
                         </div>
                     </div>

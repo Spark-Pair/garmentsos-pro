@@ -623,26 +623,28 @@ class OrderController extends Controller
             ->get(['id', 'article_no', 'pcs_per_packet'])
             ->keyBy('id');
 
+        $packetQuantityIssues = [];
         foreach ($lines as $articleId => $orderedPcs) {
             $article = $articlesById->get((int) $articleId);
             $pcsPerPacket = (int) ($article?->pcs_per_packet ?? 0);
-            $dispatchedPcs = (int) ($existingDispatched->get((int) $articleId) ?? 0);
+
+            if ($pcsPerPacket > 0 && $orderedPcs % $pcsPerPacket !== 0) {
+                $articleNo = $article?->article_no ?? $articleId;
+                $packetQuantityIssues[] = "{$articleNo}: {$orderedPcs} pcs (packet size: {$pcsPerPacket} pcs)";
+            }
+        }
+
+        if ($packetQuantityIssues) {
+            throw ValidationException::withMessages([
+                'articles' => 'Order cannot be saved. Fix or remove these articles so their quantities are whole packets: ' . implode('; ', $packetQuantityIssues) . '.',
+            ]);
+        }
+
+        foreach ($lines as $articleId => $orderedPcs) {
+            $article = $articlesById->get((int) $articleId);
             $currentOrderPcs = $excludeOrderId
                 ? (int) OrderArticles::where('order_id', $excludeOrderId)->where('article_id', (int) $articleId)->sum('ordered_pcs')
                 : 0;
-
-            // Older orders may contain quantities that no longer match the
-            // article's packet size. Let unchanged legacy quantities survive
-            // an edit; enforce whole packets when a quantity is added or changed.
-            if (
-                $pcsPerPacket > 0 &&
-                $orderedPcs % $pcsPerPacket !== 0 &&
-                (!$excludeOrderId || $orderedPcs !== $currentOrderPcs)
-            ) {
-                throw ValidationException::withMessages([
-                    'articles' => "Order quantity for {$article?->article_no} must make whole packets of {$pcsPerPacket} pcs.",
-                ]);
-            }
 
             $maxOrderPcs = (int) ($stockMap->get((int) $articleId)['orderable_quantity_pcs'] ?? 0) + $currentOrderPcs;
 

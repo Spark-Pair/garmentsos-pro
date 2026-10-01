@@ -700,6 +700,21 @@ class InvoiceController extends Controller
                     ]);
                 }
 
+                $duplicateCustomers = $this->shipmentInvoiceDuplicateCustomerIds(
+                    $shipment,
+                    $selectedCustomerIds->all()
+                )
+                    ->map(fn ($customerId) => $customerModels->get((int) $customerId)?->customer_name)
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                if ($duplicateCustomers->isNotEmpty()) {
+                    throw ValidationException::withMessages([
+                        'customers_array' => 'A shipment invoice already exists for this customer on this date in this branch: ' . $duplicateCustomers->implode(', ') . '.',
+                    ]);
+                }
+
                 /*
                 * Calculate total cartons.
                 */
@@ -1550,6 +1565,16 @@ class InvoiceController extends Controller
                     ]);
                 }
 
+                $targetCustomerId = $isDeveloper
+                    ? (int) $validated['customer_id']
+                    : (int) $invoice->customer_id;
+
+                if ($this->shipmentInvoiceDuplicateCustomerIds($shipment, [$targetCustomerId], $invoice->id)->isNotEmpty()) {
+                    throw ValidationException::withMessages([
+                        'date' => 'This customer already has a shipment invoice for this date in this branch.',
+                    ]);
+                }
+
                 $cartonCount = (int) $validated['carton_count'];
 
                 // ── Sales return guard: recompute what the new carton count would
@@ -1771,6 +1796,37 @@ class InvoiceController extends Controller
             'invoicePayloads' => $invoicePayloads,
             'client_company' => app('client_company'),
         ]);
+    }
+
+    protected function shipmentInvoiceDuplicateCustomerIds(
+        Shipment $shipment,
+        array $customerIds,
+        ?int $exceptInvoiceId = null
+    ): Collection {
+        if (!$customerIds) {
+            return collect();
+        }
+
+        return Invoice::query()
+            ->whereIn('customer_id', $customerIds)
+            ->whereNotNull('shipment_no')
+            ->when($exceptInvoiceId, fn ($query) => $query->whereKeyNot($exceptInvoiceId))
+            ->where(function ($query) use ($shipment) {
+                $query->where('shipment_no', $shipment->shipment_no)
+                    ->orWhereHas('shipment', function ($shipmentQuery) use ($shipment) {
+                        $shipmentQuery->whereDate('date', $shipment->date?->toDateString());
+
+                        if ($shipment->branch_id === null) {
+                            $shipmentQuery->whereNull('branch_id');
+                        } else {
+                            $shipmentQuery->where('branch_id', $shipment->branch_id);
+                        }
+                    });
+            })
+            ->pluck('customer_id')
+            ->map(fn ($customerId) => (int) $customerId)
+            ->unique()
+            ->values();
     }
 
     protected function validateInvoiceStock(

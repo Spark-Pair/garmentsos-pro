@@ -96,7 +96,7 @@
 @endsection
 
 @push('page-scripts')
-<script defer src="{{ asset('js/pages/reports-fabric.js') }}"></script>
+    <script defer src="{{ asset('js/pages/reports-fabric.js') }}?v={{ filemtime(public_path('js/pages/reports-fabric.js')) }}"></script>
 <script>
     window.__reportsFabric = {
         authLayout: @json($authLayout),
