@@ -129,8 +129,15 @@
 
 
 @push('page-scripts')
-<script defer src="{{ asset('js/pages/orders-edit.js') }}?v={{ config('app.version', 'local') }}"></script>
+<script defer src="{{ asset('js/pages/orders-edit.js') }}?v={{ config('app.version', 'local') }}-{{ filemtime(public_path('js/pages/orders-edit.js')) }}"></script>
 <script>
+        @if ($errors->any())
+            window.addEventListener('load', () => {
+                if (typeof appAlert === 'function') {
+                    appAlert(@json($errors->first()), 'error');
+                }
+            });
+        @endif
         window.__ordersEdit = {
             order: @json($orderPayload),
             companyData: @json($branchBranding ?? $client_company),

@@ -626,16 +626,24 @@ class OrderController extends Controller
         foreach ($lines as $articleId => $orderedPcs) {
             $article = $articlesById->get((int) $articleId);
             $pcsPerPacket = (int) ($article?->pcs_per_packet ?? 0);
-            if ($pcsPerPacket > 0 && $orderedPcs % $pcsPerPacket !== 0) {
+            $dispatchedPcs = (int) ($existingDispatched->get((int) $articleId) ?? 0);
+            $currentOrderPcs = $excludeOrderId
+                ? (int) OrderArticles::where('order_id', $excludeOrderId)->where('article_id', (int) $articleId)->sum('ordered_pcs')
+                : 0;
+
+            // Older orders may contain quantities that no longer match the
+            // article's packet size. Let unchanged legacy quantities survive
+            // an edit; enforce whole packets when a quantity is added or changed.
+            if (
+                $pcsPerPacket > 0 &&
+                $orderedPcs % $pcsPerPacket !== 0 &&
+                (!$excludeOrderId || $orderedPcs !== $currentOrderPcs)
+            ) {
                 throw ValidationException::withMessages([
                     'articles' => "Order quantity for {$article?->article_no} must make whole packets of {$pcsPerPacket} pcs.",
                 ]);
             }
 
-            $dispatchedPcs = (int) ($existingDispatched->get((int) $articleId) ?? 0);
-            $currentOrderPcs = $excludeOrderId
-                ? (int) OrderArticles::where('order_id', $excludeOrderId)->where('article_id', (int) $articleId)->sum('ordered_pcs')
-                : 0;
             $maxOrderPcs = (int) ($stockMap->get((int) $articleId)['orderable_quantity_pcs'] ?? 0) + $currentOrderPcs;
 
             if ($physicalQuantityEnabled && $orderedPcs > $maxOrderPcs) {

@@ -1,4 +1,15 @@
 (function () {
+    window.addEventListener('error', event => {
+        const source = String(event.filename || '');
+        if (!source.includes('orders-edit.js')) return;
+
+        const details = event.message || 'Unknown JavaScript error';
+        console.error('Order edit page error:', event.error || details);
+        if (typeof appAlert === 'function') {
+            appAlert(`Order edit could not finish loading: ${details}`, 'error');
+        }
+    });
+
     let order = null;
     let maxLimitOfArticles = 500;
     let limitOfArticles = 500;
@@ -509,7 +520,7 @@
 
             closeModal('QuantityModalForm');
             const quantity = Number(quantityInputDOM.value || 0);
-            const quantityLabel = targetCard.querySelector('.quantity-label');
+            const quantityLabel = targetCard?.querySelector('.quantity-label');
 
             if (invoicedQuantity > 0 && quantity < invoicedQuantity) {
                 showOrderEditError(`This article already has invoice quantity ${invoicedQuantity} pcs. Edit invoice first, then reduce order quantity.`);
@@ -525,14 +536,14 @@
                     selectedArticles.push(cardData);
                 }
                 applySelectedArticleLabels();
-            } else if (quantityLabel) {
+            } else if (alreadySelected) {
                 if (invoicedQuantity > 0) {
                     showOrderEditError(`This article already has invoice quantity ${invoicedQuantity} pcs. Edit invoice first, then remove it from order.`);
                     return;
                 }
-                quantityLabel.remove();
                 const index = selectedArticles.findIndex(c => c.id === cardData.id);
                 deselectArticleAtIndex(index);
+                quantityLabel?.remove();
                 applySelectedArticleLabels();
             }
 
@@ -629,7 +640,10 @@
 
     function generateDescription() {
         selectedArticles.forEach(selectedArticle => {
-            selectedArticle.description = `${selectedArticle.size} | ${selectedArticle.category.replaceAll('_', ' ')} | ${selectedArticle.season}`;
+            const size = String(selectedArticle.size ?? '').trim();
+            const category = String(selectedArticle.category ?? '').replaceAll('_', ' ').trim();
+            const season = String(selectedArticle.season ?? '').trim();
+            selectedArticle.description = [size, category, season].filter(Boolean).join(' | ');
         });
     }
 
@@ -801,10 +815,7 @@
                 if (generateOrderBtn) generateOrderBtn.disabled = false;
             },
             error: function () {
-                if (typeof messageBox !== 'undefined') {
-                    messageBox.innerHTML = '<div class="bg-[var(--danger-color)]/10 border border-[var(--danger-color)] text-[var(--danger-color)] text-xs px-3 py-2 rounded-lg">Could not load order edit data. Please refresh and try again.</div>';
-                    messageBoxAnimation();
-                }
+                showOrderEditError('Could not load order edit data. Please refresh and try again.');
             },
         });
     };
