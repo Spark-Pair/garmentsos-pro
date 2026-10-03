@@ -66,7 +66,7 @@
                 <div
                     class="final flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full">
                     <label for="discount" class="grow">Discount - %</label>
-                    <input type="text" id="discount" value="10"
+                    <input type="text" id="discount" value="{{ old('discount', $shipment->discount ?? 0) }}"
                         class="text-right bg-transparent outline-none w-1/2 border-none" readonly />
                 </div>
                 <div class="final flex justify-between items-center border border-gray-600 rounded-lg py-2 px-4 w-full">

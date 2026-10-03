@@ -2400,6 +2400,7 @@ class ModuleBranchService
             'logo_url' => $branchLogoUrl ?: (!empty($app->logo) ? asset('images/' . $app->logo) : null),
             'discount_disabled' => $documentOptions['discount_disabled'],
             'document_note' => $documentOptions['document_note'],
+            'default_discount_percent' => $documentOptions['default_discount_percent'],
         ];
     }
 
@@ -2408,11 +2409,14 @@ class ModuleBranchService
         $moduleKey = $this->canonicalModuleKey($moduleKey);
         $setting = $branchId ? $this->branchSetting($moduleKey, $branchId) : null;
         $metadata = is_array($setting?->metadata) ? $setting->metadata : [];
-        $supportsDocumentOptions = in_array($moduleKey, ['orders', 'invoices'], true);
+        $supportsDocumentOptions = in_array($moduleKey, ['orders', 'invoices', 'shipments'], true);
 
         return [
             'discount_disabled' => $supportsDocumentOptions && (bool) ($metadata['discount_disabled'] ?? false),
             'document_note' => $supportsDocumentOptions ? trim((string) ($metadata['document_note'] ?? '')) : '',
+            'default_discount_percent' => $moduleKey === 'shipments'
+                ? max(0, min(100, (int) ($metadata['default_shipment_discount_percent'] ?? 10)))
+                : null,
         ];
     }
 

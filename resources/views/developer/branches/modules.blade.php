@@ -18,7 +18,7 @@
         $branchOptions = $branches
             ->mapWithKeys(fn ($branch) => [$branch->id => ['text' => ($branch->display_name ?: $branch->name) . ($branch->is_main ? ' (Main)' : '')]])
             ->all();
-        $supportsDocumentOptions = in_array($selectedModuleKey, ['orders', 'invoices'], true);
+        $supportsDocumentOptions = in_array($selectedModuleKey, ['orders', 'invoices', 'shipments'], true);
         $isRequiredSystemModule = in_array($selectedModuleKey, ['home', 'dashboard'], true);
     @endphp
 
@@ -106,6 +106,7 @@
                                         $docIdentityPrefix = (string) $value('doc_identity_prefix', '');
                                         $documentNote = (string) $value('document_note', '');
                                         $defaultOrderDiscount = max(0, min(100, (int) $value('default_order_discount_percent', 0)));
+                                        $defaultShipmentDiscount = max(0, min(100, (int) $value('default_shipment_discount_percent', 10)));
                                         $discountDisabled = (bool) $value('discount_disabled', false);
                                         $rowName = "branches[{$branch->id}]";
                                         $modalId = 'branchModuleBranch_' . $branch->id;
@@ -215,6 +216,11 @@
                                                                             validateMin
                                                                             validateMax
                                                                         />
+                                                                    </div>
+                                                                @endif
+                                                                @if ($selectedModuleKey === 'shipments')
+                                                                    <div>
+                                                                        <x-input label="Default shipment discount (%)" name="{{ $rowName }}[default_shipment_discount_percent]" id="default_shipment_discount_{{ $branch->id }}" type="number" :value="$defaultShipmentDiscount" min="0" max="100" validateMin validateMax />
                                                                     </div>
                                                                 @endif
                                                                 @if ($supportsDocumentOptions)

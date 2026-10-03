@@ -236,7 +236,7 @@ class ShipmentController extends Controller
             })->toArray(),
         ];
 
-        $branchBranding = app(ModuleBranchService::class)->documentBranding('cargos');
+        $branchBranding = app(ModuleBranchService::class)->documentBranding('shipments', $shipment);
 
         return view('shipments.edit', compact('shipment', 'shipmentPayload', 'branchBranding'));
     }

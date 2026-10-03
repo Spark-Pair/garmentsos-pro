@@ -47,7 +47,7 @@
     const documentSettings = previewData => previewData?.branch_branding || {};
 
     const documentDiscountDisabled = (type, previewData) => (
-        ['order', 'invoice'].includes(type) && truthySetting(documentSettings(previewData).discount_disabled)
+        ['order', 'invoice', 'shipment'].includes(type) && truthySetting(documentSettings(previewData).discount_disabled)
     );
 
     const documentNote = previewData => String(documentSettings(previewData).document_note || '').trim();

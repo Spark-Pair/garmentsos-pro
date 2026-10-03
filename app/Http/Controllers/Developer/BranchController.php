@@ -365,6 +365,7 @@ class BranchController extends Controller
             'modules.*.supports_branch_serial_prefix' => ['nullable', 'boolean'],
             'modules.*.supports_doc_identity_prefix' => ['nullable', 'boolean'],
             'modules.*.default_order_discount_percent' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'modules.*.default_shipment_discount_percent' => ['nullable', 'integer', 'min:0', 'max:100'],
             'modules.*.discount_disabled' => ['nullable', 'boolean'],
             'modules.*.document_note' => ['nullable', 'string', 'max:300'],
             'modules.*.doc_identity_prefix' => ['nullable', 'string', 'max:20'],
@@ -437,7 +438,13 @@ class BranchController extends Controller
                     min(100, (int) $data['default_order_discount_percent'])
                 );
             }
-            if (in_array($moduleKey, ['orders', 'invoices'], true)) {
+            if ($moduleKey === 'shipments' && array_key_exists('default_shipment_discount_percent', $data)) {
+                $metadata['default_shipment_discount_percent'] = max(
+                    0,
+                    min(100, (int) $data['default_shipment_discount_percent'])
+                );
+            }
+            if (in_array($moduleKey, ['orders', 'invoices', 'shipments'], true)) {
                 if ($advancedPresent || array_key_exists('discount_disabled', $data)) {
                     $metadata['discount_disabled'] = (bool) ($data['discount_disabled'] ?? false);
                 }
@@ -490,6 +497,7 @@ class BranchController extends Controller
             'branches.*.supports_doc_identity_prefix' => ['nullable', 'boolean'],
             'branches.*.doc_identity_prefix' => ['nullable', 'string', 'max:20'],
             'branches.*.default_order_discount_percent' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'branches.*.default_shipment_discount_percent' => ['nullable', 'integer', 'min:0', 'max:100'],
             'branches.*.discount_disabled' => ['nullable', 'boolean'],
             'branches.*.document_note' => ['nullable', 'string', 'max:300'],
             'branches.*.default_branch_id' => ['nullable', 'integer', 'exists:branches,id'],
@@ -577,7 +585,10 @@ class BranchController extends Controller
             if ($moduleKey === 'orders') {
                 $metadata['default_order_discount_percent'] = max(0, min(100, (int) ($data['default_order_discount_percent'] ?? 0)));
             }
-            if (in_array($moduleKey, ['orders', 'invoices'], true)) {
+            if ($moduleKey === 'shipments') {
+                $metadata['default_shipment_discount_percent'] = max(0, min(100, (int) ($data['default_shipment_discount_percent'] ?? 10)));
+            }
+            if (in_array($moduleKey, ['orders', 'invoices', 'shipments'], true)) {
                 $metadata['discount_disabled'] = (bool) ($data['discount_disabled'] ?? false);
                 $metadata['document_note'] = trim((string) ($data['document_note'] ?? ''));
             } else {

@@ -205,7 +205,8 @@
                                                                 ? (bool) $metadata['record_filtering_enabled']
                                                                 : (bool) ($runtimeModule['record_filtering_enabled'] ?? $supportsFiltering);
                                                             $defaultOrderDiscount = max(0, min(100, (int) ($metadata['default_order_discount_percent'] ?? 0)));
-                                                            $supportsDocumentOptions = in_array($moduleKey, ['orders', 'invoices'], true);
+                                                            $defaultShipmentDiscount = max(0, min(100, (int) ($metadata['default_shipment_discount_percent'] ?? 10)));
+                                                            $supportsDocumentOptions = in_array($moduleKey, ['orders', 'invoices', 'shipments'], true);
                                                             $discountDisabled = (bool) ($metadata['discount_disabled'] ?? false);
                                                             $documentNote = (string) ($metadata['document_note'] ?? '');
                                                             $displayLabel = (string) ($runtimeModule['label'] ?? $metadata['label_override'] ?? $module['label'] ?? $moduleKey);
@@ -351,7 +352,7 @@
                                                                                         <p class="text-xs text-[var(--secondary-text)]">Branch-specific order/invoice print behavior.</p>
                                                                                     </div>
                                                                                     <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                                                                        @if ($moduleKey === 'orders')
+                                                                @if ($moduleKey === 'orders')
                                                                                             <div>
                                                                                                 <span class="mb-1 block text-xs text-[var(--secondary-text)]">Default order discount (%)</span>
                                                                                                 <x-input
@@ -364,6 +365,12 @@
                                                                                                     validateMin
                                                                                                     validateMax
                                                                                                 />
+                                                                                            </div>
+                                                                                        @endif
+                                                                                        @if ($moduleKey === 'shipments')
+                                                                                            <div>
+                                                                                                <span class="mb-1 block text-xs text-[var(--secondary-text)]">Default shipment discount (%)</span>
+                                                                                                <x-input name="modules[{{ $moduleKey }}][default_shipment_discount_percent]" id="default_shipment_discount_percent_{{ $moduleKey }}" type="number" :value="$defaultShipmentDiscount" min="0" max="100" validateMin validateMax />
                                                                                             </div>
                                                                                         @endif
                                                                                         @if ($supportsDocumentOptions)

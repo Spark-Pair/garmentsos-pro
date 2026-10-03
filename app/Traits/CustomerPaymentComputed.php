@@ -716,7 +716,15 @@ trait CustomerPaymentComputed
                     ->orWhereHas('slip.supplier', fn($sq) => $sq->where('supplier_name', 'like', "%$value%"))
                     ->orWhereHas('cheque.voucher.supplier', fn($sq) => $sq->where('supplier_name', 'like', "%$value%"))
                     ->orWhereHas('slip.voucher.supplier', fn($sq) => $sq->where('supplier_name', 'like', "%$value%"))
-                    ->orWhereHas('program.subCategory', fn($sq) => $sq->where('supplier_name', 'like', "%$value%"));
+                    // A program supplier is the displayed supplier only for
+                    // program payments. Cheque/slip payments can retain a
+                    // program_id for reconciliation, but their supplier is
+                    // resolved from the cheque/slip first.
+                    ->orWhere(function ($programQuery) use ($value) {
+                        $programQuery
+                            ->whereRaw('LOWER(customer_payments.method) = ?', ['program'])
+                            ->whereHas('program.subCategory', fn ($sq) => $sq->where('supplier_name', 'like', "%$value%"));
+                    });
                 });
 
             case 'reff_no':
