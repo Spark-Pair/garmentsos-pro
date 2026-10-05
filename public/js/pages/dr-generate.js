@@ -18,12 +18,16 @@
             $.ajax({
                 url: "/dr/get-payments",
                 method: "GET",
-                data: {
-                    customer_id: document.querySelector('input[data-for="customer"]')?.value,
-                },
+                    data: {
+                        customer_id: document.querySelector('input[data-for="customer"]')?.value,
+                        dr_id: config.editData?.id || null,
+                    },
                 success: function (response) {
                     if (response.status === "success") {
                         payments = response.data;
+                        payments.forEach(payment => {
+                            payment.checked = selectedPayments.includes(Number(payment.id));
+                        });
                         renderList();
                     } else {
                         console.error("Failed to fetch payments");
@@ -91,10 +95,11 @@
                 }
             }
 
-            if (selectedPayments.includes(paymentId)) {
-                selectedPayments = selectedPayments.filter(id => id !== paymentId);
+            const numericPaymentId = Number(paymentId);
+            if (selectedPayments.includes(numericPaymentId)) {
+                selectedPayments = selectedPayments.filter(id => Number(id) !== numericPaymentId);
             } else {
-                selectedPayments.push(paymentId);
+                selectedPayments.push(numericPaymentId);
             }
 
             renderList();
@@ -356,6 +361,10 @@
         };
 
         window.onSubmitFunction = function onSubmitFunction() {
+            if (config.editData) {
+                return true;
+            }
+
             if (totalSelectedAmount <= 0) {
                 if (typeof messageBox !== "undefined") {
                     messageBox.innerHTML = config.selectPaymentAlertHtml || "";
@@ -374,6 +383,49 @@
 
             return true;
         };
+
+        if (config.editData) {
+            const restoreEditState = function restoreEditState() {
+            const customerInput = document.querySelector('input.dbInput[data-for="customer"]');
+            if (customerInput) {
+                customerInput.value = String(config.editData.customer_id || '');
+                const selectedOption = document.querySelector(
+                    `.optionsDropdown li[data-for="customer"][data-value="${CSS.escape(customerInput.value)}"]`
+                );
+                const customerSearch = document.querySelector('#customer');
+                if (customerSearch) {
+                    customerSearch.value = selectedOption
+                        ? selectedOption.textContent.trim()
+                        : (config.editData.customer_text || '');
+                }
+                if (selectedOption) {
+                    selectedOption.classList.add('selected');
+                }
+            }
+            const dateInput = document.getElementById('date');
+            if (dateInput && config.editData.date) dateInput.value = config.editData.date;
+            };
+
+            // Select defaults are booted by a separate deferred script. Restore
+            // edit values after that boot as well as during initial page load.
+            restoreEditState();
+            setTimeout(restoreEditState, 0);
+            setTimeout(restoreEditState, 100);
+
+            selectedPayments = (config.editData.return_payments || []).map(Number);
+            const hasPreloadedReturns = Array.isArray(config.editData.return_payment_details);
+            if (hasPreloadedReturns) {
+                payments = config.editData.return_payment_details;
+                payments.forEach(payment => {
+                    payment.checked = selectedPayments.includes(Number(payment.id));
+                });
+                renderList();
+            }
+            addedPaymentsArray = config.editData.new_payment_details || [];
+            totalAddedAmount = addedPaymentsArray.reduce((sum, payment) => sum + parseFormattedNumber(payment.amount), 0);
+            renderSecondList();
+            if (!hasPreloadedReturns) getPayments();
+        }
     }
 
     window.initDrGenerate = initDrGenerate;

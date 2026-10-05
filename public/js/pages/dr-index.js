@@ -29,7 +29,13 @@
                 actions: [],
             };
 
-            if (isDeveloperUser()) {
+            contextMenuData.actions.push({
+                id: 'edit-dr',
+                text: 'Edit',
+                onclick: `window.location.href='/dr/${data.id}/edit'`,
+            });
+
+            if (isDeveloperUser('dr')) {
                 contextMenuData.actions.push({
                     id: 'delete-dr',
                     text: 'Delete',
@@ -91,7 +97,13 @@
                 bottomActions: [],
             };
 
-            if (isDeveloperUser()) {
+            modalData.bottomActions.push({
+                id: 'edit-dr',
+                text: 'Edit',
+                onclick: `window.location.href='/dr/${data.id}/edit'`,
+            });
+
+            if (isDeveloperUser('dr')) {
                 modalData.bottomActions.push({
                     id: 'delete-dr',
                     text: 'Delete',
