@@ -27,6 +27,9 @@
                     type: "POST",
                     data: {
                         voucher_no: e.target.value,
+                        edit_payment_ids: (config.editData?.return_payments || [])
+                            .map(payment => payment.id ?? payment.payment_id)
+                            .filter(Boolean),
                     },
                     headers: {
                         "X-CSRF-TOKEN": $("meta[name=\"csrf-token\"]").attr("content"),
@@ -39,6 +42,22 @@
                             supplierNameDom.value = voucher.supplier_name;
 
                             paymentsArray = voucher.payments;
+                            if (config.editData) {
+                                const returnedIds = (config.editData.return_payments || [])
+                                    .flatMap(payment => [payment.id, payment.payment_id])
+                                    .filter(Boolean)
+                                    .map(Number);
+                                paymentsArray.forEach(payment => {
+                                    payment.checked = returnedIds.includes(Number(payment.id))
+                                        || returnedIds.includes(Number(payment.payment_id));
+                                });
+                                addedPaymentsArray = (config.editData.new_payments || []).map(payment => ({
+                                    ...payment,
+                                    method: String(payment.method || '').replace(/\s*\|\s*CR$/i, ''),
+                                    data_value: payment.data_value ?? payment.payment_id ?? payment.id,
+                                    amount: payment.amount ?? 0,
+                                }));
+                            }
 
                             const messages = document.querySelectorAll(".alert-message");
                             messages.forEach(message => {
@@ -63,7 +82,8 @@
                                 messageBoxAnimation();
                             }
                         }
-                        renderSelectPaymentList();
+                            renderSelectPaymentList();
+                            renderAddPaymentList();
                     },
                     error: function (xhr, status, error) {
                         console.error(error);
@@ -272,6 +292,10 @@
         };
 
         window.onSubmitFunction = function onSubmitFunction() {
+            if (config.editData) {
+                return true;
+            }
+
             if (totalSelectedAmount <= 0) {
                 if (typeof messageBox !== "undefined") {
                     messageBox.innerHTML = config.selectPaymentAlertHtml || "";
@@ -290,6 +314,13 @@
 
             return true;
         };
+
+        if (config.editData && voucherIdInpDom?.value) {
+            trackVoucherState({
+                key: "Enter",
+                target: document.getElementById("voucher_no"),
+            });
+        }
     }
 
     window.initCrGenerate = initCrGenerate;

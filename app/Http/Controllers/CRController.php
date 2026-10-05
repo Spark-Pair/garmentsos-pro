@@ -11,6 +11,7 @@ use App\Services\Branches\BranchSerialService;
 use App\Services\Branches\ModuleBranchService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class CRController extends Controller
@@ -48,7 +49,10 @@ class CRController extends Controller
 
         $supplier_id = $request->supplier;
         $method = $request->method;
-        $maxDate = $request->max_date;
+        // The date field is populated after voucher selection; keep the
+        // options endpoint safe when a method is changed before that value
+        // reaches the request (especially on the edit wizard).
+        $maxDate = $request->max_date ?: today()->toDateString();
         $payment_options = [];
         $branches = app(ModuleBranchService::class);
 
@@ -95,11 +99,38 @@ class CRController extends Controller
         } else if ($method === 'self_cheque') {
             $self_accounts = $branches->applyRelatedScope(BankAccount::where('category', 'self')->with('bank:id,title,short_title'), 'bank_accounts', 'cr')->get();
 
+            // Do not use BankAccount::$available_cheques here: that accessor
+            // performs one SupplierPayment query per account. The CR method
+            // endpoint is called while typing/selecting, so batch this once.
+            $selfAccountIds = $self_accounts->pluck('id')->map(fn ($id) => (int) $id)->values();
+            $usedChequesByAccount = $selfAccountIds->isEmpty()
+                ? collect()
+                : SupplierPayment::whereIn('bank_account_id', $selfAccountIds)
+                    ->with('cheque:id,cheque_no')
+                    ->get(['bank_account_id', 'cheque_id', 'cheque_no'])
+                    ->map(fn ($payment) => [
+                        'account_id' => (int) $payment->bank_account_id,
+                        'cheque_no' => (int) ($payment->cheque_no ?: $payment->cheque?->cheque_no),
+                    ])
+                    ->filter(fn ($payment) => $payment['cheque_no'] > 0)
+                    ->groupBy('account_id')
+                    ->map(fn ($payments) => $payments->pluck('cheque_no')->unique()->values()->all());
+            $bankAccountPayloads = $self_accounts->mapWithKeys(fn ($account) => [
+                (int) $account->id => $this->formatBankAccountOptionPayload($account),
+            ]);
+
             foreach ($self_accounts as $self_account) {
-                foreach ($self_account->available_cheques as $available_cheque) {
+                $start = (int) $self_account->chqbk_serial_start;
+                $end = (int) $self_account->chqbk_serial_end;
+                $allCheques = ($start > 0 && $end >= $start) ? range($start, $end) : [];
+                $usedCheques = $usedChequesByAccount->get((int) $self_account->id, []);
+
+                foreach (array_values(array_diff($allCheques, $usedCheques)) as $available_cheque) {
+                    $accountParts = explode('|', (string) $self_account->account_title, 2);
+                    $accountLabel = trim($accountParts[1] ?? $accountParts[0]);
                     $payment_options[(int)$available_cheque] = [
-                        'text' => $available_cheque . ' |' . explode('|', $self_account->account_title)[1],
-                        'data_option' => $this->formatBankAccountOptionPayload($self_account),
+                        'text' => $available_cheque . ' | ' . $accountLabel,
+                        'data_option' => $bankAccountPayloads->get((int) $self_account->id),
                     ];
                 }
             }
@@ -295,7 +326,18 @@ class CRController extends Controller
      */
     public function edit(string $id)
     {
-        app(ModuleBranchService::class)->assertRecordInAllowedBranch(CR::findOrFail($id), 'cr');
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'manager', 'admin', 'accountant', 'guest'])) {
+            return $resp;
+        }
+
+        $cr = CR::with('voucher.supplier')->findOrFail($id);
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($cr, 'cr');
+
+        return view('cr.generate', [
+            'cr' => $cr,
+            'payment_options' => [],
+            'voucher_options' => [],
+        ]);
     }
 
     /**
@@ -303,7 +345,119 @@ class CRController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        app(ModuleBranchService::class)->assertRecordInAllowedBranch(CR::findOrFail($id), 'cr');
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'manager', 'admin', 'accountant', 'guest'])) {
+            return $resp;
+        }
+
+        $cr = CR::findOrFail($id);
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($cr, 'cr');
+
+        $validated = $request->validate([
+            'date' => 'required|date',
+            'c_r_no' => 'required|string|max:255',
+            'voucher_id' => 'nullable|integer|exists:vouchers,id',
+            'returnPayments' => 'nullable|string',
+            'newPayments' => 'nullable|string',
+        ]);
+
+        $returnPayments = collect(json_decode((string) $request->input('returnPayments', ''), true) ?: ($cr->return_payments ?? []));
+        $newPayments = collect(json_decode((string) $request->input('newPayments', ''), true) ?: ($cr->new_payments ?? []));
+        if ($returnPayments->isEmpty() || $newPayments->isEmpty()) {
+            return redirect()->back()->withInput()->with('error', 'Please select returned payments and add replacement payments.');
+        }
+
+        $branches = app(ModuleBranchService::class);
+        $voucherId = $validated['voucher_id'] ?: $cr->voucher_id;
+        $voucher = $branches->applyRelatedScope(Voucher::query(), 'vouchers', 'cr')->find($voucherId);
+        if (!$voucher) {
+            return redirect()->back()->withInput()->withErrors(['voucher_id' => 'Selected voucher is not available for this branch.']);
+        }
+
+        DB::transaction(function () use ($cr, $validated, $voucherId, $returnPayments, $newPayments, $branches, $voucher) {
+            $paymentQuery = fn () => $branches->applyRelatedScope(SupplierPayment::query(), 'supplier_payments', 'cr');
+            $customerPaymentQuery = fn () => $branches->applyRelatedScope(CustomerPayment::query(), 'customer_payments', 'cr');
+
+            $oldReturns = collect($cr->return_payments ?? []);
+            $oldSupplierReturnIds = $oldReturns->map(fn ($payment) => data_get($payment, 'id'))->filter()->map(fn ($id) => (int) $id);
+            $oldCustomerReturnIds = $oldReturns->map(fn ($payment) => data_get($payment, 'payment_id'))->filter()->map(fn ($id) => (int) $id);
+            $newSupplierReturnIds = $returnPayments->map(fn ($payment) => data_get($payment, 'id') ?? data_get($payment, 'payment_id'))->filter()->map(fn ($id) => (int) $id);
+            $newCustomerReturnIds = $returnPayments->map(fn ($payment) => data_get($payment, 'payment_id'))->filter()->map(fn ($id) => (int) $id);
+
+            $oldSupplierReturnIds->diff($newSupplierReturnIds)->each(fn ($paymentId) => $paymentQuery()->whereKey($paymentId)->where('is_return', true)->update(['is_return' => false]));
+            $oldCustomerReturnIds->diff($newCustomerReturnIds)->each(fn ($paymentId) => $customerPaymentQuery()->whereKey($paymentId)->where('is_return', true)->update(['is_return' => false]));
+            $newSupplierReturnIds->each(fn ($paymentId) => $paymentQuery()->whereKey($paymentId)->update(['is_return' => true]));
+            $newCustomerReturnIds->each(fn ($paymentId) => $customerPaymentQuery()->whereKey($paymentId)->update(['is_return' => true]));
+
+            $oldGeneratedPayments = $paymentQuery()->where('c_r_id', $cr->id)->get();
+            $retainedPaymentIds = collect();
+            $savedPayments = [];
+            $columnMap = [
+                'Self Cheque' => 'cheque_no',
+                'Cheque' => 'cheque_id',
+                'Slip' => 'slip_id',
+            ];
+
+            foreach ($newPayments as $payment) {
+                $method = trim((string) data_get($payment, 'method'));
+                $paymentId = data_get($payment, 'payment_id');
+                $existing = $paymentId ? $oldGeneratedPayments->firstWhere('id', (int) $paymentId) : null;
+
+                if ($existing) {
+                    $retainedPaymentIds->push($existing->id);
+                    $payment['payment_id'] = $existing->id;
+                    $savedPayments[] = $payment;
+                    continue;
+                }
+
+                if ($method === 'Payment Program') {
+                    $programPayment = $paymentQuery()->whereKey(data_get($payment, 'data_value'))
+                        ->where('method', 'program')->first();
+                    if ($programPayment) {
+                        $programPayment->update(['method' => 'Payment Program | CR', 'c_r_id' => $cr->id]);
+                        $retainedPaymentIds->push($programPayment->id);
+                        $payment['payment_id'] = $programPayment->id;
+                        $savedPayments[] = $payment;
+                    }
+                    continue;
+                }
+
+                if (!isset($columnMap[$method])) {
+                    continue;
+                }
+
+                $created = SupplierPayment::create($branches->assignBranchOnCreate([
+                    'supplier_id' => $voucher->supplier_id,
+                    'date' => $validated['date'],
+                    'method' => $method . ' | CR',
+                    'amount' => data_get($payment, 'amount', 0),
+                    'bank_account_id' => data_get($payment, 'bank_account_id'),
+                    'voucher_id' => null,
+                    'c_r_id' => $cr->id,
+                    $columnMap[$method] => data_get($payment, 'data_value'),
+                ], 'supplier_payments'));
+                $retainedPaymentIds->push($created->id);
+                $payment['payment_id'] = $created->id;
+                $savedPayments[] = $payment;
+            }
+
+            $oldGeneratedPayments->reject(fn ($payment) => $retainedPaymentIds->contains($payment->id))->each(function (SupplierPayment $payment) {
+                if (stripos((string) $payment->method, 'payment program') === 0) {
+                    $payment->update(['method' => 'program', 'c_r_id' => null]);
+                } else {
+                    $payment->delete();
+                }
+            });
+
+            $cr->update([
+                'date' => $validated['date'],
+                'c_r_no' => $validated['c_r_no'],
+                'voucher_id' => $voucherId,
+                'return_payments' => $returnPayments->all(),
+                'new_payments' => $savedPayments,
+            ]);
+        });
+
+        return redirect()->route('cr.index')->with('success', 'CR updated successfully.');
     }
 
     /**
@@ -311,6 +465,46 @@ class CRController extends Controller
      */
     public function destroy(string $id)
     {
-        app(ModuleBranchService::class)->assertRecordInAllowedBranch(CR::findOrFail($id), 'cr');
+        if (Auth::user()?->role !== 'developer' && !app_can('cr', 'override')) {
+            abort(403, 'Only a developer or developer-mode user can delete CR records.');
+        }
+
+        $cr = CR::findOrFail($id);
+        $branches = app(ModuleBranchService::class);
+        $branches->assertRecordInAllowedBranch($cr, 'cr');
+
+        DB::transaction(function () use ($cr, $branches) {
+            foreach (collect($cr->return_payments ?? []) as $payment) {
+                $supplierPaymentId = data_get($payment, 'id') ?? data_get($payment, 'payment_id');
+                $customerPaymentId = data_get($payment, 'payment_id');
+
+                if ($supplierPaymentId) {
+                    $branches->applyRelatedScope(SupplierPayment::query(), 'supplier_payments', 'cr')
+                        ->whereKey($supplierPaymentId)
+                        ->update(['is_return' => false]);
+                }
+
+                if ($customerPaymentId) {
+                    $branches->applyRelatedScope(CustomerPayment::query(), 'customer_payments', 'cr')
+                        ->whereKey($customerPaymentId)
+                        ->update(['is_return' => false]);
+                }
+            }
+
+            $branches->applyRelatedScope(SupplierPayment::query(), 'supplier_payments', 'cr')
+                ->where('c_r_id', $cr->id)
+                ->get()
+                ->each(function (SupplierPayment $payment) {
+                    if (stripos((string) $payment->method, 'payment program') === 0) {
+                        $payment->update(['method' => 'program', 'c_r_id' => null]);
+                    } else {
+                        $payment->delete();
+                    }
+                });
+
+            $cr->delete();
+        });
+
+        return redirect()->route('cr.index')->with('success', 'CR deleted successfully.');
     }
 }
