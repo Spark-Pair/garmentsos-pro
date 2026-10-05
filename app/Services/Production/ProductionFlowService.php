@@ -70,19 +70,20 @@ class ProductionFlowService
             || strcasecmp(trim((string) $work?->title), 'Cut to Pack') === 0;
     }
 
-    public function cuttingReceivedByPart(int $articleId): Collection
+    public function cuttingReceivedByPart(int $articleId, ?int $excludeProductionId = null): Collection
     {
         return ProductionFlow::query()
             ->where('article_id', $articleId)
             ->where('movement_type', 'receive')
             ->whereHas('work', fn ($query) => $query->where('title', 'Cutting'))
+            ->when($excludeProductionId, fn ($query) => $query->where('production_id', '!=', $excludeProductionId))
             ->selectRaw('part, SUM(quantity) as total_quantity')
             ->groupBy('part')
             ->pluck('total_quantity', 'part')
             ->map(fn ($value) => (float) $value);
     }
 
-    public function downstreamIssuedByPart(int $articleId, ?int $workId = null): Collection
+    public function downstreamIssuedByPart(int $articleId, ?int $workId = null, ?int $excludeProductionId = null): Collection
     {
         $query = ProductionFlow::query()
             ->where('article_id', $articleId)
@@ -93,6 +94,10 @@ class ProductionFlowService
             $query->where('work_id', $workId);
         }
 
+        if ($excludeProductionId) {
+            $query->where('production_id', '!=', $excludeProductionId);
+        }
+
         return $query
             ->selectRaw('part, SUM(quantity) as total_quantity')
             ->groupBy('part')
@@ -100,10 +105,10 @@ class ProductionFlowService
             ->map(fn ($value) => (float) $value);
     }
 
-    public function issueableByPart(int $articleId, ?int $workId = null): Collection
+    public function issueableByPart(int $articleId, ?int $workId = null, ?int $excludeProductionId = null): Collection
     {
-        $cutting = $this->cuttingReceivedByPart($articleId);
-        $issued = $this->downstreamIssuedByPart($articleId, $workId);
+        $cutting = $this->cuttingReceivedByPart($articleId, $excludeProductionId);
+        $issued = $this->downstreamIssuedByPart($articleId, $workId, $excludeProductionId);
 
         return $cutting
             ->map(fn ($quantity, $part) => max(0, (float) $quantity - (float) ($issued[$part] ?? 0)))
@@ -141,7 +146,7 @@ class ProductionFlowService
             ->values();
     }
 
-    public function receiveableByPart(string $ticket): Collection
+    public function receiveableByPart(string $ticket, ?int $excludeProductionId = null): Collection
     {
         $issued = ProductionFlow::query()
             ->where('ticket', $ticket)
@@ -154,6 +159,7 @@ class ProductionFlowService
         $received = ProductionFlow::query()
             ->where('parent_ticket', $ticket)
             ->where('movement_type', 'receive')
+            ->when($excludeProductionId, fn ($query) => $query->where('production_id', '!=', $excludeProductionId))
             ->selectRaw('part, SUM(quantity) as total_quantity')
             ->groupBy('part')
             ->pluck('total_quantity', 'part')
@@ -164,10 +170,10 @@ class ProductionFlowService
             ->filter(fn ($quantity) => $quantity > 0);
     }
 
-    public function validateCuttingReceive(Article $article, Collection $parts): void
+    public function validateCuttingReceive(Article $article, Collection $parts, ?int $excludeProductionId = null): void
     {
         $limit = $this->articleLimit($article);
-        $received = $this->cuttingReceivedByPart((int) $article->id);
+        $received = $this->cuttingReceivedByPart((int) $article->id, $excludeProductionId);
 
         foreach ($parts as $row) {
             $part = $row['part'];
@@ -180,9 +186,9 @@ class ProductionFlowService
         }
     }
 
-    public function validateIssue(Article $article, Collection $parts, ?Setup $work = null): void
+    public function validateIssue(Article $article, Collection $parts, ?Setup $work = null, ?int $excludeProductionId = null): void
     {
-        $available = $this->issueableByPart((int) $article->id, $work?->id ? (int) $work->id : null);
+        $available = $this->issueableByPart((int) $article->id, $work?->id ? (int) $work->id : null, $excludeProductionId);
 
         foreach ($parts as $row) {
             $part = $row['part'];
@@ -194,9 +200,9 @@ class ProductionFlowService
         }
     }
 
-    public function validateReceive(string $ticket, Collection $parts): void
+    public function validateReceive(string $ticket, Collection $parts, ?int $excludeProductionId = null): void
     {
-        $available = $this->receiveableByPart($ticket);
+        $available = $this->receiveableByPart($ticket, $excludeProductionId);
 
         foreach ($parts as $row) {
             $part = $row['part'];

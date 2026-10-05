@@ -61,7 +61,7 @@
                 <span class="w-1/8" >${data.receive_date}</span>
                 <span class="w-1/8" >${data.ticket}</span>
                 <span class="w-1/7" >${data.worker_name}</span>
-                <span class="w-1/8" >${data.movement_type || "-"}</span>
+                <span class="w-1/8" >${data.status || (data.receive_date ? "Received" : "Pending")}</span>
                 <span class="w-1/8" title="${htmlAttr(partQuantitiesText(data))}">${formatNumbersWithDigits(data.quantity ?? 0, 1, 1)}</span>
                 <span class="w-1/8" >${formatNumbersWithDigits(data.rate ?? 0, 2, 2)}</span>
                 <span class="w-1/8" >${formatNumbersWithDigits(data.amount ?? 0, 1, 1)}</span>
@@ -82,12 +82,12 @@
                 },
             ];
 
+            actions.push({
+                id: "edit-production",
+                text: "Edit",
+                onclick: `window.location.href='/productions/${data.id}/edit'`,
+            });
             if (isDeveloperUser()) {
-                actions.push({
-                    id: "edit-production",
-                    text: "Edit",
-                    onclick: `generateEditProductionModal(${JSON.stringify(data)})`,
-                });
                 if (hasRecordId(data)) {
                     actions.push({
                         id: "delete-production",
@@ -116,7 +116,7 @@
                 Article: article.article_no || data.article_no,
                 Work: work.title || "-",
                 Worker: worker.employee_name || "-",
-                Type: data.movement_type || (data.issue_date ? "Issue" : "Receive"),
+                Status: data.status || (data.receive_date ? "Received" : "Pending"),
                 "Issue Date": data.issue_date ? formatDate(data.issue_date) : '-',
                 "Receive Date": data.receive_date ? formatDate(data.receive_date) : '-',
                 "Issued By": data.issued_by_name || '-',
@@ -143,12 +143,12 @@
                 },
             ];
 
+            bottomActions.push({
+                id: "edit-production",
+                text: "Edit",
+                onclick: `window.location.href='/productions/${data.id}/edit'`,
+            });
             if (isDeveloperUser()) {
-                bottomActions.push({
-                    id: "edit-production",
-                    text: "Edit",
-                    onclick: `generateEditProductionModal(${JSON.stringify(data)})`,
-                });
                 if (hasRecordId(data)) {
                     bottomActions.push({
                         id: "delete-production",

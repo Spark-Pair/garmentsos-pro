@@ -16,6 +16,14 @@
         const tickets = config.tickets || [];
         const inventoryItems = config.inventoryItems || [];
         const printTicket = config.printTicket || null;
+        const existing = config.existing || null;
+        const editingRecords = config.editingRecords || {};
+
+        window.switchProductionEditRecord = function switchProductionEditRecord(type) {
+            const record = editingRecords[type];
+            if (!record?.id || String(record.id) === String(existing?.id || "")) return;
+            window.location.href = `/productions/${record.id}/edit`;
+        };
         const availabilityUrl = config.availabilityUrl || "";
         const workAvailabilityUrl = config.workAvailabilityUrl || "";
         if (config.companyData) {
@@ -26,10 +34,19 @@
         let selectedPartQuantities = [];
 
         function setAvailableParts(parts) {
-            currentAvailableParts = Array.isArray(parts) ? parts : [];
+            const existingParts = new Map((existing?.part_quantities || []).map((item) => [String(item.part), Number(item.quantity || 0)]));
+            currentAvailableParts = (Array.isArray(parts) ? parts : []).map((item) => ({
+                ...item,
+                quantity: Number(item.quantity || 0) + (existingParts.get(String(item.part)) || 0),
+            }));
+            existingParts.forEach((quantity, part) => {
+                if (!currentAvailableParts.some((item) => String(item.part) === part)) {
+                    currentAvailableParts.push({ part, quantity });
+                }
+            });
             selectedPartQuantities = currentAvailableParts.map((item) => ({
                 part: item.part,
-                quantity: Number(item.quantity || 0),
+                quantity: existingParts.has(String(item.part)) ? existingParts.get(String(item.part)) : Number(item.quantity || 0),
             }));
             syncSelectedPartInputs();
         }
@@ -107,6 +124,7 @@
             url.searchParams.set("mode", mode);
             if (workId) url.searchParams.set("work_id", workId);
             if (ticket) url.searchParams.set("ticket", ticket);
+            if (existing?.id) url.searchParams.set("exclude_production_id", existing.id);
 
             const response = await fetch(url.toString(), {
                 headers: {
@@ -193,7 +211,7 @@
                 titleContainer.classList.add("hidden");
                 rateInput.readOnly = true;
                 const selectedText = elem.closest(".selectParent").querySelector("li.selected").textContent;
-                rateInput.value = selectedText.split("|")[1]?.trim() || "";
+                rateInput.value = (selectedText.split("|")[1] || "").replace(/,/g, "").trim();
                 titleInput.value = selectedText.split("|")[0]?.trim() || "";
                 calculateAmount();
             } else if (elem.value === "0") {
@@ -302,14 +320,14 @@
                 }, {});
             }
             let materialModalData = {};
-            let materialsArray = [];
+            let materialsArray = existing?.materials ? [...existing.materials] : [];
             let selectedPartsArray = [];
             let tagCardData = [];
             const articleSelectInputDOM = document.getElementById("article");
             const articleIdInputDOM = document.getElementById("article_id");
 
             let tags = [];
-            let selectedTagsArray = [];
+            let selectedTagsArray = existing?.tags ? [...existing.tags] : [];
 
             if (!articleSelectInputDOM || !articleIdInputDOM) return;
 
@@ -420,7 +438,7 @@
                 }).then((availableWorkIds) => {
                     if (currentWorkLoadToken !== workLoadToken) return;
                     ul.querySelectorAll('li[data-for="work"][data-value]:not([data-value=""])').forEach((li) => {
-                        if (!availableWorkIds.includes(String(li.dataset.value))) {
+                        if (!availableWorkIds.includes(String(li.dataset.value)) && String(li.dataset.value) !== String(existing?.work?.id || "")) {
                             li.remove();
                         }
                     });
@@ -490,7 +508,7 @@
 
                             filteredRates.forEach((rate) => {
                                 ratesUL.innerHTML += `
-                                    <li data-for="select_rate" data-value="${rate.id}" onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)]">${rate.title} | ${formatMoney(rate.rate)}</li>
+                                    <li data-for="select_rate" data-value="${rate.id}" onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)]">${rate.title} | ${formatNumbersWithDigits(rate.rate, 2, 2)}</li>
                                 `;
                             });
 
@@ -516,7 +534,7 @@
                 );
                 tags = selectedWorkerData.taags || [];
                 elem.value !== "" && gotoStep(2);
-                selectedTagsArray = [];
+                if (!existing) selectedTagsArray = [];
             };
 
             function generateMaterialsModal(animate = "animate") {
@@ -968,7 +986,7 @@
             const articleIdInputDOM = document.getElementById("article_id");
 
             let tags = [];
-            let selectedTagsArray = [];
+            let selectedTagsArray = existing?.tags ? [...existing.tags] : [];
 
             if (!articleSelectInputDOM || !articleIdInputDOM) return;
 
@@ -1188,7 +1206,7 @@
                         if (filteredRates.length > 0) {
                             filteredRates.forEach((rate) => {
                                 ratesUL.innerHTML += `
-                                    <li data-for="select_rate" data-value="${rate.id}" onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)]">${rate.title} | ${formatMoney(rate.rate)}</li>
+                                    <li data-for="select_rate" data-value="${rate.id}" onmousedown="selectThisOption(this)" class="py-2 px-3 cursor-pointer rounded-lg hover:bg-[var(--h-bg-color)]">${rate.title} | ${formatNumbersWithDigits(rate.rate, 2, 2)}</li>
                                 `;
                             });
                         }
@@ -1214,8 +1232,19 @@
                     1
                 );
                 tags = selectedWorkerData.taags || [];
+                if (existing?.tags?.length) {
+                    existing.tags.forEach((savedTag) => {
+                        const availableTag = tags.find((tag) => tag.tag === savedTag.tag);
+                        if (availableTag) {
+                            availableTag.available_quantity = Number(availableTag.available_quantity || 0) + Number(savedTag.quantity || 0);
+                            availableTag.selected_quantity = Number(savedTag.quantity || 0);
+                        } else {
+                            tags.push({ ...savedTag, available_quantity: Number(savedTag.quantity || 0), selected_quantity: Number(savedTag.quantity || 0) });
+                        }
+                    });
+                }
+                if (!existing) selectedTagsArray = [];
                 elem.value !== "" && gotoStep(2);
-                selectedTagsArray = [];
             };
 
             window.generateSelectTagModal = function generateSelectTagModal(animate = "animate") {
@@ -1427,7 +1456,7 @@
                     titleContainer.classList.add("hidden");
                     rateInput.readOnly = true;
                     const selectedText = elem.closest(".selectParent").querySelector("li.selected").textContent;
-                    rateInput.value = selectedText.split("|")[1].trim();
+                    rateInput.value = (selectedText.split("|")[1] || "").replace(/,/g, "").trim();
                     titleInput.value = selectedText.split("|")[0].trim();
                     calculateAmount();
                 } else if (elem.value === "0") {
@@ -1487,6 +1516,65 @@
 
                 syncSelectedPartInputs();
             };
+        }
+
+        function initializeExistingProduction() {
+            if (!existing) return;
+
+            const article = existing.article || {};
+            if (productionType === "receive" && existing.parent_ticket) {
+                const ticketOption = document.querySelector(`ul[data-for="ticket"] li[data-value="${CSS.escape(existing.parent_ticket)}"]`);
+                if (ticketOption) {
+                    selectThisOption(ticketOption, { validate: false });
+                }
+            } else if (typeof window.selectThisArticle === "function" && article.id) {
+                const articleElement = {
+                    getAttribute: () => JSON.stringify({ data: article }),
+                    dataset: { json: true },
+                };
+                window.selectThisArticle(articleElement);
+            }
+
+            setTimeout(() => {
+                const workOption = document.querySelector(`ul[data-for="work"] li[data-value="${CSS.escape(String(existing.work?.id || ""))}"]`);
+                if (workOption) selectThisOption(workOption, { validate: false });
+            }, 250);
+
+            setTimeout(() => {
+                const workerOption = document.querySelector(`ul[data-for="worker"] li[data-value="${CSS.escape(String(existing.worker?.id || ""))}"]`);
+                if (workerOption) selectThisOption(workerOption, { validate: false });
+
+                const values = {
+                    issue_date: existing.issue_date || "",
+                    receive_date: existing.receive_date || "",
+                    rate: existing.rate ?? "",
+                    amount: existing.amount ?? "",
+                    title: existing.title || "",
+                    issued_by_name: existing.issued_by_name || "",
+                    received_by_name: existing.received_by_name || "",
+                };
+                Object.entries(values).forEach(([name, value]) => {
+                    const input = document.querySelector(`[name="${name}"]`);
+                    if (input) input.value = value;
+                });
+                const tagsInput = document.querySelector('input[name="tags"]');
+                if (tagsInput) tagsInput.value = JSON.stringify(existing.tags || []);
+                const tagsDisplay = document.getElementById("tags");
+                if (tagsDisplay) {
+                    tagsDisplay.value = existing.tags?.length ? `${existing.tags.length} Selected` : "";
+                }
+                const materialsInput = document.querySelector('input[name="materials"]');
+                if (materialsInput) materialsInput.value = JSON.stringify(existing.materials || []);
+                const materialsDisplay = document.getElementById("materials");
+                if (materialsDisplay) {
+                    materialsDisplay.value = existing.materials?.length ? `${existing.materials.length} Material${existing.materials.length > 1 ? "s" : ""} Selected` : "";
+                }
+                if (typeof window.gotoStep === "function") window.gotoStep(2);
+            }, 800);
+        }
+
+        if (existing) {
+            setTimeout(initializeExistingProduction, 50);
         }
     }
 
