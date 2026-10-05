@@ -17,6 +17,7 @@ trait VoucherComputed
             $cacheKey = implode('|', [
                 $this->supplier->id,
                 $this->date->format('Y-m-d'),
+                $this->id,
                 implode(',', $scope['branch_ids']),
                 $scope['include_null_branch_records'] ? 'null' : 'strict',
             ]);
@@ -29,6 +30,7 @@ trait VoucherComputed
                     true,
                     $scope['branch_ids'],
                     $scope['include_null_branch_records'],
+                    $this->id,
                 );
             }
             $previousBalance = $balanceCache[$cacheKey];

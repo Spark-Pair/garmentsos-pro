@@ -784,12 +784,12 @@ class Controller extends BaseController
         ];
     }
 
-    protected function supplierBalance(Supplier $supplier, mixed $toDate = null): float
+    protected function supplierBalance(Supplier $supplier, mixed $toDate = null, ?int $excludeVoucherId = null): float
     {
         $scope = $this->balanceBranchScope();
 
         return (float) ($toDate
-            ? $supplier->calculateBalance(null, $toDate, false, true, $scope['branch_ids'], $scope['include_null_branch_records'])
+            ? $supplier->calculateBalance(null, $toDate, false, true, $scope['branch_ids'], $scope['include_null_branch_records'], $excludeVoucherId)
             : $supplier->calculateBalance(branchIds: $scope['branch_ids'], includeNullBranchRecords: $scope['include_null_branch_records']));
     }
 
@@ -1258,6 +1258,10 @@ class Controller extends BaseController
 
     public function getVoucherDetails(Request $request)
     {
+        $editPaymentIds = collect($request->input('edit_payment_ids', []))
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->all();
         $voucher = Voucher::where('voucher_no', $request->voucher_no)
             ->with([
                 'supplier:id,supplier_name',
@@ -1291,27 +1295,29 @@ class Controller extends BaseController
             // --- Cheque ---
             $chequeNotCleared = false;
             if ($payment->cheque) {
-                if (!$payment->cheque->is_return) {
+                if (!$payment->cheque->is_return || in_array((int) $payment->id, $editPaymentIds, true)) {
                     $hasChequeOrSlip = true;
 
                     $clearAmount  = $payment->cheque->paymentClearRecord->sum('amount');
                     $hasClearDate = !is_null($payment->cheque->clear_date);
 
                     // agar amount = 0 aur clear_date null hai tabhi "not cleared"
-                    $chequeNotCleared = ($clearAmount == 0 && !$hasClearDate);
+                    $chequeNotCleared = in_array((int) $payment->id, $editPaymentIds, true)
+                        || ($clearAmount == 0 && !$hasClearDate);
                 }
             }
 
             // --- Slip ---
             $slipNotCleared = false;
             if ($payment->slip) {
-                if (!$payment->slip->is_return) {
+                if (!$payment->slip->is_return || in_array((int) $payment->id, $editPaymentIds, true)) {
                     $hasChequeOrSlip = true;
 
                     $clearAmount  = $payment->slip->paymentClearRecord->sum('amount');
                     $hasClearDate = !is_null($payment->slip->clear_date);
 
-                    $slipNotCleared = ($clearAmount == 0 && !$hasClearDate);
+                    $slipNotCleared = in_array((int) $payment->id, $editPaymentIds, true)
+                        || ($clearAmount == 0 && !$hasClearDate);
                 }
             }
 
@@ -1324,6 +1330,7 @@ class Controller extends BaseController
                     'reff_no' => $payment->cheque->cheque_no ?? $payment->slip->slip_no,
                     'amount' => $payment->cheque->amount ?? $payment->slip->amount,
                     'customer_name' => $payment->cheque ? ($payment->cheque->customer?->customer_name . ' | ' . $payment->cheque->customer?->city?->short_title) : ($payment->slip ? ($payment->slip->customer?->customer_name . ' | ' . $payment->slip->customer?->city?->short_title) : null),
+                    'checked' => in_array((int) $payment->id, $editPaymentIds, true),
                 ];
             }
         }

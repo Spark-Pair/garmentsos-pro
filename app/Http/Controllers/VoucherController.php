@@ -490,7 +490,7 @@ class VoucherController extends Controller
         ]);
 
         if ($voucher->supplier && $voucher->date) {
-            $voucher->supplier->balance_at_date = $this->supplierBalance($voucher->supplier, $voucher->date);
+            $voucher->supplier->balance_at_date = $this->supplierBalance($voucher->supplier, $voucher->date, $voucher->id);
         }
 
         $branches = app(ModuleBranchService::class);

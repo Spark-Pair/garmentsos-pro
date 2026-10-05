@@ -114,7 +114,7 @@ class Supplier extends Model
         return $this->calculateBalance();
     }
 
-    public function calculateBalance($fromDate = null, $toDate = null, $formatted = false, $includeGivenDate = true, ?array $branchIds = null, bool $includeNullBranchRecords = false)
+    public function calculateBalance($fromDate = null, $toDate = null, $formatted = false, $includeGivenDate = true, ?array $branchIds = null, bool $includeNullBranchRecords = false, ?int $excludeVoucherId = null)
     {
         $expenseQuery = $this->expenses();
 
@@ -167,6 +167,9 @@ class Supplier extends Model
         $applyBranchScope($inventoryExpenseQuery, 'inventory_transactions');
         $applyBranchScope($paymentsQuery, 'supplier_payments');
         $paymentsQuery->whereNotNull('voucher_id');
+        if ($excludeVoucherId !== null) {
+            $paymentsQuery->where('voucher_id', '!=', $excludeVoucherId);
+        }
         $applyBranchScope($adjustmentsQuery, 'statement_adjustments');
 
         if ($productionQuery) {
