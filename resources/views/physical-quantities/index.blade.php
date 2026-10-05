@@ -2,6 +2,9 @@
 @section('title', 'Show Physical Quantities | ' . $client_company->name)
 @section('content')
     @php
+        $categoryOptions = app('article')->categories;
+        $sizeOptions = app('article')->sizes;
+        $seasonOptions = app('article')->seasons;
         $searchFields = [
             "Article No" => [
                 "id" => "article_no",
@@ -15,6 +18,27 @@
                 "type" => "text",
                 "placeholder" => "Enter processed by",
                 "dataFilterPath" => "processed_by",
+            ],
+            "Category" => [
+                "id" => "category",
+                "type" => "select",
+                "options" => $categoryOptions,
+                "multiple" => true,
+                "dataFilterPath" => "category",
+            ],
+            "Size" => [
+                "id" => "size",
+                "type" => "select",
+                "options" => $sizeOptions,
+                "multiple" => true,
+                "dataFilterPath" => "size",
+            ],
+            "Season" => [
+                "id" => "season",
+                "type" => "select",
+                "options" => $seasonOptions,
+                "multiple" => true,
+                "dataFilterPath" => "season",
             ],
             'Shipment' => [
                 'id' => 'shipment',

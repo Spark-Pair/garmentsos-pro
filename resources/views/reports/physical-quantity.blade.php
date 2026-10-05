@@ -41,40 +41,21 @@
         <div class="step1 space-y-4">
             <input type="hidden" id="report_type" name="report_type" value="{{ $reportType }}" />
 
-            <x-select
-                label="Report Mode"
-                name="mode"
-                id="mode"
-                :options="[
-                    'all_articles' => ['text' => 'All Articles'],
-                    'article_wise' => ['text' => 'Article-wise'],
-                    'proceed_by_wise' => ['text' => 'Proceed By-wise'],
-                ]"
-                :value="$mode"
-                showDefault
-                onchange="togglePhysicalQuantityMode()"
-            />
-
-            <div id="articleFilterWrap" class="{{ $mode === 'article_wise' ? '' : 'hidden' }}">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <x-select
-                    label="Article"
+                    label="Articles"
                     name="article_id"
                     id="article_id"
                     :options="$articleOptions"
-                    :value="old('article_id', $data['article_id'] ?? '')"
+                    :value="old('article_id', $data['filters']['article_id'] ?? '')"
+                    multiple
                     showDefault
                 />
-            </div>
-
-            <div id="proceedByFilterWrap" class="{{ $mode === 'proceed_by_wise' ? '' : 'hidden' }}">
-                <x-input
-                    label="Proceed By"
-                    name="proceed_by"
-                    id="proceed_by"
-                    type="text"
-                    :value="old('proceed_by', $data['proceed_by'] ?? '')"
-                    placeholder="Type proceed by"
-                />
+                <x-select label="Season" name="season" id="season" :options="$filterOptions['seasons']" :value="old('season', $data['filters']['season'] ?? '')" multiple showDefault />
+                <x-select label="Size" name="size" id="size" :options="$filterOptions['sizes']" :value="old('size', $data['filters']['size'] ?? '')" multiple showDefault />
+                <x-select label="Category" name="category" id="category" :options="$filterOptions['categories']" :value="old('category', $data['filters']['category'] ?? '')" multiple showDefault />
+                <x-select label="Proceed By" name="processed_by" id="processed_by" :options="$filterOptions['proceed_by']" :value="old('processed_by', $data['filters']['processed_by'] ?? '')" multiple showDefault />
+                <x-select label="Shipment" name="shipment" id="shipment" :options="$filterOptions['shipments']" :value="old('shipment', $data['filters']['shipment'] ?? '')" multiple showDefault />
             </div>
         </div>
 
@@ -134,7 +115,7 @@
                                                             <div class="preview-table w-full">
                                                             <div class="table w-full border border-gray-700 rounded-lg p-1 text-xs">
                                                                 <div class="thead w-full">
-                                                                    <div class="tr flex w-full px-2 py-1.5 bg-[var(--primary-color)] text-white text-center rounded-md">
+                                                                    <div class="tr flex w-full px-2 py-1 bg-[var(--primary-color)] text-white text-center rounded-md">
                                                                         <div class="th font-medium overflow-hidden w-[8%] text-left">#</div>
                                                                         <div class="th font-medium overflow-hidden w-[30%] text-left">Article/pckt.</div>
                                                                         <div class="th font-medium overflow-hidden grow">Proc. By</div>
@@ -148,7 +129,7 @@
                                                                             @unless($loop->first)
                                                                                 <hr class="w-full my-0.5 border-dotted">
                                                                             @endunless
-                                                                            <div class="tr flex  w-full px-2 text-center gap-0.5">
+                                                                            <div class="tr flex w-full px-2 py-[0.5px] text-center gap-0.5 leading-[0.72rem]">
                                                                                 <div class="td font-medium overflow-hidden w-[8%] text-left capitalize truncate">{{ $serial++ }}.</div>
                                                                                 <div class="td font-medium overflow-hidden w-[30%] text-left truncate">{{ $row['article_no'] }}</div>
                                                                                 <div class="td font-medium overflow-hidden grow capitalize truncate">{{ $row['proceed_by'] }}</div>

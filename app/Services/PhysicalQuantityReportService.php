@@ -99,17 +99,7 @@ class PhysicalQuantityReportService
 
     public function getArticleOptions(?array $branchIds = null, bool $includeNullBranchRecords = false): array
     {
-        $query = Article::query()->orderByDesc('id');
-        if ($branchIds !== null && !empty($branchIds) && Schema::hasColumn('articles', 'branch_id')) {
-            $query->where(function ($scope) use ($branchIds, $includeNullBranchRecords) {
-                $scope->whereIn('branch_id', $branchIds);
-                if ($includeNullBranchRecords) {
-                    $scope->orWhereNull('branch_id');
-                }
-            });
-        } else {
-            $query = app(ModuleBranchService::class)->applyRelatedScope($query, 'articles', 'reports_physical_quantity');
-        }
+        $query = $this->reportArticlesQuery($branchIds, $includeNullBranchRecords)->orderByDesc('id');
 
         return $query
             ->get(['id', 'article_no', 'processed_by'])
@@ -124,6 +114,56 @@ class PhysicalQuantityReportService
                 ];
             })
             ->all();
+    }
+
+    /**
+     * Values used by the physical quantity report's multi-select filters.
+     * Keep these options scoped to the same branches as the report itself.
+     */
+    public function getReportFilterOptions(?array $branchIds = null, bool $includeNullBranchRecords = false): array
+    {
+        $articles = $this->reportArticlesQuery($branchIds, $includeNullBranchRecords)
+            ->get(['id', 'article_no', 'category', 'size', 'season', 'processed_by']);
+
+        $values = static function ($items): array {
+            return collect($items)
+                ->map(fn ($value) => trim((string) $value))
+                ->filter()
+                ->unique(fn ($value) => mb_strtolower($value))
+                ->sort(fn ($left, $right) => strnatcasecmp($left, $right))
+                ->mapWithKeys(fn ($value) => [$value => ['text' => $value]])
+                ->all();
+        };
+
+        return [
+            'seasons' => $values($articles->pluck('season')),
+            'sizes' => $values($articles->pluck('size')),
+            'categories' => $values($articles->pluck('category')),
+            'proceed_by' => $values($articles->pluck('processed_by')),
+            'shipments' => [
+                'karachi' => ['text' => 'Karachi'],
+                'other' => ['text' => 'Other'],
+                'all' => ['text' => 'All'],
+            ],
+        ];
+    }
+
+    protected function reportArticlesQuery(?array $branchIds = null, bool $includeNullBranchRecords = false): Builder
+    {
+        $query = Article::query();
+
+        if ($branchIds !== null && !empty($branchIds) && Schema::hasColumn('articles', 'branch_id')) {
+            $query->where(function ($scope) use ($branchIds, $includeNullBranchRecords) {
+                $scope->whereIn('branch_id', $branchIds);
+                if ($includeNullBranchRecords) {
+                    $scope->orWhereNull('branch_id');
+                }
+            });
+        } else {
+            $query = app(ModuleBranchService::class)->applyRelatedScope($query, 'articles', 'reports_physical_quantity');
+        }
+
+        return $query;
     }
 
     protected function articleBranchScope(?array $branchIds = null, bool $includeNullBranchRecords = false): callable
@@ -194,18 +234,81 @@ class PhysicalQuantityReportService
             }
 
             if ($key === 'article_id') {
-                $query->whereKey((int) $value);
+                $articleIds = collect(is_array($value) ? $value : explode(',', (string) $value))
+                    ->map(fn ($item) => (int) $item)
+                    ->filter()
+                    ->values();
+
+                if ($articleIds->isNotEmpty()) {
+                    $query->whereIn($query->getModel()->getTable() . '.id', $articleIds);
+                }
                 continue;
             }
 
             if ($key === 'processed_by') {
-                $processedBy = mb_strtolower(trim((string) $value));
-                $query->whereRaw('LOWER(processed_by) LIKE ?', ["%{$processedBy}%"]);
+                $processedBy = collect(is_array($value) ? $value : explode(',', (string) $value))
+                    ->map(fn ($item) => mb_strtolower(trim((string) $item)))
+                    ->filter()
+                    ->values();
+
+                if ($processedBy->isNotEmpty()) {
+                    $query->where(function (Builder $fieldQuery) use ($processedBy) {
+                        foreach ($processedBy as $index => $item) {
+                            $method = $index === 0 ? 'whereRaw' : 'orWhereRaw';
+                            $fieldQuery->{$method}('LOWER(processed_by) LIKE ?', ["%{$item}%"]);
+                        }
+                    });
+                }
                 continue;
             }
 
-            if ($key === 'shipment' && in_array($value, ['karachi', 'other', 'all'], true)) {
-                $this->applyShipmentFilter($query, (string) $value);
+            if (in_array($key, ['category', 'size', 'season'], true)) {
+                $column = $key;
+                $values = collect(is_array($value) ? $value : explode(',', (string) $value))
+                    ->map(function ($item) {
+                        $item = mb_strtolower(trim((string) $item));
+
+                        return str_replace(['_', '-'], ' ', $item);
+                    })
+                    ->filter()
+                    ->values();
+
+                if ($values->isNotEmpty()) {
+                    $query->where(function (Builder $fieldQuery) use ($column, $values) {
+                        foreach ($values as $index => $normalizedValue) {
+                            $method = $index === 0 ? 'whereRaw' : 'orWhereRaw';
+                            $fieldQuery->{$method}(
+                                "LOWER(REPLACE(REPLACE({$column}, '_', ' '), '-', ' ')) LIKE ?",
+                                ["%{$normalizedValue}%"]
+                            );
+                        }
+                    });
+                }
+                continue;
+            }
+
+            if ($key === 'shipment') {
+                $shipments = collect(is_array($value) ? $value : explode(',', (string) $value))
+                    ->map(fn ($item) => trim((string) $item))
+                    ->filter(fn ($item) => in_array($item, ['karachi', 'other', 'all'], true))
+                    ->unique()
+                    ->values();
+
+                if ($shipments->isNotEmpty() && !$shipments->contains('all')) {
+                    $query->where(function (Builder $shipmentQuery) use ($shipments) {
+                        foreach ($shipments as $index => $shipment) {
+                            $method = $index === 0 ? 'whereHas' : 'orWhereHas';
+                            $shipmentQuery->{$method}('shipmentArticles.shipment', function (Builder $relatedQuery) use ($shipment) {
+                                if ($shipment === 'karachi') {
+                                    $relatedQuery->where('city', 'karachi');
+                                } else {
+                                    $relatedQuery->where('city', '!=', 'karachi');
+                                }
+                            });
+                        }
+                    });
+                }
+                continue;
             }
         }
     }
