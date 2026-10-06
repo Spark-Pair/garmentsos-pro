@@ -142,18 +142,24 @@
                 }
 
                 const customerCopy =
-                    previewDom.innerHTML;
+                    extractPreviewMarkup(previewDom.innerHTML);
 
                 const officeCopy =
-                    buildInvoicePreviewLikeModal(
-                        previewData,
-                        'Office'
+                    extractPreviewMarkup(
+                        buildInvoicePreviewLikeModal(
+                            previewData,
+                            'Office'
+                        )
                     );
 
                 return [
                     customerCopy,
                     officeCopy
-                ].filter(Boolean);
+                ]
+                    .filter(Boolean)
+                    .map(copy => (
+                        `<div class="invoice-print-copy">${copy}</div>`
+                    ));
             })
             .filter(Boolean);
 
@@ -166,18 +172,6 @@
 
             invoiceContainer.appendChild(wrapper);
 
-            if (index < previewsHtml.length - 1) {
-
-                const pageBreak =
-                    document.createElement('div');
-
-                pageBreak.className =
-                    'page-break';
-
-                invoiceContainer.appendChild(
-                    pageBreak
-                );
-            }
         });
 
         /*
@@ -197,6 +191,28 @@
 
             }, 400);
         }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Keep one print container for all pages
+    |--------------------------------------------------------------------------
+    |
+    | DocumentPreview also returns a container for normal in-app previews.
+    | The print helper creates its own container, so nesting those containers
+    | makes the flex layout eligible for pagination and can split one invoice.
+    |
+    */
+    function extractPreviewMarkup(markup) {
+        const holder = document.createElement('div');
+        holder.innerHTML = markup || '';
+
+        const previewContainer =
+            holder.querySelector('#preview-container');
+
+        return previewContainer
+            ? previewContainer.innerHTML
+            : holder.innerHTML;
     }
 
     /*
@@ -290,7 +306,7 @@
         };
         window.addEventListener('focus', redirectWhenDialogReturnsFocus);
 
-        window.DocumentPrint.printHtml({
+        window.DocumentPrint.printPreview({
 
             title: 'Print Invoice',
 
@@ -298,36 +314,16 @@
 
             delay: 600,
 
-            style: `
-                @page {
-                    size: A5 portrait;
-                    margin: 3mm;
+            extraStyle: `
+                .invoice-print-copy {
+                    width: 148mm !important;
+                    height: auto !important;
+                    overflow: visible !important;
                 }
 
-                @media print {
-                    body {
-                        margin: 0;
-                        padding: 0;
-                        width: 148mm;
-                        height: 210mm;
-                    }
-
-                    .preview-container,
-                    .preview {
-                        width: 148mm !important;
-                        height: 210mm !important;
-                        max-width: 148mm !important;
-                        max-height: 210mm !important;
-                    }
-
-                    .preview-container,
-                    .preview-container * {
-                        page-break-inside: avoid;
-                    }
-
-                    .page-break {
-                        page-break-after: always;
-                    }
+                .invoice-print-copy:last-child .preview:last-child {
+                    break-after: auto;
+                    page-break-after: auto;
                 }
             `,
 
