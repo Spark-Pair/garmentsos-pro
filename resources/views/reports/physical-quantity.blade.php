@@ -68,8 +68,8 @@
                         $reportHeading = $activeReportType === 'stock'
                             ? 'Physical Quantity Stock Report'
                             : 'Physical Quantity Altration Report';
-                        $primaryLabel = $activeReportType === 'stock' ? 'Ordered' : 'Received';
-                        $secondaryLabel = $activeReportType === 'stock' ? 'Current' : 'Remaining';
+                        $primaryLabel = $activeReportType === 'stock' ? 'Sell' : 'Received';
+                        $secondaryLabel = $activeReportType === 'stock' ? 'Stock' : 'Remaining';
                     @endphp
                     @forelse ($data['pages'] as $page)
                         @php
