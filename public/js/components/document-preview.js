@@ -108,17 +108,7 @@
                     borderClass: 'border-gray-600',
                 })
             );
-        }
 
-        rows.push(
-            renderTotalRow({
-                label: 'T. Payment',
-                value: formatNumbersWithDigits(totalPayment, 1, 1),
-                borderClass: 'border-gray-600',
-            })
-        );
-
-        if (hasSupplier) {
             rows.push(
                 renderTotalRow({
                     label: 'C. Balance',
@@ -128,6 +118,14 @@
                 })
             );
         }
+
+        rows.push(
+            renderTotalRow({
+                label: 'T. Payment',
+                value: formatNumbersWithDigits(totalPayment, 1, 1),
+                borderClass: 'border-gray-600',
+            })
+        );
 
         return rows.join('');
     };
