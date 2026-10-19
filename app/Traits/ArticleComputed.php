@@ -41,6 +41,7 @@ trait ArticleComputed
             'id' => $this->id,
             'image' => $this->image == 'no_image_icon.png' ? '/images/no_image_icon.png' : '/storage/uploads/images/' . $this->image,
             'name' => $this->article_no,
+            'creator' => $this->creator?->name,
             'status' => $this->sales_rate == 0.00 ? 'no_rate' : 'transparent',
             'category' => $this->category,
             'season' => $this->season,

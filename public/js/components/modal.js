@@ -1,4 +1,9 @@
 function createModal(data, animate = 'animate') {
+    const escapeModalText = (value) => {
+        const element = document.createElement('div');
+        element.textContent = value == null ? '' : String(value);
+        return element.innerHTML;
+    };
     const appInputBaseClass = 'w-full rounded-lg border border-gray-600 bg-[var(--h-bg-color)] px-3 text-[var(--text-color)] transition-all duration-200 ease-out placeholder:capitalize disabled:bg-transparent disabled:opacity-70 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] focus:border-transparent';
     const appInputClassFor = (type = 'text') => `${appInputBaseClass} ${type === 'date' ? 'py-[7px]' : 'py-2'}`;
     const appButtonClass = 'bg-[var(--primary-color)] px-4 rounded-lg hover:bg-[var(--h-primary-color)] transition-all duration-300 ease-in-out cursor-pointer text-nowrap disabled:opacity-50 disabled:cursor-not-allowed';
@@ -112,6 +117,11 @@ function createModal(data, animate = 'animate') {
             <div id="modelInner" class="flex-1 flex flex-col ${data.image ? 'ml-8' : ''} h-full w-full ${!data.table?.scrollable ? 'overflow-y-auto my-scrollbar-2' : ''}">
                 <div class="flex justify-between">
                     <h5 id="name" class="text-2xl my-1 text-[var(--text-color)] capitalize font-semibold">${data.name}</h5>
+                    ${data.creator && data.creatorButtonHtml ? `
+                        <div class="shrink-0 self-start ml-4">
+                            ${data.creatorButtonHtml.replace('__ARTICLE_CREATOR__', escapeModalText(data.creator))}
+                        </div>
+                    ` : ''}
                     ${data.searchFilter ? renderSearchFilter() : ''}
                     ${data.basicSearch ? renderBasicSearch() : ''}
                 </div>
