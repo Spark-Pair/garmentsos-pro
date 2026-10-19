@@ -22,7 +22,7 @@
     </div>
 
     <section class="text-center mx-auto">
-        <div class="show-box mx-auto w-[80%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
+        <div class="show-box mx-auto w-[90%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
             <x-form-title-bar title="Backup & Restore" />
             <div class="details h-full z-40">
                 <div class="container-parent h-full">

@@ -31,14 +31,14 @@
             ],
         ];
     @endphp
-    <div class="w-[80%] mx-auto">
+    <div class="w-[90%] mx-auto">
         <x-search-header heading="Setups" :search_fields=$searchFields/>
     </div>
 
     <!-- Main Content -->
     <section class="text-center mx-auto ">
         <div
-            class="show-box mx-auto w-[80%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative mt-3">
+            class="show-box mx-auto w-[90%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative mt-3">
             <x-form-title-bar printBtn title="Show Setups" resetSortBtn />
 
             <div class="absolute bottom-3 right-3 flex items-center gap-2 w-fll z-50">

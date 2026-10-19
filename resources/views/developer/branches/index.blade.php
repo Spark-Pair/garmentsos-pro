@@ -32,12 +32,12 @@
     @endphp
 
     <div>
-        <div class="w-[80%] mx-auto">
+        <div class="w-[90%] mx-auto">
             <x-search-header heading="Branches" :search_fields="$searchFields" />
         </div>
 
         <section class="text-center mx-auto">
-            <div class="show-box mx-auto w-[80%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
+            <div class="show-box mx-auto w-[90%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
                 <x-form-title-bar title="Show Branches" />
 
                 <div class="absolute bottom-0 right-0 flex items-center justify-between gap-2 w-fll z-50 p-3 w-full pointer-events-none">

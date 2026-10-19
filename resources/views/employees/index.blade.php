@@ -33,13 +33,13 @@
         ];
     @endphp
     <div>
-        <div class="w-[80%] mx-auto">
+        <div class="w-[90%] mx-auto">
             <x-search-header heading="Employees" :search_fields=$searchFields/>
         </div>
 
         <!-- Main Content -->
         <section class="text-center mx-auto">
-            <div class="show-box mx-auto w-[80%] h-[70vh] bg-[var(--secondary-bg-color)] rounded-xl shadow pt-8.5 pr-2 relative">
+            <div class="show-box mx-auto w-[90%] h-[70vh] bg-[var(--secondary-bg-color)] rounded-xl shadow pt-8.5 pr-2 relative">
                 <x-form-title-bar printBtn title="Show Employees" changeLayoutBtn layout="{{ $authLayout }}" resetSortBtn />
 
                 <div class="absolute bottom-3 right-3 flex items-center gap-2 w-fll z-50">
