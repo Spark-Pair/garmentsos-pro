@@ -66,14 +66,14 @@
             ],
         ];
     @endphp
-    <div class="w-[80%] mx-auto">
+    <div class="w-[90%] mx-auto">
         <x-search-header heading="Payment Programs" :search_fields=$searchFields />
     </div>
 
     <!-- Main Content -->
     <section class="text-center mx-auto">
         <div
-            class="show-box mx-auto w-[80%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
+            class="show-box mx-auto w-[90%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
             <x-form-title-bar printBtn layout="table" title="Show Payment Programs" resetSortBtn />
 
             <div class="absolute bottom-14 right-0 flex items-center justify-end gap-2 w-fll z-50 p-3 w-full pointer-events-none">
@@ -88,7 +88,7 @@
                             <div class="w-[10%] cursor-pointer" onclick="sortByThis(this)">Date</div>
                             <div class="w-[8%] cursor-pointer" onclick="sortByThis(this)">O/P No.</div>
                             <div class="w-[19%] cursor-pointer" onclick="sortByThis(this)">Customer</div>
-                            <div class="w-[10%] cursor-pointer" onclick="sortByThis(this)">Cus. Bal.</div>
+                            <div class="w-[10%] cursor-pointer" onclick="sortByThis(this)">Cus. Total Bal.</div>
                             <div class="w-[9%] cursor-pointer" onclick="sortByThis(this)">Category</div>
                             <div class="w-[15%] cursor-pointer" onclick="sortByThis(this)">Beneficiary</div>
                             <div class="w-[10%] cursor-pointer" onclick="sortByThis(this)">Amount</div>
