@@ -267,12 +267,26 @@ function getNextFooterActionButton() {
                 return field;
             }
 
-            return selectParent.querySelector(
-                ':scope > .form-group input:not([type="hidden"])'
-            ) || field;
+            return getSelectVisibleInput(selectParent) || field;
         }
 
         return field;
+    }
+
+    function getSelectVisibleInput(selectParent) {
+        if (!selectParent) return null;
+
+        // Blade select structure: selectParent > .form-group > .field-control > input
+        return selectParent.querySelector(
+            ':scope > .form-group > .field-control > input:not([type="hidden"]):not(.dbInput)'
+        ) ||
+            // JS-generated select structure: selectParent > input
+            selectParent.querySelector(
+                ':scope > input:not([type="hidden"]):not(.dbInput)'
+            ) ||
+            selectParent.querySelector(
+                'input:not([type="hidden"]):not(.dbInput)'
+            );
     }
 
     function getFieldScope(field) {
@@ -532,6 +546,17 @@ function getNextFooterActionButton() {
                 }
             }
 
+            // Generic form submit buttons are intentionally excluded from
+            // normal field navigation, but should receive focus after the
+            // last editable field so the next Enter activates Save/Submit.
+            const submitButton = scope?.querySelector?.(
+                'button[type="submit"]:not([disabled]), input[type="submit"]:not([disabled])'
+            );
+            if (submitButton?.isConnected && isRenderedField(submitButton)) {
+                focusField(submitButton, { fromKeyboard: true });
+                return true;
+            }
+
             const footerBtn = getNextFooterActionButton();
             if (footerBtn) {
                 focusField(footerBtn);
@@ -628,12 +653,7 @@ function getNextFooterActionButton() {
 
             if (selectParent) {
                 const selectInput =
-                    selectParent.querySelector(
-                        ':scope > .form-group input:not([type="hidden"])'
-                    ) ||
-                    selectParent.querySelector(
-                        'input:not([type="hidden"]):not(.dbInput)'
-                    );
+                    getSelectVisibleInput(selectParent);
 
                 if (selectInput) {
                     /*
@@ -672,6 +692,13 @@ function getNextFooterActionButton() {
         }
 
         if (event.key !== "Enter") return;
+
+        const form = target.closest('form');
+        if (form?.hasAttribute('data-enter-submit') && !event.shiftKey) {
+            event.preventDefault();
+            form.requestSubmit();
+            return;
+        }
 
         event.preventDefault();
 
