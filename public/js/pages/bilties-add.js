@@ -120,7 +120,7 @@
                             <div class="w-[17%] capitalize">${selectedInvoice.customer.customer_name}</div>
                             <div class="w-[10%]">${selectedInvoice.customer.city.title}</div>
                             <div class="w-1/6">
-                                <input oninput="setBiltyNo(${selectedInvoice.id}, this.value)" class="bilty_no w-[80%] border border-gray-600 bg-[var(--h-bg-color)] py-0.5 px-2 rounded-md text-xs focus:outline-none" type="number"/>
+                                <input oninput="setBiltyNo(${selectedInvoice.id}, sanitizeBiltyNo(this))" class="bilty_no w-[80%] border border-gray-600 bg-[var(--h-bg-color)] py-0.5 px-2 rounded-md text-xs focus:outline-none" type="text" inputmode="text" pattern="[A-Za-z0-9 _./:#-]+" title="Use letters, numbers, spaces, dots, slashes, colons, underscores, and hyphens only." required />
                             </div>
                             <div class="w-1/6">${cargoName}</div>
                             <div class="w-[8%] text-center">
@@ -307,6 +307,14 @@
                 invoice.biltyNo = biltyNo;
             }
             updateInputInvoicesArray();
+        };
+
+        window.sanitizeBiltyNo = function sanitizeBiltyNo(input) {
+            if (!input) return '';
+
+            // Allow practical document-number characters only.
+            input.value = String(input.value || '').replace(/[^A-Za-z0-9 _./:#-]/g, '');
+            return input.value;
         };
 
         window.setCargoName = function setCargoName(invoiceId, cargoName) {

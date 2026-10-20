@@ -14,6 +14,7 @@ trait BiltyComputed
             'date' => $this->date->format('d-M-Y, D'),
             'customer_name' => $this->invoice->customer->customer_name . ' | ' . $this->invoice->customer->city->title,
             'invoice_no' => $this->invoice->invoice_no,
+            'amount' => \App\Support\Money::format($this->invoice->netAmount ?? 0),
             'cargo_name' => $this->invoice->cargo_name,
             'bilty_no' => $this->bilty_no . ' | ' . $this->invoice->carton_count,
         ];
