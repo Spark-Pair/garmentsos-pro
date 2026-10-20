@@ -138,7 +138,7 @@ trait CustomerPaymentComputed
         return null;
     }
 
-    protected function hasProgramVoucher(): bool
+    public function hasProgramVoucher(): bool
     {
         if (!$this->program_id) {
             return false;
