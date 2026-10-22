@@ -73,7 +73,15 @@ class PhysicalQuantityReportService
         return $this->getIndexRows($filters, null, $branchIds, $includeNullBranchRecords)
             ->map(function (array $row) use ($reportType) {
                 $processedBy = trim((string) ($row['processed_by'] ?? ''));
-                $orderedQty = $row['ordered_quantity'] ?? $this->formatPacketQuantity((float) ($row['ordered_packets_numeric'] ?? 0));
+                $sellPcs = (float) ($row['ordered_pcs_numeric'] ?? 0)
+                    + (float) ($row['shipment_invoiced_pcs_numeric'] ?? 0);
+                $sellPackets = (float) ($row['ordered_packets_numeric'] ?? 0)
+                    + (float) ($row['shipment_invoiced_packets_numeric'] ?? 0);
+                $sellQty = $this->formatStockQuantity(
+                    $sellPackets,
+                    $sellPcs,
+                    (float) ($row['unit'] ?? 0)
+                );
                 $currentStockQty = $row['current_stock'] ?? $this->formatPacketQuantity((float) ($row['current_stock_packets_numeric'] ?? 0));
                 $receivedQty = $row['received_quantity'] ?? $this->formatPacketQuantity((float) ($row['received_packets_numeric'] ?? 0));
                 $remainingQty = $row['remaining_quantity'] ?? $this->formatPacketQuantity((float) ($row['remaining_packets_numeric'] ?? 0));
@@ -81,10 +89,10 @@ class PhysicalQuantityReportService
                 return [
                     'article_no' => $row['article_no'] ?? '-',
                     'proceed_by' => $processedBy !== '' ? $processedBy : '-',
-                    'primary_qty' => $reportType === 'stock' ? $orderedQty : $receivedQty,
+                    'primary_qty' => $reportType === 'stock' ? $sellQty : $receivedQty,
                     'secondary_qty' => $reportType === 'stock' ? $currentStockQty : $remainingQty,
                     'primary_qty_numeric' => $reportType === 'stock'
-                        ? (float) ($row['ordered_packets_numeric'] ?? 0)
+                        ? $sellPackets
                         : (float) ($row['received_packets_numeric'] ?? 0),
                     'secondary_qty_numeric' => $reportType === 'stock'
                         ? (float) ($row['current_stock_packets_numeric'] ?? 0)
@@ -490,11 +498,13 @@ class PhysicalQuantityReportService
                     'total_pcs_numeric' => $totalPcs,
                     'orderable_pcs_numeric' => $orderablePcs,
                     'ordered_pcs_numeric' => $orderedPcs,
+                    'shipment_invoiced_pcs_numeric' => $shipmentInvoicedPcs,
                     'received_pcs_numeric' => $receivedPcs,
                     'current_stock_pcs_numeric' => $currentStockPcs,
                     'total_packets_numeric' => $totalPackets,
                     'orderable_packets_numeric' => $orderablePackets,
                     'ordered_packets_numeric' => $orderedPackets,
+                    'shipment_invoiced_packets_numeric' => $shipmentinvoicedPackets,
                     'received_packets_numeric' => $receivedPackets,
                     'invoiced_packets_numeric' => $invoicedPackets,
                     'return_packets_numeric' => $returnPackets,
