@@ -244,6 +244,8 @@ Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensur
     Route::get('daily-ledger/summary', [DailyLedgerController::class, 'summary'])->name('daily-ledger.summary');
     Route::resource('daily-ledger', DailyLedgerController::class);
 
+    Route::get('sales-returns/print/{returnNo}', [SalesReturnController::class, 'print'])->name('sales-returns.print');
+    Route::delete('sales-returns/document/{returnNo}', [SalesReturnController::class, 'destroyDocument'])->name('sales-returns.document.destroy');
     Route::resource('sales-returns', SalesReturnController::class);
     Route::post('sales-returns/get-details', [SalesReturnController::class, 'getDetails'])->name('sales-returns.get-details');
     Route::resource('statement-adjustments', StatementAdjustmentController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);

@@ -139,11 +139,30 @@
                 data: {
                     customer_id: selectedCustomerId,
                     getReturnLines: true,
+                    editing_return_no: config.editingReturnNo || "",
                     _token: csrfToken,
                 },
                 success: function (response) {
                     returnableLines = normalizeResponse(response);
-                    selectedReturns = [];
+                    selectedReturns = (config.initialLines || []).map(initial => {
+                        const line = returnableLines.find(item => item.key === initial.key);
+                        if (!line) return null;
+                        const quantity = Math.min(parseInt(initial.quantity || 0, 10), parseInt(line.remaining_quantity || 0, 10));
+                        return quantity > 0 ? {
+                            key: line.key,
+                            invoice_id: line.invoice_id,
+                            invoice_no: line.invoice_no,
+                            invoice_date: line.invoice_date,
+                            article_id: line.article_id,
+                            article_no: line.article_no,
+                            description: line.description,
+                            remaining_quantity: line.remaining_quantity,
+                            sales_rate: line.sales_rate,
+                            discount: line.discount,
+                            quantity,
+                            amount: lineAmount(line, quantity),
+                        } : null;
+                    }).filter(Boolean);
                     returnModalSearch = "";
 
                     if (returnableLines.length === 0) {
@@ -152,7 +171,7 @@
                     }
 
                     dateInput.disabled = false;
-                    dateInput.value = localDateString();
+                    dateInput.value = config.initialDate || localDateString();
                     selectArticlesBtn.disabled = false;
                     removeReturnsAfterSelectedDate();
                     renderList();
@@ -420,6 +439,15 @@
         });
 
         resetReturns();
+
+        if (config.editingCustomerId) {
+            const customerInput = document.querySelector('#customer');
+            const customerHidden = document.querySelector('.dbInput[data-for="customer"]');
+            if (customerHidden) customerHidden.value = config.editingCustomerId;
+            if (customerInput) customerInput.value = customerInput.value || "";
+            window.onCustomerSelect({ value: String(config.editingCustomerId) });
+        }
+
         const initialType = typeInput?.value === "adjustment" ? "adjustment" : "return";
         window.setSalesReturnType(
             document.getElementById(initialType === "adjustment" ? "adjustmentTypeBtn" : "returnTypeBtn"),

@@ -10,14 +10,12 @@
     window.createRow = function createRow(data) {
         return `
             <div id="${data.id}" oncontextmenu='${htmlAttr(data.oncontextmenu || "")}' onclick='${htmlAttr(data.onclick || "")}'
-                class="item row relative group grid grid-cols-[0.5fr_1.25fr_1.8fr_1.15fr_1.15fr_0.85fr_0.9fr_1.05fr] border-b border-[var(--h-bg-color)] items-center py-2 cursor-pointer hover:bg-[var(--h-secondary-bg-color)] transition-all fade-in ease-in-out"
+                class="item row relative group grid grid-cols-[1.25fr_1.25fr_2.2fr_0.95fr_1fr_1.15fr] border-b border-[var(--h-bg-color)] items-center py-2 cursor-pointer hover:bg-[var(--h-secondary-bg-color)] transition-all fade-in ease-in-out"
                 data-json='${jsonAttr(data)}'>
 
-                <span>${data.id}</span>
+                <span>${data.return_no}</span>
                 <span>${data.date}</span>
                 <span>${data.customer}</span>
-                <span>${data.article_no}</span>
-                <span>${data.invoice_no}</span>
                 <span>${data.type === 'adjustment' ? 'Adjustment' : 'Return'}</span>
                 <span>${data.quantity + ' - PCs'}</span>
                 <span>${formatMoney(data.amount)}</span>
@@ -30,12 +28,21 @@
         if (!item) return;
         const data = JSON.parse(item.dataset.json);
 
-        const actions = [];
+        const actions = [{
+            id: 'print-sales-return',
+            text: 'Print Sales Return',
+            link: `/sales-returns/print/${encodeURIComponent(data.return_no)}`,
+        }];
         if (isDeveloperUser()) {
+            actions.push({
+                id: 'edit-sales-return',
+                text: 'Edit',
+                link: `/sales-returns/${data.id}/edit`,
+            });
             actions.push({
                 id: 'delete-sales-return',
                 text: 'Delete',
-                onclick: `submitResourceDelete('/sales-returns/${data.id}')`,
+                onclick: `submitResourceDelete('/sales-returns/document/${encodeURIComponent(data.return_no)}')`,
             });
         }
 
@@ -53,24 +60,29 @@
 
         const modalData = {
             id: 'modalForm',
-            name: data.article_no,
-            details: {
-                ID: data.id,
-                Date: data.date,
-                Customer: data.customer,
-                'Invoice No.': data.invoice_no,
-                Type: data.type === 'adjustment' ? 'Adjustment' : 'Return',
-                Quantity: `${data.quantity} - PCs`,
-                Amount: formatMoney(data.amount),
+            preview: {
+                type: 'sales_return',
+                size: 'A5',
+                data: data.data,
+                document: 'Sales Return',
             },
-            bottomActions: [],
+            bottomActions: [{
+                id: 'print-sales-return',
+                text: 'Print Sales Return',
+                link: `/sales-returns/print/${encodeURIComponent(data.return_no)}`,
+            }],
         };
 
         if (isDeveloperUser()) {
             modalData.bottomActions.push({
+                id: 'edit-sales-return',
+                text: 'Edit',
+                link: `/sales-returns/${data.id}/edit`,
+            });
+            modalData.bottomActions.push({
                 id: 'delete-sales-return',
                 text: 'Delete',
-                onclick: `submitResourceDelete('/sales-returns/${data.id}')`,
+                onclick: `submitResourceDelete('/sales-returns/document/${encodeURIComponent(data.return_no)}')`,
             });
         }
 
@@ -84,12 +96,6 @@
 
         const listContainer = document.querySelector('.search_container');
         if (listContainer) {
-            listContainer.addEventListener('click', (e) => {
-                const row = e.target.closest('.item');
-                if (!row || !row.dataset.json) return;
-                window.generateModal(row);
-            });
-
             listContainer.addEventListener('contextmenu', (e) => {
                 const row = e.target.closest('.item');
                 if (!row || !row.dataset.json) return;

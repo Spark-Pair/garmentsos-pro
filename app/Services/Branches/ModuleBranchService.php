@@ -517,9 +517,10 @@ class ModuleBranchService
             'can_use_branch_branding' => true,
             'supports_branch_selector' => true,
             'supports_multi_branch_selector' => false,
-            'supports_branch_serial_prefix' => false,
+            'supports_branch_serial_prefix' => true,
             'safe_default_enabled' => false,
-            'notes' => 'Sales return rows should follow invoice branch when enabled.',
+            'doc_identity_prefix' => 'SR',
+            'notes' => 'Sales return documents follow invoice/article branch when enabled.',
         ],
         'expenses' => [
             'label' => 'Expenses / Fabrics',

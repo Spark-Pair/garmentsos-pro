@@ -11,21 +11,70 @@ trait SalesReturnComputed
 
     public function toFormattedArray()
     {
+        $customer = $this->invoice?->customer;
+        $invoiceArticle = $this->invoice?->invoiceArticles?->firstWhere('article_id', $this->article_id);
+        $description = trim((string) ($invoiceArticle?->description ?: $this->article?->description ?: '-'));
+        $customerName = trim(($customer?->customer_name ?? '-') . ' | ' . ($customer?->city?->title ?? '-'), ' |');
+        $returnNo = $this->return_no ?: ('LEGACY-SR-' . optional($this->date)->format('Ymd'));
+
         return [
             'id' => $this->id,
+            'return_no' => $returnNo,
             'date' => $this->date->format('d-M-Y, D'),
-            'customer' => $this->invoice->customer->customer_name . ' | ' . $this->invoice->customer->city->title,
+            'customer' => $customerName,
             'article_no' => $this->article->article_no,
             'invoice_no' => $this->invoice->invoice_no,
             'type' => $this->type,
             'quantity' => $this->quantity,
             'amount' => \App\Support\Money::format($this->amount),
+            'line_count' => 1,
+            'data' => [
+                'return_no' => $returnNo,
+                'date' => $this->date?->format('Y-m-d'),
+                'type' => $this->type,
+                'branch_id' => $this->branch_id,
+                'branch_branding' => app(\App\Services\Branches\ModuleBranchService::class)->documentBranding('sales_returns', $this),
+                'customer' => $customer ? [
+                    'id' => $customer->id,
+                    'customer_name' => $customer->customer_name,
+                    'urdu_title' => $customer->urdu_title,
+                    'address' => $customer->address,
+                    'phone_number' => $customer->phone_number,
+                    'city' => $customer->city ? [
+                        'id' => $customer->city->id,
+                        'title' => $customer->city->title,
+                        'short_title' => $customer->city->short_title,
+                    ] : null,
+                ] : null,
+                'articles' => [[
+                    'article' => $this->article ? [
+                        'id' => $this->article->id,
+                        'article_no' => $this->article->article_no,
+                        'description' => $this->article->description,
+                        'pcs_per_packet' => $this->article->pcs_per_packet,
+                        'sales_rate' => $this->article->sales_rate,
+                    ] : null,
+                    'article_no' => $this->article?->article_no,
+                    'description' => $description,
+                    'invoice_no' => $this->invoice?->invoice_no,
+                    'quantity' => (int) $this->quantity,
+                    'sales_rate' => (float) ($this->article?->sales_rate ?? 0),
+                    'amount' => (float) $this->amount,
+                    'customer' => $customerName,
+                    'type' => $this->type,
+                ]],
+            ],
+            'oncontextmenu' => "generateContextMenu(event)",
+            'onclick' => "generateModal(this)",
         ];
     }
 
     public function scopeApplyModelFilters($query, $key, $value)
     {
         switch ($key) {
+            case 'return_no':
+                return $query->where('return_no', 'like', "%{$value}%");
+
             case 'id':
                 $tokens = $this->searchFilterTokens($value)
                     ->filter(fn ($token) => ctype_digit((string) $token)

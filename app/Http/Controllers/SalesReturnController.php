@@ -9,6 +9,7 @@ use App\Models\InvoiceArticles;
 use App\Models\PhysicalQuantity;
 use App\Models\SalesReturn;
 use App\Services\Branches\ModuleBranchService;
+use App\Services\Branches\BranchSerialService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -28,7 +29,7 @@ class SalesReturnController extends Controller
 
         if ($request->ajax()) {
             $salesReturnsQuery = $branches->applyScope(
-                SalesReturn::with(['article', 'invoice.customer.city']),
+                SalesReturn::with(['article', 'invoice.customer.city', 'invoice.invoiceArticles']),
                 'sales_returns'
             )->applyFilters($request, false, true);
 
@@ -40,7 +41,39 @@ class SalesReturnController extends Controller
                 $salesReturnsQuery->limit($limit);
             }
 
-            $sales_returns = $salesReturnsQuery->get()->map->toFormattedArray();
+            $sales_returns = $salesReturnsQuery->get()
+                ->map->toFormattedArray()
+                ->groupBy('return_no')
+                ->map(function ($lines, $returnNo) {
+                    $first = $lines->first();
+                    $customers = $lines->pluck('data.customer.customer_name')->filter()->unique()->values();
+                    $previewData = $first['data'] ?? [];
+                    $previewData['return_no'] = $returnNo;
+                    $previewData['articles'] = $lines
+                        ->flatMap(fn ($line) => $line['data']['articles'] ?? [])
+                        ->values()
+                        ->all();
+                    $previewData['customer'] = $customers->count() === 1
+                        ? ($lines->first()['data']['customer'] ?? null)
+                        : [
+                            'customer_name' => 'Multiple Customers',
+                            'urdu_title' => '',
+                            'address' => '',
+                            'phone_number' => '',
+                            'city' => null,
+                        ];
+                    $first['return_no'] = $returnNo;
+                    $first['line_count'] = $lines->count();
+                    $first['quantity'] = $lines->sum(fn ($line) => (int) $line['quantity']);
+                    $first['amount'] = \App\Support\Money::format($lines->sum(fn ($line) => (float) str_replace(',', '', $line['amount'])));
+                    $first['customer'] = $customers->count() > 1 ? 'Multiple Customers' : ($first['customer'] ?? '-');
+                    $first['lines'] = $lines->values()->all();
+                    $first['data'] = $previewData;
+                    $first['oncontextmenu'] = 'generateContextMenu(event)';
+                    $first['onclick'] = 'generateModal(this)';
+                    return $first;
+                })
+                ->values();
 
             return response()->json([
                 'data' => $sales_returns,
@@ -86,6 +119,7 @@ class SalesReturnController extends Controller
             'date' => 'required|date',
             'returns_data' => 'required|json',
             'type' => 'required|in:return,adjustment',
+            'return_no' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -108,6 +142,12 @@ class SalesReturnController extends Controller
                 $hasCustomerPaymentBranch = Schema::hasColumn('customer_payments', 'branch_id');
                 $physicalQuantityLinksSalesReturn = Schema::hasColumn('physical_quantities', 'sales_return_id');
                 $fallbackBranchId = $branches->branchIdForCreate('sales_returns');
+                $returnNo = $data['return_no'] ?? app(BranchSerialService::class)->next(
+                    'sales_returns',
+                    SalesReturn::class,
+                    'return_no',
+                    'SR'
+                );
 
                 $totalsByBranch = [];        // branchId => total amount
                 $firstReturnIdByBranch = [];  // branchId => first SalesReturn id in this batch
@@ -171,6 +211,7 @@ class SalesReturnController extends Controller
                     $lineBranchId = $invoiceArticle->article?->branch_id ?? $fallbackBranchId;
 
                     $salesReturn = SalesReturn::create([
+                        'return_no' => $returnNo,
                         'article_id' => $articleId,
                         'invoice_id' => $invoiceId,
                         'type' => $data['type'],
@@ -228,8 +269,7 @@ class SalesReturnController extends Controller
                         'type' => 'sales_return',
                         'method' => 'return',
                         'amount' => $branchTotal,
-                        'reff_no' => ($data['type'] === 'adjustment' ? 'ADJ-' : 'SR-')
-                        . ($firstReturnIdByBranch[$branchId] ?? $salesReturn->id),
+                        'reff_no' => $returnNo,
                         'remarks' => $data['type'] === 'adjustment' ? 'Invoice adjustment' : 'Sales return',
                     ];
 
@@ -252,7 +292,9 @@ class SalesReturnController extends Controller
      */
     public function show(SalesReturn $salesReturn)
     {
-        //
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($salesReturn, 'sales_returns');
+
+        return redirect()->route('sales-returns.index', ['open_return' => $salesReturn->id]);
     }
 
     /**
@@ -260,7 +302,43 @@ class SalesReturnController extends Controller
      */
     public function edit(SalesReturn $salesReturn)
     {
-        //
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($salesReturn, 'sales_returns');
+
+        $documentLines = SalesReturn::with(['article', 'invoice.customer.city'])
+            ->where(function ($query) use ($salesReturn) {
+                if ($salesReturn->return_no) {
+                    $query->where('return_no', $salesReturn->return_no);
+                } else {
+                    $query->whereKey($salesReturn->id);
+                }
+            })
+            ->orderBy('id')
+            ->get();
+
+        $customer = $documentLines->first()?->invoice?->customer;
+        if (!$customer) {
+            return redirect()->route('sales-returns.index')->with('error', 'Sales return customer was not found.');
+        }
+
+        $branches = app(ModuleBranchService::class);
+        $customers = $branches->applyRelatedScope(Customer::whereHas('user', function ($query) {
+            $query->where('status', 'active');
+        })->with('city'), 'customers', 'sales_returns')->get()->makeHidden('creator');
+        $customerOptions = $customers->mapWithKeys(fn ($item) => [
+            $item->id => ['text' => $item->customer_name . ' | ' . $item->city->short_title],
+        ])->toArray();
+
+        return view('sales-return.return', [
+            'customerOptions' => $customerOptions,
+            'editReturn' => $documentLines->first(),
+            'editReturnLines' => $documentLines,
+            'editingReturnNo' => $documentLines->first()?->return_no,
+            'editingCustomerId' => $customer->id,
+        ]);
     }
 
     /**
@@ -268,7 +346,42 @@ class SalesReturnController extends Controller
      */
     public function update(Request $request, SalesReturn $salesReturn)
     {
-        //
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant'])) {
+            return $resp;
+        }
+
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($salesReturn, 'sales_returns');
+        $returnNo = $salesReturn->return_no;
+
+        if (!$returnNo) {
+            return redirect()->route('sales-returns.edit', $salesReturn)->with('error', 'Legacy return records cannot be edited until a document is created.');
+        }
+
+        $validated = Validator::make($request->all(), [
+            'customer_id' => 'required|integer|exists:customers,id',
+            'date' => 'required|date',
+            'returns_data' => 'required|json',
+            'type' => 'required|in:return,adjustment',
+        ]);
+
+        if ($validated->fails()) {
+            return redirect()->back()->withErrors($validated)->withInput();
+        }
+
+        $data = $validated->validated();
+        $lines = collect(json_decode($data['returns_data'], true))->filter(fn ($line) => is_array($line))->values();
+        if ($lines->isEmpty()) {
+            return redirect()->back()->with('error', 'Please select at least one article to return.')->withInput();
+        }
+
+        $oldLines = SalesReturn::where('return_no', $returnNo)->get();
+        DB::transaction(function () use ($oldLines, $returnNo) {
+            PhysicalQuantity::whereIn('sales_return_id', $oldLines->pluck('id'))->delete();
+            CustomerPayment::where('reff_no', $returnNo)->delete();
+            SalesReturn::whereIn('id', $oldLines->pluck('id'))->delete();
+        });
+
+        return $this->store($request->merge(['return_no' => $returnNo]));
     }
 
     /**
@@ -280,6 +393,10 @@ class SalesReturnController extends Controller
             return $resp;
         }
 
+        if ($salesReturn->return_no) {
+            return $this->destroyDocument($salesReturn->return_no);
+        }
+
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($salesReturn, 'sales_returns');
 
         DB::transaction(function () use ($salesReturn) {
@@ -288,6 +405,48 @@ class SalesReturnController extends Controller
         });
 
         return redirect()->route('sales-returns.index')->with('success', 'Sales return deleted successfully.');
+    }
+
+    public function destroyDocument(string $returnNo)
+    {
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $lines = SalesReturn::where('return_no', $returnNo)->get();
+        if ($lines->isEmpty()) {
+            return redirect()->route('sales-returns.index')->with('error', 'Sales return document not found.');
+        }
+
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($lines->first(), 'sales_returns');
+        DB::transaction(function () use ($lines, $returnNo) {
+            PhysicalQuantity::whereIn('sales_return_id', $lines->pluck('id'))->delete();
+            CustomerPayment::where('reff_no', $returnNo)->delete();
+            SalesReturn::whereIn('id', $lines->pluck('id'))->delete();
+        });
+
+        return redirect()->route('sales-returns.index')->with('success', 'Sales return document deleted successfully.');
+    }
+
+    public function print(string $returnNo)
+    {
+        $lines = SalesReturn::with(['article', 'invoice.customer.city'])
+            ->where('return_no', $returnNo)
+            ->orderBy('id')
+            ->get();
+
+        if ($lines->isEmpty()) {
+            return redirect()->route('sales-returns.index')->with('error', 'Sales return document not found.');
+        }
+
+        app(ModuleBranchService::class)->assertRecordInAllowedBranch($lines->first(), 'sales_returns');
+
+        return view('sales-return.print', [
+            'returnNo' => $returnNo,
+            'lines' => $lines,
+            'customer' => $lines->first()->invoice?->customer,
+            'branding' => app(ModuleBranchService::class)->documentBranding('sales_returns', $lines->first()),
+        ]);
     }
 
     public function getDetails(Request $request)
@@ -301,7 +460,12 @@ class SalesReturnController extends Controller
                 return response()->json([]);
             }
 
-            return $this->returnableSalesReturnLines($customer, $branches);
+            $excludedIds = collect();
+            if ($request->filled('editing_return_no')) {
+                $excludedIds = SalesReturn::where('return_no', $request->editing_return_no)->pluck('id');
+            }
+
+            return $this->returnableSalesReturnLines($customer, $branches, $excludedIds);
         }
 
         if ($request->customer_id && $request->getArticles) {
@@ -391,7 +555,7 @@ class SalesReturnController extends Controller
         return response()->json([]);
     }
 
-    private function returnableSalesReturnLines(Customer $customer, ?ModuleBranchService $branches = null)
+    private function returnableSalesReturnLines(Customer $customer, ?ModuleBranchService $branches = null, $excludedIds = null)
     {
         $branches = $branches ?? app(ModuleBranchService::class);
 
@@ -406,15 +570,16 @@ class SalesReturnController extends Controller
         return $invoicesQuery
             ->orderByDesc('date')
             ->get()
-            ->flatMap(function ($invoice) {
+            ->flatMap(function ($invoice) use ($excludedIds) {
                 $discount = optional($invoice->order)->discount
                     ?? optional($invoice->shipment)->discount
                     ?? 0;
 
                 return $invoice->invoiceArticles
                     ->filter(fn ($invoiceArticle) => $invoiceArticle->article)
-                    ->map(function ($invoiceArticle) use ($invoice, $discount) {
+                    ->map(function ($invoiceArticle) use ($invoice, $discount, $excludedIds) {
                         $alreadyReturned = $invoice->salesReturns
+                            ->when($excludedIds?->isNotEmpty(), fn ($returns) => $returns->whereNotIn('id', $excludedIds))
                             ->where('article_id', $invoiceArticle->article_id)
                             ->sum('quantity');
                         $invoiceQuantity = (int) ($invoiceArticle->invoice_pcs ?? 0);
