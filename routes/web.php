@@ -12,6 +12,7 @@ use App\Http\Controllers\CRController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerPaymentController;
 use App\Http\Controllers\DailyLedgerController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Developer\BackupController;
 use App\Http\Controllers\Developer\BranchController;
 use App\Http\Controllers\Developer\LicenseController;
@@ -146,7 +147,8 @@ Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensur
 });
 
 Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensureLicense', 'readonly', 'blockWhenUpdating', 'appPermission', 'dbTransaction']], function () {
-    Route::get('home', [Controller::class, 'home'])->name('home');
+    Route::get('home', [DashboardController::class, 'index'])->name('home');
+    Route::get('home/dashboard-data', [DashboardController::class, 'data'])->name('home.dashboard-data');
 
     Route::resource('users', UserController::class)->except(['show']);
     Route::post('update-user-status', [UserController::class, 'updateStatus'])->name('update-user-status');

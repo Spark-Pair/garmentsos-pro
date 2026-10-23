@@ -1,5 +1,14 @@
 # Current Status
 
+## Owner Dashboard (Developer Preview)
+
+- The Home route now renders a clean owner-level business dashboard for the Developer role; all other roles retain the existing welcome home.
+- Dashboard totals are provided by a reusable `OwnerDashboardService`, use existing customer/supplier/order/stock balance rules, and are cached for one minute with an explicit refresh option.
+- The dashboard includes current receivables, payables, cash/bank and net position; period sales, collections and expenses; pending orders; finished stock; material inventory; production; due/action items; branch comparison; and recent activity.
+- Disabled client modules do not render their corresponding dashboard cards. Branch comparison respects per-branch module state and Main Branch legacy `NULL branch_id` inclusion.
+- Date changes update the inner dashboard without a page reload. Detail views use the app's existing reusable modal utility, and loading state always clears on success or failure.
+- No schema migration was required.
+
 ## Completed
 
 - Dynamic Branch Module Registry with 50 modules.

@@ -30,7 +30,7 @@ class ModuleBranchService
             'supports_multi_branch_selector' => false,
             'supports_branch_serial_prefix' => false,
             'safe_default_enabled' => false,
-            'notes' => 'Global summary screen. Branch filtering can be added later when dashboard totals are reviewed.',
+            'notes' => 'Global owner summary. It shows an all-business view with an audited branch comparison and is currently restricted to Developer.',
         ],
         'articles' => [
             'label' => 'Articles',
