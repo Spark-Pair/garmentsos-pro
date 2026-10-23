@@ -9,6 +9,9 @@
 - Main Branch defaults all modules enabled but Developer can disable.
 - No locked modules.
 - Record Filtering checkbox exists and is saved in metadata.
+- Branch Module Management has a searchable all-module overview with visible client, branching, switcher, multi-branch, and record-filtering states.
+- Overview chips (`All`, `Branch`, `Filter`, `Off`) filter the module list live and combine with module search.
+- Switching between modules on Branch Module Management updates only the detail panel instead of refreshing the full page.
 - `shouldFilterRecords()` requires usable selected branch, `record_filtering_enabled`, branch ID support, and readiness.
 - `applyScope()` returns unchanged when filtering is off.
 - `applyRelatedScope()` filters only when current module and related module are both record-filtered.

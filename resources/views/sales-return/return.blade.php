@@ -13,7 +13,7 @@
 @extends('app')
 @section('title', 'Sales Return | ' . $client_company->name)
 @section('content')
-    <div class="switch-btn-container flex absolute top-3 md:top-17 left-3 md:left-5 z-[100]">
+    {{-- <div class="switch-btn-container flex absolute top-3 md:top-17 left-3 md:left-5 z-[100]">
         <div class="switch-btn relative flex border-3 border-[var(--secondary-bg-color)] bg-[var(--secondary-bg-color)] rounded-2xl overflow-hidden">
             <div id="returnTypeHighlight" class="absolute h-full rounded-xl bg-[var(--bg-color)] transition-all duration-300 ease-in-out z-0"></div>
             <button id="returnTypeBtn" type="button"
@@ -23,7 +23,7 @@
                 class="relative z-10 px-3.5 md:px-5 py-1.5 md:py-2 cursor-pointer rounded-xl"
                 onclick="setSalesReturnType(this, 'adjustment')">Adjustment</button>
         </div>
-    </div>
+    </div> --}}
 
     <div class="mb-5 max-w-4xl mx-auto fade-in">
         <x-search-header heading="Sales Return" link linkText="Show Returns" linkHref="{{ route('sales-returns.index') }}"/>
