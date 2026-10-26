@@ -54,18 +54,22 @@
                 @if ($voucherType == 'supplier')
                     {{-- supplier --}}
                     <div class="col-span-full">
-                        <x-input label="Supplier" name="supplier_id" id="supplier_id" disabled value="{{ $voucher->supplier?->supplier_name }}" />
+                        @if ($developerCanEditVoucherHeader)
+                            <x-select label="Supplier" name="supplier_id" id="supplier_id" :options="$suppliers_options" :value="$voucher->supplier_id" required showDefault onchange="trackSupplierState()" />
+                        @else
+                            <x-input label="Supplier" name="supplier_id" id="supplier_id" disabled value="{{ $voucher->supplier?->supplier_name }}" />
+                        @endif
                     </div>
 
                     {{-- balance --}}
                     <x-input label="Balance" placeholder="Select supplier first" name="balance" id="balance" disabled />
 
                     {{-- date --}}
-                    <x-input label="Date" name="date" id="date" type="date" disabled value="{{ ($voucher->date)->format('Y-m-d') }}" />
+                    <x-input label="Date" name="date" id="date" type="date" :disabled="!$developerCanEditVoucherHeader" value="{{ ($voucher->date)->format('Y-m-d') }}" onchange="trackDateState(this)" />
                 @else
                     <div class="col-span-full">
                         {{-- date --}}
-                        <x-input label="Date" name="date" id="date" type="date" disabled value="{{ ($voucher->date)->format('Y-m-d') }}" />
+                        <x-input label="Date" name="date" id="date" type="date" :disabled="!$developerCanEditVoucherHeader" value="{{ ($voucher->date)->format('Y-m-d') }}" onchange="trackDateState(this)" />
                     </div>
                 @endif
             </div>
@@ -162,7 +166,7 @@
         window.__vouchersEdit = {
             voucherType: @json($voucherType),
             voucher: @json($voucherPayload),
-            isDeveloper: @json(Auth::user()?->role === 'developer' || app_can('vouchers', 'override')),
+            isDeveloper: @json($developerCanEditVoucherHeader),
             branchBranding: @json($branchBranding ?? null),
             companyData: @json($branchBranding ?? $client_company),
             companyLogoUrl: @json(($branchBranding['logo_url'] ?? null) ?: asset('images/' . $client_company->logo)),

@@ -550,10 +550,26 @@ class VoucherController extends Controller
             $user->save();
         }
 
+        $developerCanEditVoucherHeader = Auth::user()?->role === 'developer' || app_can('vouchers', 'override');
+        $suppliers_options = [];
+        if ($developerCanEditVoucherHeader && $voucher->supplier_id !== null) {
+            $suppliers = $branches
+                ->applyRelatedScope(Supplier::whereHas('user', fn ($q) => $q->where('status', 'active')), 'suppliers', 'vouchers')
+                ->select('id', 'supplier_name', 'date')
+                ->get();
+            $supplierPayloads = $this->supplierOptionPayloads($suppliers, 'vouchers');
+            $suppliers_options = $suppliers->mapWithKeys(fn ($supplier) => [
+                (int) $supplier->id => [
+                    'text' => $supplier->supplier_name,
+                    'data_option' => $supplierPayloads[(int) $supplier->id],
+                ],
+            ])->all();
+        }
+
         $branchBranding = app(ModuleBranchService::class)->documentBranding('vouchers', $voucher);
         $voucherPayload = $this->formatVoucherEditPayload($voucher);
 
-        return view("vouchers.edit", compact('voucher', 'voucherPayload', 'cheques_options', 'slips_options', 'selfAccountsPayload', 'self_accounts_options', 'branchBranding'));
+        return view("vouchers.edit", compact('voucher', 'voucherPayload', 'cheques_options', 'slips_options', 'selfAccountsPayload', 'self_accounts_options', 'branchBranding', 'suppliers_options', 'developerCanEditVoucherHeader'));
     }
 
     private function formatVoucherEditPayload(Voucher $voucher): array
@@ -704,8 +720,11 @@ class VoucherController extends Controller
         // -----------------------------
         // Step 2: Validation
         // -----------------------------
+        $canEditVoucherHeader = Auth::user()?->role === 'developer' || app_can('vouchers', 'override');
         $validator = Validator::make($request->all(), [
             "payment_details_array" => "required|json",
+            "supplier_id" => [$canEditVoucherHeader ? ($voucher->supplier_id !== null ? 'required' : 'nullable') : 'prohibited', 'integer', 'exists:suppliers,id'],
+            "date" => [$canEditVoucherHeader ? 'required' : 'prohibited', 'date'],
         ]);
 
         if ($validator->fails()) {
@@ -713,10 +732,25 @@ class VoucherController extends Controller
         }
 
         $requestPayments = json_decode($request->payment_details_array, true);
+        if ($canEditVoucherHeader && $request->filled('supplier_id')) {
+            $supplierIsAllowed = app(ModuleBranchService::class)
+                ->applyRelatedScope(Supplier::query(), 'suppliers', 'vouchers')
+                ->whereKey($request->input('supplier_id'))
+                ->exists();
+            if (!$supplierIsAllowed) {
+                return redirect()->back()->withInput()->with('error', 'The selected supplier is not available in the current branch context.');
+            }
+        }
         $this->assertVoucherPaymentsAreUnique($requestPayments ?? [], $voucher);
-        $this->assertSelfVoucherPaymentsAreComplete($requestPayments ?? [], !$voucher->supplier_id);
+        $supplierId = $canEditVoucherHeader ? $request->input('supplier_id') : $voucher->supplier_id;
+        $voucherDate = $canEditVoucherHeader ? $request->input('date') : $voucher->date->format('Y-m-d');
+        $this->assertSelfVoucherPaymentsAreComplete($requestPayments ?? [], !$supplierId);
 
-        DB::transaction(function () use ($voucher, $requestPayments) {
+        DB::transaction(function () use ($voucher, $requestPayments, $supplierId, $voucherDate) {
+            $voucher->update([
+                'supplier_id' => $supplierId,
+                'date' => $voucherDate,
+            ]);
 
             // -----------------------------
             // Step 3: Delete existing payments
@@ -777,15 +811,18 @@ class VoucherController extends Controller
             // -----------------------------
             foreach ($requestPayments as $pd) {
 
-                $pd['supplier_id'] = $voucher->supplier_id;
+                $pd['supplier_id'] = $supplierId;
                 $pd['voucher_id']  = $voucher->id;
-                $pd['date']        = $voucher->date;
+                $pd['date']        = $voucherDate;
                 $pd['branch_id']   = $voucher->branch_id ?: app(ModuleBranchService::class)->branchIdForCreate('vouchers');
 
                 if (in_array($pd['method'], ['program', 'Program'])) {
                     $supplierPayment = SupplierPayment::find($pd['payment_id'] ?? $pd['id'] ?? null);
                     if ($supplierPayment) {
-                        $supplierPayment->update(['voucher_id' => $pd['voucher_id']]);
+                        $supplierPayment->update([
+                            'voucher_id' => $pd['voucher_id'],
+                            'supplier_id' => $supplierId,
+                        ]);
                     }
                     continue;
                 }

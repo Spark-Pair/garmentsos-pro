@@ -62,7 +62,7 @@ function initVouchersEdit() {
         });
     }
 
-    let supplierSelectDom = document.getElementById('supplier_id');
+    let supplierSelectDom = document.querySelector('.dbInput[data-for="supplier_id"]');
     let methodSelectDom = document.getElementById('method');
     let dateDom = document.getElementById('date');
     let balanceDom = document.getElementById('balance');
@@ -85,10 +85,12 @@ function initVouchersEdit() {
 
     window.trackSupplierState = function() {
         balanceDom.value = '';
-        methodSelectDom.value = '';
 
         if (supplierSelectDom && supplierSelectDom.value != '') {
-            selectedSupplier = voucher.supplier;
+            const selectedOption = supplierSelectDom.closest('.selectParent')?.querySelector(`ul[data-for="supplier_id"] li.selected[data-value="${supplierSelectDom.value}"]`);
+            selectedSupplier = selectedOption?.dataset.option
+                ? JSON.parse(selectedOption.dataset.option)
+                : voucher.supplier;
             methodSelectDom.disabled = false;
             const initialBalance = selectedSupplier.balance_at_date ?? selectedSupplier.balance ?? 0;
             balanceDom.value = formatNumbersWithDigits(initialBalance, 1, 1);
@@ -99,9 +101,11 @@ function initVouchersEdit() {
     }
 
     window.trackDateState = function(elem) {
-        paymentDetailsArray = [];
-        methodSelectDom.value = '';
-        renderList();
+        if (!isDeveloper) {
+            paymentDetailsArray = [];
+            methodSelectDom.value = '';
+            renderList();
+        }
 
         if (elem.value != '') {
             gotoStep(2);
