@@ -14,6 +14,7 @@ class SalesReturn extends Model
     use Filterable, SalesReturnComputed;
 
     protected $fillable = [
+        'return_no',
         'article_id',
         'invoice_id',
         'type',

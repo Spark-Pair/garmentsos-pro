@@ -213,6 +213,42 @@
             minmax(66px, 1.2fr) !important;
     }
 
+    .sales-return-preview .sales-return-grid {
+        grid-template-columns:
+            7%
+            17%
+            minmax(0, 1fr)
+            18%
+            9%
+            12%
+            14% !important;
+        column-gap: 0 !important;
+        align-items: center;
+        box-sizing: border-box;
+        justify-content: stretch;
+    }
+
+    .sales-return-preview .sales-return-grid .td,
+    .sales-return-preview .sales-return-grid .th {
+        min-width: 0 !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    .sales-return-preview .sales-return-grid .invoice-description-cell {
+        overflow: visible !important;
+        overflow-wrap: anywhere !important;
+        text-overflow: clip !important;
+        white-space: normal !important;
+        line-height: 1.15 !important;
+    }
+
+    .sales-return-preview .sales-return-grid > :first-child {
+        justify-content: flex-start !important;
+        text-align: left !important;
+    }
+
     .gos-a5-document .th,
     .gos-a5-document .td {
         min-width: 0;

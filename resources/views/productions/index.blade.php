@@ -29,14 +29,14 @@
             ],
         ];
     @endphp
-    <div class="w-[80%] mx-auto">
+    <div class="w-[90%] mx-auto">
         <x-search-header heading="Production" :search_fields=$searchFields/>
     </div>
 
     <!-- Main Content -->
     <section class="text-center mx-auto ">
         <div
-            class="show-box mx-auto w-[80%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
+            class="show-box mx-auto w-[90%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
             <x-form-title-bar printBtn layout="table" title="Show Productions" resetSortBtn />
 
             <div class="absolute bottom-3 right-3 flex items-center gap-2 w-fll z-50">
@@ -52,7 +52,7 @@
                             <div class="w-1/8 cursor-pointer" onclick="sortByThis(this)">Receive Date</div>
                             <div class="w-1/8 cursor-pointer" onclick="sortByThis(this)">Ticket</div>
                             <div class="w-1/7 cursor-pointer" onclick="sortByThis(this)">Worker Name</div>
-                            <div class="w-1/8 cursor-pointer" onclick="sortByThis(this)">Type</div>
+                            <div class="w-1/8 cursor-pointer" onclick="sortByThis(this)">Status</div>
                             <div class="w-1/8 cursor-pointer" onclick="sortByThis(this)">Quantity</div>
                             <div class="w-1/8 cursor-pointer" onclick="sortByThis(this)">Rate</div>
                             <div class="w-1/8 cursor-pointer" onclick="sortByThis(this)">Amount</div>

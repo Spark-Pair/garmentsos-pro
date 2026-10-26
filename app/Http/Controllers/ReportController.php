@@ -1065,6 +1065,7 @@ class ReportController extends Controller
         );
         $includeNullBranchRecords = $branchContext['include_null_main_records'] ?? false;
         $articleOptions = $physicalQuantityReportService->getArticleOptions($selectedBranchIds, $includeNullBranchRecords);
+        $filterOptions = $physicalQuantityReportService->getReportFilterOptions($selectedBranchIds, $includeNullBranchRecords);
         $mode = $request->input('mode', 'all_articles');
         $reportType = Auth::user()?->physical_quantity_report_type ?? 'altration';
         if (!in_array($mode, ['all_articles', 'article_wise', 'proceed_by_wise'], true)) {
@@ -1077,23 +1078,23 @@ class ReportController extends Controller
 
         if ($request->boolean('withData')) {
             $filters = [];
-            $canGenerate = true;
+            foreach (['article_id', 'season', 'size', 'category', 'processed_by', 'shipment'] as $filter) {
+                $values = $request->input($filter, []);
+                $values = is_array($values) ? $values : explode(',', (string) $values);
+                $values = array_values(array_filter(array_map('trim', $values), fn ($value) => $value !== ''));
 
-            if ($mode === 'article_wise' && $request->filled('article_id')) {
-                $filters['article_id'] = (int) $request->input('article_id');
-            } elseif ($mode === 'article_wise') {
-                $canGenerate = false;
+                if ($values !== []) {
+                    $filters[$filter] = $values;
+                }
             }
 
-            if ($mode === 'proceed_by_wise' && $request->filled('proceed_by')) {
-                $filters['processed_by'] = $request->input('proceed_by');
-            } elseif ($mode === 'proceed_by_wise') {
-                $canGenerate = false;
-            }
-
-            $rows = $canGenerate
-                ? $physicalQuantityReportService->getArticleReportRows($filters, $reportType, $selectedBranchIds, $includeNullBranchRecords)
-                : collect();
+            $rows = $physicalQuantityReportService->getArticleReportRows(
+                $filters,
+                $reportType,
+                $selectedBranchIds,
+                $includeNullBranchRecords
+            );
+            // Keep the A4 preview split at 58 articles per column.
             $maxRowsPerColumn = 58;
             $maxRowsPerPage = $maxRowsPerColumn * 2;
 
@@ -1110,8 +1111,7 @@ class ReportController extends Controller
             $data = [
                 'mode' => $mode,
                 'report_type' => $reportType,
-                'article_id' => $request->input('article_id'),
-                'proceed_by' => $request->input('proceed_by'),
+                'filters' => $filters,
                 'rows' => $rows,
                 'pages' => $pages,
                 'generated_at' => now(),
@@ -1119,7 +1119,7 @@ class ReportController extends Controller
             ];
         }
 
-        return view('reports.physical-quantity', compact('articleOptions', 'mode', 'reportType', 'data', 'selectedBranchLabels', 'physicalBranding'));
+        return view('reports.physical-quantity', compact('articleOptions', 'filterOptions', 'mode', 'reportType', 'data', 'selectedBranchLabels', 'physicalBranding'));
     }
 
     private function applyReportBranchScope($query, string $tableName, array $branchIds, array $branchContext, string $branchColumn = 'branch_id')

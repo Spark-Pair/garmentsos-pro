@@ -1,6 +1,19 @@
 @extends('app')
 @section('title', 'Generate DR | ' . $client_company->name)
 @section('content')
+    @php $isEdit = isset($dR); @endphp
+    @php
+        $editData = $isEdit ? [
+            'id' => $dR->id,
+            'customer_id' => $dR->customer_id,
+            'customer_text' => $dR->customer?->customer_name . ($dR->customer?->city?->short_title ? ' | ' . strtoupper($dR->customer->city->short_title) : ''),
+            'date' => $dR->date?->format('Y-m-d'),
+            'return_payments' => $dR->return_payments,
+            'return_payment_details' => $return_payment_details,
+            'new_payments' => $dR->new_payments,
+            'new_payment_details' => $new_payment_details,
+        ] : null;
+    @endphp
     @php
         $method_options = [
             'cash' => ['text' => 'Cash'],
@@ -41,15 +54,16 @@
     <!-- Main Content -->
     <!-- Progress Bar -->
     <div class="mb-5 max-w-5xl mx-auto">
-        <x-search-header heading="Generate DR" link linkText="Show DR" linkHref="{{ route('dr.index') }}"/>
+        <x-search-header heading="{{ $isEdit ? 'Edit DR' : 'Generate DR' }}" link linkText="Show DR" linkHref="{{ route('dr.index') }}"/>
         <x-progress-bar :steps="['Select Payment', 'Add Payment']" :currentStep="1" />
     </div>
 
     <!-- Form -->
-    <form id="form" action="{{ route('dr.store') }}" method="post" enctype="multipart/form-data"
+    <form id="form" action="{{ $isEdit ? url('/dr/' . $dR->id) : route('dr.store') }}" method="post" enctype="multipart/form-data" {{ $isEdit ? 'data-skip-validation novalidate' : '' }}
         class="bg-[var(--secondary-bg-color)] text-sm rounded-xl shadow-lg p-8 border border-[var(--glass-border-color)]/20 pt-14 max-w-5xl mx-auto  relative overflow-hidden">
         @csrf
-        <x-form-title-bar title="Generate DR" />
+        @if ($isEdit) @method('PUT') @endif
+        <x-form-title-bar title="{{ $isEdit ? 'Edit DR' : 'Generate DR' }}" />
 
         <!-- Step 1: Generate cargo list -->
         <div class="step1 space-y-4 ">
@@ -61,6 +75,7 @@
                         id="customer"
                         name="customer_id"
                         :options="$customer_options"
+                        :value="$isEdit ? $dR->customer_id : ''"
                         showDefault
                         onchange="trackCustomerState(this)"
                     />
@@ -68,7 +83,7 @@
 
                 <div class="w-1/4">
                     {{-- date --}}
-                    <x-input label="Date" name="date" id="date" type="date" validateMax max="{{ today()->toDateString() }}" required/>
+                    <x-input label="Date" name="date" id="date" type="date" validateMax max="{{ today()->toDateString() }}" required value="{{ $isEdit ? $dR->date?->format('Y-m-d') : '' }}"/>
                 </div>
 
                 <button id="showPaymentBtn" type="button" class="bg-[var(--primary-color)] px-4 py-2 rounded-lg hover:bg-[var(--h-primary-color)] transition-all duration-300 ease-in-out text-nowrap cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" disabled onclick="getPayments()">Show Payments</button>
@@ -148,13 +163,14 @@
 @endsection
 
 @push('page-scripts')
-<script defer src="{{ asset('js/pages/dr-generate.js') }}"></script>
 <script>
         window.__drGenerate = {
+            editData: @json($editData),
             bankSelectHtml: @json($bankSelectHtml),
             remarksInputHtml: @json($remarksInputHtml),
             selectPaymentAlertHtml: @json($selectPaymentAlertHtml),
             amountMismatchAlertHtml: @json($amountMismatchAlertHtml),
         };
     </script>
+<script defer src="{{ asset('js/pages/dr-generate.js') }}?v={{ filemtime(public_path('js/pages/dr-generate.js')) }}"></script>
 @endpush

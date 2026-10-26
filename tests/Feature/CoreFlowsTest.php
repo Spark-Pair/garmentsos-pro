@@ -663,6 +663,58 @@ class CoreFlowsTest extends TestCase
         $this->assertSame(0.0, (float) $destination->fresh()->calculateBalance());
     }
 
+    public function test_voucher_previous_balance_excludes_its_own_payment_and_is_not_shared_by_same_date_vouchers(): void
+    {
+        $user = $this->actingDeveloper();
+        $supplierUser = User::create([
+            'name' => 'Balance Supplier',
+            'username' => 'balance_supplier',
+            'password' => Hash::make('password'),
+            'role' => 'guest',
+            'status' => 'active',
+        ]);
+        $supplier = Supplier::create([
+            'user_id' => $supplierUser->id,
+            'supplier_name' => 'Balance Supplier',
+            'person_name' => 'Balance Person',
+            'phone_number' => '03000000000',
+            'date' => '2026-02-26',
+            'categories_array' => '[]',
+            'creator_id' => $user->id,
+        ]);
+
+        $firstVoucher = Voucher::create([
+            'voucher_no' => 2301,
+            'supplier_id' => $supplier->id,
+            'date' => '2026-02-26',
+        ]);
+        $secondVoucher = Voucher::create([
+            'voucher_no' => 2302,
+            'supplier_id' => $supplier->id,
+            'date' => '2026-02-26',
+        ]);
+        SupplierPayment::create([
+            'supplier_id' => $supplier->id,
+            'voucher_id' => $firstVoucher->id,
+            'date' => '2026-02-26',
+            'method' => 'Cash',
+            'amount' => 27000,
+        ]);
+        SupplierPayment::create([
+            'supplier_id' => $supplier->id,
+            'voucher_id' => $secondVoucher->id,
+            'date' => '2026-02-26',
+            'method' => 'Cash',
+            'amount' => 12000,
+        ]);
+
+        $first = $firstVoucher->fresh()->toFormattedArray();
+        $second = $secondVoucher->fresh()->toFormattedArray();
+
+        $this->assertSame(-12000.0, $first['previous_balance_numeric']);
+        $this->assertSame(-27000.0, $second['previous_balance_numeric']);
+    }
+
     public function test_incomplete_self_cheque_does_not_create_a_voucher(): void
     {
         $this->actingDeveloper();

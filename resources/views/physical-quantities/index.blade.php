@@ -2,6 +2,9 @@
 @section('title', 'Show Physical Quantities | ' . $client_company->name)
 @section('content')
     @php
+        $categoryOptions = app('article')->categories;
+        $sizeOptions = app('article')->sizes;
+        $seasonOptions = app('article')->seasons;
         $searchFields = [
             "Article No" => [
                 "id" => "article_no",
@@ -16,6 +19,27 @@
                 "placeholder" => "Enter processed by",
                 "dataFilterPath" => "processed_by",
             ],
+            "Category" => [
+                "id" => "category",
+                "type" => "select",
+                "options" => $categoryOptions,
+                "multiple" => true,
+                "dataFilterPath" => "category",
+            ],
+            "Size" => [
+                "id" => "size",
+                "type" => "select",
+                "options" => $sizeOptions,
+                "multiple" => true,
+                "dataFilterPath" => "size",
+            ],
+            "Season" => [
+                "id" => "season",
+                "type" => "select",
+                "options" => $seasonOptions,
+                "multiple" => true,
+                "dataFilterPath" => "season",
+            ],
             'Shipment' => [
                 'id' => 'shipment',
                 'type' => 'select',
@@ -29,14 +53,14 @@
         ];
     @endphp
 
-    <div class="w-[80%] mx-auto">
+    <div class="w-[90%] mx-auto">
         <x-search-header heading="Physical Quantity" :search_fields=$searchFields />
     </div>
 
     <!-- Main Content -->
     <section class="text-center mx-auto ">
         <div
-            class="show-box mx-auto w-[80%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
+            class="show-box mx-auto w-[90%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
             <x-form-title-bar printBtn layout="table" title="Show Physical Quantities" resetSortBtn />
 
             <div class="absolute bottom-3 right-3 flex items-center gap-2 w-fll z-50">

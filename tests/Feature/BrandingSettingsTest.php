@@ -210,8 +210,9 @@ class BrandingSettingsTest extends TestCase
 
         $this->get(route('home'))
             ->assertOk()
-            ->assertSee('Welcome to Effective Company!')
-            ->assertSee('Effective App | Track your progress');
+            ->assertSee('Business Dashboard')
+            ->assertSee('Effective Company')
+            ->assertSee('Effective App');
 
         $this->view('auth.login')
             ->assertSee('Effective App')

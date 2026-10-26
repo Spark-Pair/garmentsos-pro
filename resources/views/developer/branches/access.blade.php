@@ -12,12 +12,12 @@
         $userOptions = $users->mapWithKeys(fn ($user) => [$user->id => ['text' => ($user->name ?? $user->username) . ' (' . $user->role . ')']])->all();
     @endphp
 
-    <div class="w-[80%] mx-auto">
+    <div class="w-[90%] mx-auto">
         <x-search-header heading="Role / Permission Management" link linkText="Back to Settings" linkHref="{{ route('developer.settings') }}" />
     </div>
 
     <section class="text-center mx-auto">
-        <div class="show-box mx-auto w-[80%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
+        <div class="show-box mx-auto w-[90%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
             <x-form-title-bar title="Role / Permission Management" />
 
             <div class="details h-full z-40">

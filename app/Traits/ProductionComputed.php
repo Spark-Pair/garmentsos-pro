@@ -21,17 +21,22 @@ trait ProductionComputed
         $partQuantities = $this->partQuantitiesForPayload();
         $flowQuantity = collect($partQuantities)->max('quantity') ?? $this->quantity;
         $flowType = $this->issue_date ? 'Issue' : 'Receive';
+        $issueDate = $this->effectiveIssueDate();
         $receiveDate = $this->effectiveReceiveDate();
+        $status = $receiveDate ? 'Received' : 'Pending';
         $rate = $this->effectiveRate();
         $amount = $this->effectiveAmount();
 
         return [
             'id' => $this->id,
+            'article_id' => $this->article_id,
+            'work_id' => $this->work_id,
             'article_no' => $this->article->article_no,
             'worker_name' => $this->worker->employee_name . ' | ' . $this->work->title,
             'ticket' => $this->ticket,
-            'issue_date' => $this->issue_date?->format('d-M-Y, D') ?? '-',
+            'issue_date' => $issueDate?->format('d-M-Y, D') ?? '-',
             'receive_date' => $receiveDate?->format('d-M-Y, D') ?? '-',
+            'status' => $status,
             'movement_type' => $flowType,
             'quantity' => $flowQuantity,
             'rate' => $rate,
@@ -45,16 +50,19 @@ trait ProductionComputed
             'onclick' => 'generateModal(this)',
             'data' => [
                 'id' => $this->id,
+                'article_id' => $this->article_id,
+                'work_id' => $this->work_id,
                 'ticket' => $this->ticket,
                 'branch_id' => $this->branch_id,
                 'branch_branding' => app(\App\Services\Branches\ModuleBranchService::class)->documentBranding('productions', $this),
-                'issue_date' => $this->issue_date?->format('Y-m-d'),
+                'issue_date' => $issueDate?->format('Y-m-d'),
                 'receive_date' => $receiveDate?->format('Y-m-d'),
                 'article_no' => $this->article?->article_no,
                 'article' => $this->article,
                 'work' => $this->work,
                 'worker' => $this->worker,
                 'worker_name' => $this->worker?->employee_name,
+                'status' => $status,
                 'movement_type' => $flowType,
                 'parent_ticket' => $this->partParentTicket(),
                 'quantity' => $flowQuantity,
@@ -144,26 +152,40 @@ trait ProductionComputed
         return $date ? Carbon::parse($date) : null;
     }
 
-    private function effectiveRate(): ?float
+    private function effectiveIssueDate()
     {
-        if ((float) ($this->rate ?? 0) > 0) {
-            return (float) $this->rate;
+        if ($this->issue_date) {
+            return $this->issue_date;
         }
 
-        $receive = $this->latestReceiveChild();
+        if (!Schema::hasTable('production_flows') || !$this->ticket) {
+            return null;
+        }
 
-        return $receive && (float) ($receive->rate ?? 0) > 0 ? (float) $receive->rate : $this->rate;
+        $parentTicket = $this->productionFlows
+            ->pluck('parent_ticket')
+            ->filter()
+            ->first();
+
+        if (!$parentTicket) {
+            return null;
+        }
+
+        $date = self::query()
+            ->where('ticket', $parentTicket)
+            ->value('issue_date');
+
+        return $date ? Carbon::parse($date) : null;
+    }
+
+    private function effectiveRate(): ?float
+    {
+        return $this->rate !== null ? (float) $this->rate : null;
     }
 
     private function effectiveAmount(): ?float
     {
-        if ((float) ($this->amount ?? 0) > 0) {
-            return (float) $this->amount;
-        }
-
-        $receive = $this->latestReceiveChild();
-
-        return $receive && (float) ($receive->amount ?? 0) > 0 ? (float) $receive->amount : $this->amount;
+        return $this->amount !== null ? (float) $this->amount : null;
     }
 
     private function latestReceiveChild(): ?self

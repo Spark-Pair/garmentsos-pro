@@ -78,9 +78,28 @@ class BiltyController extends Controller
 
         $invoicesArray = json_decode($request->invoices_array, true);
 
+        if (!is_array($invoicesArray) || empty($invoicesArray)) {
+            return redirect()->back()->withInput()->with('error', 'Please select at least one invoice.');
+        }
+
+        $validator = validator(['invoices' => $invoicesArray], [
+            'invoices' => 'required|array|min:1',
+            'invoices.*.id' => 'required|integer',
+            'invoices.*.biltyNo' => [
+                'required',
+                'string',
+                'max:255',
+                'regex:/\A[A-Za-z0-9 _\.\/:#-]+\z/u',
+            ],
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()->withInput()->with('error', 'Bilty No may contain only letters, numbers, spaces, dots, slashes, colons, underscores, and hyphens.');
+        }
+
         // Validate that all invoices have biltyNo
         foreach ($invoicesArray as $invoice) {
-            if (!isset($invoice['biltyNo'])) {
+            if (!isset($invoice['biltyNo']) || trim((string) $invoice['biltyNo']) === '') {
                 return redirect()->back()->withInput()->with('error', 'Please enter a bilty number for every selected invoice.');
             }
         }
@@ -125,6 +144,8 @@ class BiltyController extends Controller
     public function show(Bilty $bilty)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($bilty, 'bilties');
+
+        return redirect()->route('bilties.index');
     }
 
     /**
@@ -133,6 +154,14 @@ class BiltyController extends Controller
     public function edit(Bilty $bilty)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($bilty, 'bilties');
+
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant'])) {
+            return $resp;
+        }
+
+        $bilty->load('invoice.customer.city');
+
+        return view('bilties.edit', compact('bilty'));
     }
 
     /**
@@ -141,6 +170,24 @@ class BiltyController extends Controller
     public function update(Request $request, Bilty $bilty)
     {
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($bilty, 'bilties');
+
+        if ($resp = $this->denyIfNoRole(['developer', 'owner', 'admin', 'accountant'])) {
+            return $resp;
+        }
+
+        $validated = $request->validate([
+            'date' => 'required|date',
+            'bilty_no' => [
+                'required',
+                'string',
+                'max:255',
+                'regex:/\A[A-Za-z0-9 _\.\/:#-]+\z/u',
+            ],
+        ]);
+
+        $bilty->update($validated);
+
+        return redirect()->route('bilties.index')->with('success', 'Bilty updated successfully.');
     }
 
     /**

@@ -12,6 +12,7 @@ use App\Http\Controllers\CRController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerPaymentController;
 use App\Http\Controllers\DailyLedgerController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Developer\BackupController;
 use App\Http\Controllers\Developer\BranchController;
 use App\Http\Controllers\Developer\LicenseController;
@@ -146,7 +147,8 @@ Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensur
 });
 
 Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensureLicense', 'readonly', 'blockWhenUpdating', 'appPermission', 'dbTransaction']], function () {
-    Route::get('home', [Controller::class, 'home'])->name('home');
+    Route::get('home', [DashboardController::class, 'index'])->name('home');
+    Route::get('home/dashboard-data', [DashboardController::class, 'data'])->name('home.dashboard-data');
 
     Route::resource('users', UserController::class)->except(['show']);
     Route::post('update-user-status', [UserController::class, 'updateStatus'])->name('update-user-status');
@@ -244,6 +246,8 @@ Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensur
     Route::get('daily-ledger/summary', [DailyLedgerController::class, 'summary'])->name('daily-ledger.summary');
     Route::resource('daily-ledger', DailyLedgerController::class);
 
+    Route::get('sales-returns/print/{returnNo}', [SalesReturnController::class, 'print'])->name('sales-returns.print');
+    Route::delete('sales-returns/document/{returnNo}', [SalesReturnController::class, 'destroyDocument'])->name('sales-returns.document.destroy');
     Route::resource('sales-returns', SalesReturnController::class);
     Route::post('sales-returns/get-details', [SalesReturnController::class, 'getDetails'])->name('sales-returns.get-details');
     Route::resource('statement-adjustments', StatementAdjustmentController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);

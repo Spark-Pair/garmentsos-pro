@@ -65,7 +65,7 @@
                             <div class="grid grid-cols-1 gap-4">
                                 @foreach ($search_fields as $search_field => $value)
                                     @if ($value['type'] == "select")
-                                        <x-select label="{{ $search_field }}" id="{{ $value['id'] }}" :options="$value['options']" :dataClearable="true" dataFilterPath="{{ $value['dataFilterPath'] }}" showDefault />
+                                        <x-select label="{{ $search_field }}" id="{{ $value['id'] }}" :options="$value['options']" :dataClearable="true" dataFilterPath="{{ $value['dataFilterPath'] }}" :multiple="$value['multiple'] ?? false" showDefault />
                                     @elseif ($value['type'] == "text")
                                         <x-input label="{{ $search_field }}" id="{{ $value['id'] }}" type="{{ $value['type'] }}" :dataClearable="true" dataFilterPath="{{ $value['dataFilterPath'] }}" placeholder="{{ $value['placeholder'] }}" :listInput="$value['listInput'] ?? false" />
                                     @elseif (isset($value['type2']) && isset($value['id2']))

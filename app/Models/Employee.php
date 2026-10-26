@@ -162,6 +162,9 @@ class Employee extends Model
         $productionQuery = $this->productions()
             ->whereBetween(DB::raw('DATE(receive_date)'), [$start, $end])
             ->when($hasBranchScope && Schema::hasColumn('productions', 'branch_id'), $branchScope);
+        $productionDetailsQuery = $this->productions()
+            ->with(['article', 'work', 'productionFlows'])
+            ->when($hasBranchScope && Schema::hasColumn('productions', 'branch_id'), $branchScope);
         $paymentQuery = $this->payments()
             ->whereBetween(DB::raw('DATE(date)'), [$start, $end])
             ->when($hasBranchScope && Schema::hasColumn('employee_payments', 'branch_id'), $branchScope);
@@ -255,20 +258,58 @@ class Employee extends Model
                 ->sortBy($makeSortKey)
                 ->values();
         } else {
-            $productions = $mapQuery($productionQuery, fn ($production) => [
-                'date' => $rawDate($production, 'receive_date'),
-                'reff_no' => $production->ticket ?? '-',
-                'type' => 'invoice',
-                'method' => 'Production',
-                'bill' => (float) ($production->amount ?? 0),
-                'payment' => 0,
-                'description' => $production->title ?? '-',
-                'created_at' => $production->created_at,
-                'source' => [
-                    'type' => 'production',
-                    'id' => $production->id,
-                ],
-            ]);
+            $productionRows = $productionDetailsQuery->get();
+            $productionGroups = $productionRows->groupBy(function ($production) {
+                $parentTicket = $production->productionFlows
+                    ->pluck('parent_ticket')
+                    ->filter()
+                    ->first();
+
+                return $parentTicket ?: ($production->ticket ?: 'production-' . $production->id);
+            })->filter(function ($group) use ($start, $end) {
+                return $group->contains(function ($production) use ($start, $end) {
+                    return collect([$production->issue_date, $production->receive_date])
+                        ->filter()
+                        ->contains(fn ($date) => $date->betweenIncluded($start, $end));
+                });
+            });
+
+            $productions = $productionGroups->map(function ($group) {
+                $production = $group->sortBy('id')->first();
+                $issueRows = $group->filter(fn ($row) => $row->issue_date);
+                $receiveRows = $group->filter(fn ($row) => $row->receive_date);
+                $issueQuantity = (float) $group->flatMap->productionFlows
+                    ->where('movement_type', 'issue')
+                    ->sum('quantity');
+                $receiveQuantity = (float) $group->flatMap->productionFlows
+                    ->where('movement_type', 'receive')
+                    ->sum('quantity');
+                $hasIssue = $issueRows->isNotEmpty() || $issueQuantity > 0;
+                $isReceived = !$hasIssue || $receiveQuantity + 0.00001 >= $issueQuantity;
+                $issueDate = $issueRows->sortBy('issue_date')->first();
+                $receiveDate = $receiveRows->sortBy('receive_date')->last();
+                $description = collect([
+                    $production->article?->article_no ? 'Article: ' . $production->article->article_no : null,
+                    'Status: ' . ($isReceived ? 'Received' : 'Pending'),
+                ])->filter()->implode(' | ');
+
+                return [
+                    'date' => $issueDate
+                        ? $issueDate->issue_date
+                        : ($receiveDate?->receive_date ?? $production->receive_date ?? $production->issue_date),
+                    'reff_no' => $production->ticket ?? '-',
+                    'type' => 'invoice',
+                    'method' => 'Production',
+                    'bill' => (float) $group->sum(fn ($row) => (float) ($row->amount ?? 0)),
+                    'payment' => 0,
+                    'description' => $description ?: '-',
+                    'created_at' => $group->min('created_at'),
+                    'source' => [
+                        'type' => 'production',
+                        'id' => $production->id,
+                    ],
+                ];
+            })->values();
             $salaries = $mapQuery($salaryQuery, fn ($salary) => [
                 'date' => $salaryDate($salary),
                 'reff_no' => 'SAL-' . $salary->id,

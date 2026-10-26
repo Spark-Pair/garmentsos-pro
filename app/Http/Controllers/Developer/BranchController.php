@@ -135,21 +135,58 @@ class BranchController extends Controller
         }
 
         $branchRows = Branch::query()->orderByDesc('is_main')->orderBy('name')->get();
-        $settings = BranchModuleSetting::query()
-            ->where('module_key', $selectedModule)
+        $allSettings = BranchModuleSetting::query()
+            ->whereIn('module_key', $moduleKeys)
             ->get()
+            ->groupBy('module_key');
+        $settings = $allSettings
+            ->get($selectedModule, collect())
             ->keyBy(fn (BranchModuleSetting $setting) => $setting->branch_id ?? 'global');
+        $clientModuleStates = collect($moduleSettings->all())->keyBy('key');
+        $moduleLabels = $branches->moduleLabels();
+        $moduleOverview = collect($registry)->map(function (array $module, string $moduleKey) use ($allSettings, $branchRows, $clientModuleStates, $moduleLabels) {
+            $moduleSettings = $allSettings->get($moduleKey, collect());
+            $globalSetting = $moduleSettings->firstWhere('branch_id', null);
+            $globalMetadata = is_array($globalSetting?->metadata) ? $globalSetting->metadata : [];
+            $branchSettings = $moduleSettings->whereIn('branch_id', $branchRows->pluck('id'));
+            $metadataEnabledCount = function (string $key) use ($branchSettings): int {
+                return $branchSettings->filter(function (BranchModuleSetting $setting) use ($key) {
+                    $metadata = is_array($setting->metadata) ? $setting->metadata : [];
+
+                    return (bool) ($metadata[$key] ?? false);
+                })->count();
+            };
+
+            return [
+                'key' => $moduleKey,
+                'label' => $globalMetadata['label_override'] ?? ($moduleLabels[$moduleKey] ?? $module['label'] ?? $moduleKey),
+                'client_enabled' => ! (bool) ($globalMetadata['client_disabled'] ?? false),
+                'sidebar_visible' => (bool) ($clientModuleStates->get($moduleKey)['visible_in_sidebar'] ?? true),
+                'branching_count' => $branchSettings->where('branch_enabled', true)->count(),
+                'switching_count' => $branchSettings->where('allow_user_switching', true)->count(),
+                'filtering_count' => $metadataEnabledCount('record_filtering_enabled'),
+                'multi_count' => $metadataEnabledCount('supports_multi_branch_selector'),
+                'branch_count' => $branchRows->count(),
+            ];
+        })->values();
 
         return view('developer.branches.modules', [
             'branches' => $branchRows,
             'moduleRegistry' => $registry,
-            'moduleLabels' => $branches->moduleLabels(),
+            'moduleLabels' => $moduleLabels,
             'selectedModuleKey' => $selectedModule,
             'selectedModule' => $selectedModule ? $branches->runtimeModuleConfig($selectedModule, $mainBranch?->id) : null,
             'settings' => $settings,
             'clientModuleState' => $moduleSettings->effectiveState($selectedModule),
             'clientModuleKnown' => array_key_exists($selectedModule, $moduleSettings->registry()),
             'clientModuleEnabled' => ! (bool) (($settings->get('global')?->metadata ?? [])['client_disabled'] ?? false),
+            'moduleOverview' => $moduleOverview,
+            'moduleOverviewStats' => [
+                'total' => $moduleOverview->count(),
+                'branching' => $moduleOverview->where('branching_count', '>', 0)->count(),
+                'filtering' => $moduleOverview->where('filtering_count', '>', 0)->count(),
+                'disabled' => $moduleOverview->where('client_enabled', false)->count(),
+            ],
         ]);
     }
 
@@ -365,6 +402,7 @@ class BranchController extends Controller
             'modules.*.supports_branch_serial_prefix' => ['nullable', 'boolean'],
             'modules.*.supports_doc_identity_prefix' => ['nullable', 'boolean'],
             'modules.*.default_order_discount_percent' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'modules.*.default_shipment_discount_percent' => ['nullable', 'integer', 'min:0', 'max:100'],
             'modules.*.discount_disabled' => ['nullable', 'boolean'],
             'modules.*.document_note' => ['nullable', 'string', 'max:300'],
             'modules.*.doc_identity_prefix' => ['nullable', 'string', 'max:20'],
@@ -437,7 +475,13 @@ class BranchController extends Controller
                     min(100, (int) $data['default_order_discount_percent'])
                 );
             }
-            if (in_array($moduleKey, ['orders', 'invoices'], true)) {
+            if ($moduleKey === 'shipments' && array_key_exists('default_shipment_discount_percent', $data)) {
+                $metadata['default_shipment_discount_percent'] = max(
+                    0,
+                    min(100, (int) $data['default_shipment_discount_percent'])
+                );
+            }
+            if (in_array($moduleKey, ['orders', 'invoices', 'shipments'], true)) {
                 if ($advancedPresent || array_key_exists('discount_disabled', $data)) {
                     $metadata['discount_disabled'] = (bool) ($data['discount_disabled'] ?? false);
                 }
@@ -490,6 +534,7 @@ class BranchController extends Controller
             'branches.*.supports_doc_identity_prefix' => ['nullable', 'boolean'],
             'branches.*.doc_identity_prefix' => ['nullable', 'string', 'max:20'],
             'branches.*.default_order_discount_percent' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'branches.*.default_shipment_discount_percent' => ['nullable', 'integer', 'min:0', 'max:100'],
             'branches.*.discount_disabled' => ['nullable', 'boolean'],
             'branches.*.document_note' => ['nullable', 'string', 'max:300'],
             'branches.*.default_branch_id' => ['nullable', 'integer', 'exists:branches,id'],
@@ -577,7 +622,10 @@ class BranchController extends Controller
             if ($moduleKey === 'orders') {
                 $metadata['default_order_discount_percent'] = max(0, min(100, (int) ($data['default_order_discount_percent'] ?? 0)));
             }
-            if (in_array($moduleKey, ['orders', 'invoices'], true)) {
+            if ($moduleKey === 'shipments') {
+                $metadata['default_shipment_discount_percent'] = max(0, min(100, (int) ($data['default_shipment_discount_percent'] ?? 10)));
+            }
+            if (in_array($moduleKey, ['orders', 'invoices', 'shipments'], true)) {
                 $metadata['discount_disabled'] = (bool) ($data['discount_disabled'] ?? false);
                 $metadata['document_note'] = trim((string) ($data['document_note'] ?? ''));
             } else {

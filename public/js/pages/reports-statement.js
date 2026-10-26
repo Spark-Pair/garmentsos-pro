@@ -58,6 +58,9 @@
             createModal({
                 id: "modalForm",
                 preview: { type: "voucher", data: data.data, document: "Voucher" },
+                bottomActions: [
+                    { id: "print-statement-voucher", text: "Print", onclick: "printStatementPreview(this, 'Print Voucher')" },
+                ],
             });
         }
 
@@ -67,8 +70,23 @@
             createModal({
                 id: "modalForm",
                 preview: { type: "invoice", data: data.data, document: "Sales Invoice" },
+                bottomActions: [
+                    { id: "print-statement-invoice", text: "Print", onclick: "printStatementPreview(this, 'Print Invoice')" },
+                ],
             });
         }
+
+        window.printStatementPreview = function printStatementPreview(button, title = "Print Statement Preview") {
+            const modal = button?.closest("#modalForm-wrapper");
+            const preview = modal?.querySelector("#preview-container");
+            if (!preview || !window.DocumentPrint?.printPreview) return;
+
+            window.DocumentPrint.printPreview({
+                title,
+                preview,
+                delay: 300,
+            });
+        };
 
         function openCustomerPaymentStatementModal(data) {
             if (!data) return;

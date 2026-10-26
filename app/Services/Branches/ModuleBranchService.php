@@ -30,7 +30,7 @@ class ModuleBranchService
             'supports_multi_branch_selector' => false,
             'supports_branch_serial_prefix' => false,
             'safe_default_enabled' => false,
-            'notes' => 'Global summary screen. Branch filtering can be added later when dashboard totals are reviewed.',
+            'notes' => 'Global owner summary. It shows an all-business view with an audited branch comparison and is currently restricted to Developer.',
         ],
         'articles' => [
             'label' => 'Articles',
@@ -517,9 +517,10 @@ class ModuleBranchService
             'can_use_branch_branding' => true,
             'supports_branch_selector' => true,
             'supports_multi_branch_selector' => false,
-            'supports_branch_serial_prefix' => false,
+            'supports_branch_serial_prefix' => true,
             'safe_default_enabled' => false,
-            'notes' => 'Sales return rows should follow invoice branch when enabled.',
+            'doc_identity_prefix' => 'SR',
+            'notes' => 'Sales return documents follow invoice/article branch when enabled.',
         ],
         'expenses' => [
             'label' => 'Expenses / Fabrics',
@@ -2400,6 +2401,7 @@ class ModuleBranchService
             'logo_url' => $branchLogoUrl ?: (!empty($app->logo) ? asset('images/' . $app->logo) : null),
             'discount_disabled' => $documentOptions['discount_disabled'],
             'document_note' => $documentOptions['document_note'],
+            'default_discount_percent' => $documentOptions['default_discount_percent'],
         ];
     }
 
@@ -2408,11 +2410,14 @@ class ModuleBranchService
         $moduleKey = $this->canonicalModuleKey($moduleKey);
         $setting = $branchId ? $this->branchSetting($moduleKey, $branchId) : null;
         $metadata = is_array($setting?->metadata) ? $setting->metadata : [];
-        $supportsDocumentOptions = in_array($moduleKey, ['orders', 'invoices'], true);
+        $supportsDocumentOptions = in_array($moduleKey, ['orders', 'invoices', 'shipments'], true);
 
         return [
             'discount_disabled' => $supportsDocumentOptions && (bool) ($metadata['discount_disabled'] ?? false),
             'document_note' => $supportsDocumentOptions ? trim((string) ($metadata['document_note'] ?? '')) : '',
+            'default_discount_percent' => $moduleKey === 'shipments'
+                ? max(0, min(100, (int) ($metadata['default_shipment_discount_percent'] ?? 10)))
+                : null,
         ];
     }
 

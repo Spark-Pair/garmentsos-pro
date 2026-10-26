@@ -34,6 +34,7 @@ class ProductionController extends Controller
             'article_id' => 'required|integer|exists:articles,id',
             'work_id' => 'nullable|integer|exists:setups,id',
             'ticket' => 'nullable|string',
+            'exclude_production_id' => 'nullable|integer',
             'mode' => 'required|string|in:issue,receive',
         ]);
 
@@ -42,12 +43,12 @@ class ProductionController extends Controller
         }
 
         if ($validated['mode'] === 'receive' && !empty($validated['ticket'])) {
-            $parts = $flows->receiveableByPart($validated['ticket']);
+            $parts = $flows->receiveableByPart($validated['ticket'], $validated['exclude_production_id'] ?? null);
         } else {
             $work = !empty($validated['work_id']) ? Setup::find($validated['work_id']) : null;
             if ($flows->isCutting($work)) {
                 $article = Article::findOrFail($validated['article_id']);
-                $received = $flows->cuttingReceivedByPart((int) $article->id);
+                $received = $flows->cuttingReceivedByPart((int) $article->id, $validated['exclude_production_id'] ?? null);
                 $parts = collect(app('article')->parts[$this->articlePartKey($article)] ?? [])
                     ->mapWithKeys(fn ($part) => [$part => max(0, $flows->articleLimit($article) - (float) ($received[$part] ?? 0))])
                     ->filter(fn ($quantity) => $quantity > 0);
@@ -55,6 +56,7 @@ class ProductionController extends Controller
                 $parts = $flows->issueableByPart(
                     (int) $validated['article_id'],
                     !empty($validated['work_id']) ? (int) $validated['work_id'] : null,
+                    $validated['exclude_production_id'] ?? null,
                 );
             }
         }
@@ -75,6 +77,7 @@ class ProductionController extends Controller
         $validated = $request->validate([
             'article_id' => 'required|integer|exists:articles,id',
             'mode' => 'required|string|in:issue',
+            'exclude_production_id' => 'nullable|integer',
         ]);
 
         if (!$flows->ready()) {
@@ -111,16 +114,6 @@ class ProductionController extends Controller
 
             $productionsQuery = $branches
                 ->applyScope(Production::with($relations)->orderByDesc('id'), 'productions');
-            if (app(ProductionFlowService::class)->ready()) {
-                $productionsQuery->where(function ($query) {
-                    $query
-                        ->whereNotNull('issue_date')
-                        ->orWhereDoesntHave('productionFlows', function ($flowQuery) {
-                            $flowQuery->whereNotNull('parent_ticket');
-                        });
-                });
-            }
-
             if ($this->isSupplierRole()) {
                 $supplier = $this->currentSupplier();
                 if (!$supplier) {
@@ -132,7 +125,27 @@ class ProductionController extends Controller
                 $productionsQuery->where('supplier_id', $supplier->id);
             }
 
-            $productions = $productionsQuery->applyFilters($request);
+            $productions = $productionsQuery->applyFilters($request)
+                ->groupBy(fn (array $row) => ($row['article_id'] ?? '') . '|' . ($row['work_id'] ?? ''))
+                ->map(function ($group) {
+                    $latest = $group->first();
+                    $records = $group->map(function (array $row) {
+                        $data = $row['data'] ?? $row;
+
+                        return [
+                            'id' => $data['id'] ?? $row['id'] ?? null,
+                            'type' => $data['movement_type'] ?? ($data['issue_date'] ? 'Issue' : 'Receive'),
+                            'status' => $data['status'] ?? ($data['receive_date'] ? 'Received' : 'Pending'),
+                            'ticket' => $data['ticket'] ?? $row['ticket'] ?? null,
+                        ];
+                    })->filter(fn (array $record) => $record['id'] !== null)->values()->all();
+
+                    $latest['records'] = $records;
+                    $latest['data']['records'] = $records;
+
+                    return $latest;
+                })
+                ->values();
 
             return response()->json(['data' => $productions, 'authLayout' => $authLayout]);
         }
@@ -143,7 +156,7 @@ class ProductionController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create()
+    public function create(?Production $editingProduction = null, array $editingRecords = [])
     {
         if ($resp = $this->denyIfNoRole(['developer', 'owner', 'manager', 'admin', 'accountant', 'guest', 'store_keeper'])) {
             return $resp;
@@ -154,7 +167,11 @@ class ProductionController extends Controller
 
         $flowService = app(ProductionFlowService::class);
 
-        if (Auth::user()->production_type === 'issue') {
+        $productionType = $editingProduction
+            ? (filled($editingProduction->issue_date) ? 'issue' : 'receive')
+            : Auth::user()->production_type;
+
+        if ($productionType === 'issue') {
             $articleQuery = $branches->applyRelatedScope(
                 Article::whereNotNull('fabric_type')->whereNotNull('category'),
                 'articles',
@@ -170,6 +187,10 @@ class ProductionController extends Controller
                 $articles = $articles
                     ->filter(fn (Article $article) => in_array((int) $article->id, $issueableArticleIds, true))
                     ->values();
+            }
+
+            if ($editingProduction?->article && !$articles->contains('id', $editingProduction->article_id)) {
+                $articles->push($editingProduction->article);
             }
         } else {
             $cmt_work_id = Setup::where('title', 'CMT | E')->value('id') ?? 0;
@@ -189,6 +210,24 @@ class ProductionController extends Controller
                     'text' => $ticket->ticket,
                     'data_option' => $ticket->toArray(),
                 ];
+            }
+
+            if ($editingProduction && app(ProductionFlowService::class)->ready()) {
+                $parentTicket = $editingProduction->productionFlows
+                    ->pluck('parent_ticket')
+                    ->filter()
+                    ->first();
+                if ($parentTicket && !isset($ticket_options[$parentTicket])) {
+                    $parent = Production::where('ticket', $parentTicket)
+                        ->with(['article.production.work', 'work', 'worker'])
+                        ->first();
+                    if ($parent) {
+                        $ticket_options[$parent->ticket] = [
+                            'text' => $parent->ticket,
+                            'data_option' => $parent->toArray(),
+                        ];
+                    }
+                }
             }
             $articles = $branches->applyRelatedScope(Article::whereNotNull('fabric_type'), 'articles', 'productions')
                 ->whereNotNull('category')
@@ -216,6 +255,10 @@ class ProductionController extends Controller
                     })
                     ->values();
             }
+
+            if ($editingProduction?->article && !$articles->contains('id', $editingProduction->article_id)) {
+                $articles->push($editingProduction->article);
+            }
         }
         $articles->each(function (Article $article) {
             $article->setAppends([]);
@@ -237,6 +280,9 @@ class ProductionController extends Controller
                 'productions',
             )
             ->get();
+        if ($editingProduction?->worker && !$workers->contains('id', $editingProduction->worker_id)) {
+            $workers->push($editingProduction->worker);
+        }
         $employeePayloads = $this->employeeOptionPayloads($workers, 'productions');
         $workerTagBalances = app(ProductionItemSyncService::class)->workerTagBalances($workers->pluck('id'), 'productions');
         $availableTags = $workerTagBalances
@@ -320,8 +366,10 @@ class ProductionController extends Controller
         }
 
         $branchBranding = app(ModuleBranchService::class)->documentBranding('productions');
+        $editingProduction?->article?->loadMissing('production.work');
+        $editingPayload = $editingProduction ? $this->ticketPreviewPayload($editingProduction) : null;
 
-        return view('productions.add', compact('articles', 'work_options', 'worker_options', 'rates', 'ticket_options', 'branchBranding', 'inventoryItems'));
+        return view('productions.add', compact('articles', 'work_options', 'worker_options', 'rates', 'ticket_options', 'branchBranding', 'inventoryItems', 'editingProduction', 'editingPayload', 'editingRecords', 'productionType'));
     }
 
     private function articlePartKey(Article $article): string
@@ -606,6 +654,7 @@ class ProductionController extends Controller
     {
         $partQuantities = $this->productionPartQuantities($production);
         $flowQuantity = collect($partQuantities)->max('quantity') ?? $production->quantity;
+        $formatted = $production->toFormattedArray();
 
         return [
             'id' => $production->id,
@@ -618,10 +667,11 @@ class ProductionController extends Controller
             'worker' => $production->worker,
             'worker_name' => $production->worker?->employee_name,
             'movement_type' => $production->issue_date ? 'Issue' : 'Receive',
+            'status' => $production->receive_date ? 'Received' : 'Pending',
             'parent_ticket' => $this->productionParentTicket($production),
             'quantity' => $flowQuantity,
-            'rate' => $production->rate,
-            'amount' => $production->amount,
+            'rate' => $formatted['rate'] ?? $production->rate,
+            'amount' => $formatted['amount'] ?? $production->amount,
             'title' => $production->title,
             'parts' => $production->parts,
             'part_quantities' => $partQuantities,
@@ -726,12 +776,30 @@ class ProductionController extends Controller
             return $resp;
         }
 
-        $production->loadMissing(['article', 'work', 'worker', 'productionFlows']);
+        $production->loadMissing(['article', 'work', 'worker', 'productionFlows', 'productionTags', 'productionMaterials.inventoryItem']);
 
-        return view('productions.edit', [
-            'production' => $production,
-            'branchBranding' => app(ModuleBranchService::class)->documentBranding('productions', $production),
-        ]);
+        $branches = app(ModuleBranchService::class);
+        $relatedProductions = $branches
+            ->applyScope(
+                Production::where('article_id', $production->article_id)
+                    ->where('work_id', $production->work_id)
+                    ->orderByDesc('id'),
+                'productions'
+            )
+            ->get(['id', 'issue_date', 'receive_date', 'ticket']);
+
+        $editingRecords = $relatedProductions
+            ->groupBy(fn (Production $row) => $row->issue_date ? 'issue' : 'receive')
+            ->map(fn ($rows) => $rows->first())
+            ->map(fn (Production $row) => [
+                'id' => $row->id,
+                'type' => $row->issue_date ? 'issue' : 'receive',
+                'status' => $row->receive_date ? 'Received' : 'Pending',
+                'ticket' => $row->ticket,
+            ])
+            ->all();
+
+        return $this->create($production, $editingRecords);
     }
 
     /**
@@ -745,73 +813,128 @@ class ProductionController extends Controller
             return $resp;
         }
 
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
+            'article_id' => 'required|integer|exists:articles,id',
+            'work_id' => 'required|integer|exists:setups,id',
+            'worker_id' => 'required|integer|exists:employees,id',
+            'tags' => 'nullable|string',
+            'materials' => 'nullable|string',
+            'parts' => 'nullable|string',
+            'production_flows' => 'nullable|string',
+            'title' => 'nullable|string',
+            'rate' => 'nullable|decimal:0,2|min:0.01',
+            'amount' => 'nullable|decimal:0,2|min:0.01',
             'issue_date' => 'nullable|date',
             'receive_date' => 'nullable|date',
-            'rate' => 'nullable|numeric|min:0',
-            'amount' => 'nullable|numeric|min:0',
             'issued_by_name' => 'nullable|string|max:120',
             'received_by_name' => 'nullable|string|max:120',
         ]);
-
-        DB::transaction(function () use ($production, $validated) {
-            $data = [
-                'rate' => $validated['rate'] ?? null,
-                'amount' => $validated['amount'] ?? null,
-                'issued_by_name' => $validated['issued_by_name'] ?? $production->issued_by_name,
-                'received_by_name' => $validated['received_by_name'] ?? $production->received_by_name,
-            ];
-
-            if (array_key_exists('issue_date', $validated) && $validated['issue_date']) {
-                $data['issue_date'] = $validated['issue_date'];
-                $production->update($data);
-
-                if (app(ProductionFlowService::class)->ready()) {
-                    $production->productionFlows()->where('movement_type', 'issue')->update([
-                        'date' => $validated['issue_date'],
-                    ]);
-                }
-
-                return;
+        $validator->after(function ($validator) use ($request) {
+            $isReceive = $request->filled('receive_date');
+            if ($isReceive && !$request->filled('rate')) {
+                $validator->errors()->add('rate', 'Rate is required.');
             }
-
-            if (array_key_exists('receive_date', $validated) && $validated['receive_date']) {
-                if ($production->receive_date || !$production->ticket || !app(ProductionFlowService::class)->ready()) {
-                    $data['receive_date'] = $validated['receive_date'];
-                    $production->update($data);
-                    if (app(ProductionFlowService::class)->ready()) {
-                        $production->productionFlows()->where('movement_type', 'receive')->update([
-                            'date' => $validated['receive_date'],
-                        ]);
-                    }
-
-                    return;
-                }
-
-                $childId = \App\Models\ProductionFlow::query()
-                    ->where('parent_ticket', $production->ticket)
-                    ->where('movement_type', 'receive')
-                    ->orderByDesc('date')
-                    ->orderByDesc('id')
-                    ->value('production_id');
-
-                if ($childId) {
-                    $child = Production::find($childId);
-                    if ($child) {
-                        $child->update(array_merge($data, [
-                            'receive_date' => $validated['receive_date'],
-                        ]));
-                        $child->productionFlows()->where('movement_type', 'receive')->update([
-                            'date' => $validated['receive_date'],
-                        ]);
-                    }
-                } else {
-                    $production->update(array_merge($data, [
-                        'receive_date' => $validated['receive_date'],
-                    ]));
+            if ($isReceive && !$request->filled('amount')) {
+                $validator->errors()->add('amount', 'Amount is required.');
+            }
+            if (!$request->filled('issue_date') && !$request->filled('receive_date')) {
+                $validator->errors()->add('issue_date', 'Production date is required.');
+            }
+            if ($request->filled('issue_date') && $request->filled('receive_date')) {
+                $validator->errors()->add('issue_date', 'Use either issue date or receive date, not both.');
+            }
+            foreach (['parts', 'production_flows'] as $field) {
+                if ($request->filled($field) && !is_array(json_decode((string) $request->{$field}, true))) {
+                    $validator->errors()->add($field, 'Selected parts data is invalid.');
                 }
             }
         });
+        if ($validator->fails()) {
+            return $this->validationBack($validator);
+        }
+
+        $incomingTags = $this->decodeJsonArray($request->tags);
+        $incomingMaterials = $this->decodeJsonArray($request->materials);
+        $incomingParts = $this->decodeJsonArray($request->parts);
+        $flowService = app(ProductionFlowService::class);
+        $partQuantities = $flowService->normalizePartQuantities($request->production_flows);
+        if ($flowService->ready() && $partQuantities->isEmpty()) {
+            return $this->validationBack(['production_flows' => 'Select at least one part quantity.']);
+        }
+
+        $article = Article::findOrFail((int) $request->article_id);
+        $work = Setup::findOrFail((int) $request->work_id);
+        $parentTicket = $production->productionFlows->pluck('parent_ticket')->filter()->first();
+
+        if ($flowService->ready()) {
+            try {
+                if ($request->filled('receive_date')) {
+                    if ($parentTicket) {
+                        $flowService->validateReceive((string) $parentTicket, $partQuantities, $production->id);
+                    } elseif ($flowService->isCutting($work)) {
+                        $flowService->validateCuttingReceive($article, $partQuantities, $production->id);
+                    } else {
+                        return $this->validationBack(['ticket_name' => 'Select an issue ticket before receiving this work.']);
+                    }
+                } elseif ($flowService->isCutting($work)) {
+                    return $this->validationBack(['work_id' => 'Cutting issue ticket is not allowed. Receive cutting directly.']);
+                } else {
+                    $flowService->validateIssue($article, $partQuantities, $work, $production->id);
+                }
+            } catch (\Illuminate\Validation\ValidationException $exception) {
+                return $this->validationBack($exception->errors());
+            }
+        }
+
+        if (!empty($incomingTags)) {
+            $balances = app(ProductionItemSyncService::class)
+                ->workerTagBalances([(int) $request->worker_id], 'productions')
+                ->get((int) $request->worker_id, collect())
+                ->keyBy('tag');
+            foreach (app(ProductionItemSyncService::class)->tagsForPayload($production) as $tag) {
+                $row = $balances->get($tag['tag']);
+                if ($row) {
+                    $row['available_quantity'] += (float) ($tag['quantity'] ?? 0);
+                    $balances->put($tag['tag'], $row);
+                }
+            }
+            foreach (collect($incomingTags)->groupBy('tag') as $tag => $rows) {
+                $requested = collect($rows)->sum(fn ($row) => (float) ($row['quantity'] ?? 0));
+                $available = (float) ($balances->get($tag)['available_quantity'] ?? 0);
+                if ($requested > $available) {
+                    return $this->validationBack(['tags' => "{$tag} available fabric is {$available}."]);
+                }
+            }
+        }
+
+        $movementType = $request->filled('issue_date') ? 'issue' : 'receive';
+        $data = [
+            'article_id' => $request->article_id,
+            'work_id' => $request->work_id,
+            'worker_id' => $request->worker_id,
+            'tags' => null,
+            'materials' => null,
+            'parts' => $partQuantities->isNotEmpty() ? $partQuantities->pluck('part')->values()->all() : $incomingParts,
+            'title' => $request->title,
+            'rate' => $request->rate,
+            'amount' => $request->amount,
+            'issue_date' => $request->issue_date,
+            'receive_date' => $request->receive_date,
+            'issued_by_name' => $request->issued_by_name,
+            'received_by_name' => $request->received_by_name,
+        ];
+
+        try {
+            DB::transaction(function () use ($production, $data, $partQuantities, $movementType, $parentTicket, $incomingTags, $incomingMaterials, $flowService) {
+                $production->update($data);
+                if ($flowService->ready()) {
+                    $flowService->sync($production->fresh(), $movementType, $partQuantities, $parentTicket);
+                }
+                app(ProductionItemSyncService::class)->sync($production->fresh(), $incomingTags, $incomingMaterials);
+            });
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            return $this->validationBack($exception->errors());
+        }
 
         return redirect()->route('productions.index')->with('success', 'Production updated successfully.');
     }

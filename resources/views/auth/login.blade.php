@@ -15,7 +15,7 @@
         <x-search-header :heading="$loginTitle" />
     </div>
 
-    <form id="login-form" method="POST" action="{{ route('login') }}"
+    <form id="login-form" method="POST" action="{{ route('login') }}" data-enter-submit
         class="bg-[var(--secondary-bg-color)] text-sm rounded-xl shadow-lg px-7 pb-7 pt-13 md:px-8 md:pb-8 border border-[var(--glass-border-color)]/20 max-w-2xl mx-auto relative overflow-hidden">
         @csrf
         <x-form-title-bar title="Account Login" />

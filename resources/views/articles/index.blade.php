@@ -44,14 +44,14 @@
     @endphp
 
     {{-- header --}}
-    <div class="w-[80%] mx-auto">
+    <div class="w-[90%] mx-auto">
         <x-search-header heading="Articles" :search_fields=$searchFields/>
     </div>
 
     <!-- Main Content -->
     <section class="text-center mx-auto ">
         <div
-            class="show-box mx-auto w-[80%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
+            class="show-box mx-auto w-[90%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
             <x-form-title-bar printBtn title="Show Articles" changeLayoutBtn layout="{{ $authLayout }}" resetSortBtn  />
 
             <div class="absolute bottom-0 right-0 flex items-center justify-between gap-2 w-fll z-50 p-3 w-full pointer-events-none">
@@ -86,9 +86,16 @@
 @push('page-scripts')
 <script defer src="{{ asset('js/pages/articles-index.js') }}"></script>
 <script>
+        @php
+            $creatorButtonHtml = view('components.section-navigation-button', [
+                'title' => 'Added by: __ARTICLE_CREATOR__',
+                'icon' => 'fa-user',
+            ])->render();
+        @endphp
         window.__articlesIndex = {
             currentUserRole: @json(Auth::user()->role),
             authLayout: @json($authLayout),
+            creatorButtonHtml: @json($creatorButtonHtml),
             addRateUrl: @json(route('add-rate')),
             updateImageUrl: @json(route('update-image')),
         };

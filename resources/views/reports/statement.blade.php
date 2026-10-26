@@ -152,18 +152,17 @@
                     $statementRows = $shouldUseActualOpeningEntryOnly ? $statements : $openingBalanceRow->merge($statements);
                     $topSummaryLabel = match ($data['category'] ?? null) {
                         'customer' => 'Total Order Balance',
-                        'employee' => 'Total Employee Balance',
                         default => 'Total Pending Payment',
                     };
                     $topSummaryValue = match ($data['category'] ?? null) {
                         'customer' => $data['totals']['order_balance'] ?? 0,
-                        'employee' => $data['totals']['balance'] ?? 0,
                         default => $data['totals']['pending_payment'] ?? 0,
                     };
+                    $showTopSummary = ($data['category'] ?? null) !== 'employee';
                     $isSupplierStatement = ($data['category'] ?? null) === 'supplier';
-                    $footerBillTotal = ($data['totals']['bill'] ?? 0) + ($isSupplierStatement ? 0 : $topSummaryValue);
-                    $footerPaymentTotal = ($data['totals']['payment'] ?? 0) + ($isSupplierStatement ? $topSummaryValue : 0);
-                    $footerBalanceTotal = ($data['closing_balance'] ?? 0) + ($isSupplierStatement ? -$topSummaryValue : $topSummaryValue);
+                    $footerBillTotal = ($data['totals']['bill'] ?? 0) + ($isSupplierStatement || !$showTopSummary ? 0 : $topSummaryValue);
+                    $footerPaymentTotal = ($data['totals']['payment'] ?? 0) + ($isSupplierStatement && $showTopSummary ? $topSummaryValue : 0);
+                    $footerBalanceTotal = ($data['closing_balance'] ?? 0) + ($isSupplierStatement ? -$topSummaryValue : ($showTopSummary ? $topSummaryValue : 0));
                     $statementPartyCity = data_get($data, 'customer.city.title');
                     $statementPartyAddress = data_get($data, 'customer.address');
                     $datedStatementRows = $statements
@@ -266,10 +265,12 @@
                                                 <span class="font-semibold shrink-0">Branches:</span>
                                                 <span class="">{{ $data['branch_scope_label'] ?? implode(', ', $selectedBranchLabels) }}</span>
                                             </div>
-                                            <div class="flex gap-1 min-w-0">
-                                                <span class="font-semibold shrink-0">{{ $topSummaryLabel }}:</span>
-                                                <span class="">{{ \App\Support\Money::format($topSummaryValue) }}</span>
-                                            </div>
+                                            @if ($showTopSummary)
+                                                <div class="flex gap-1 min-w-0">
+                                                    <span class="font-semibold shrink-0">{{ $topSummaryLabel }}:</span>
+                                                    <span class="">{{ \App\Support\Money::format($topSummaryValue) }}</span>
+                                                </div>
+                                            @endif
                                         </div>
 
                                         <div class="min-w-0 flex-1 text-center overflow-hidden">
@@ -365,15 +366,20 @@
                                                     </div>
                                                 @endforeach
                                                 @if ($otherPages->isEmpty())
-                                                    <hr class="w-full my-1.5 border-gray-700 border-dashed">
-                                                    <div class="tr flex justify-between w-full px-2.5 gap-1 text-center font-bold">
-                                                        <div class="td w-[2.5%]"></div>
-                                                        <div class="td flex-1 text-left">{{ $topSummaryLabel }}</div>
-                                                        <div class="td w-[11%]">{{ $isSupplierStatement ? '' : \App\Support\Money::format($topSummaryValue) }}</div>
-                                                        <div class="td w-[11%]">{{ $isSupplierStatement ? \App\Support\Money::format($topSummaryValue) : '' }}</div>
-                                                        <div class="td w-[11%]"></div>
-                                                    </div>
-                                                    <hr class="w-full my-1.5 border-gray-700 border-dashed">
+                                                    @if ($showTopSummary)
+                                                        <hr class="w-full my-1.5 border-gray-700 border-dashed">
+                                                        <div class="tr flex justify-between w-full px-2.5 gap-1 text-center font-bold">
+                                                            <div class="td w-[2.5%]"></div>
+                                                            <div class="td flex-1 text-left">{{ $topSummaryLabel }}</div>
+                                                            <div class="td w-[11%]">{{ $isSupplierStatement ? '' : \App\Support\Money::format($topSummaryValue) }}</div>
+                                                            <div class="td w-[11%]">{{ $isSupplierStatement ? \App\Support\Money::format($topSummaryValue) : '' }}</div>
+                                                            <div class="td w-[11%]"></div>
+                                                        </div>
+                                                        <hr class="w-full my-1.5 border-gray-700 border-dashed">
+                                                    @endif
+                                                    @if (!$showTopSummary)
+                                                        <hr class="w-full my-1.5 border-gray-700 border-dashed">
+                                                    @endif
                                                     <div class="tr flex justify-between w-full px-2.5 gap-1 text-center font-bold">
                                                         <div class="td w-[2.5%]"></div>
                                                         <div class="td w-[11.5%] text-left">Total</div>
@@ -509,15 +515,20 @@
                                                         </div>
                                                     @endforeach
                                                     @if ($loop->last)
-                                                        <hr class="w-full my-1.5 border-gray-700 border-dashed">
-                                                        <div class="tr flex justify-between w-full px-2.5 gap-1 text-center font-bold">
-                                                            <div class="td w-[2.5%]"></div>
-                                                            <div class="td flex-1 text-left">{{ $topSummaryLabel }}</div>
-                                                            <div class="td w-[11%]">{{ $isSupplierStatement ? '' : \App\Support\Money::format($topSummaryValue) }}</div>
-                                                            <div class="td w-[11%]">{{ $isSupplierStatement ? \App\Support\Money::format($topSummaryValue) : '' }}</div>
-                                                            <div class="td w-[11%]"></div>
-                                                        </div>
-                                                        <hr class="w-full my-1.5 border-gray-700 border-dashed">
+                                                        @if ($showTopSummary)
+                                                            <hr class="w-full my-1.5 border-gray-700 border-dashed">
+                                                            <div class="tr flex justify-between w-full px-2.5 gap-1 text-center font-bold">
+                                                                <div class="td w-[2.5%]"></div>
+                                                                <div class="td flex-1 text-left">{{ $topSummaryLabel }}</div>
+                                                                <div class="td w-[11%]">{{ $isSupplierStatement ? '' : \App\Support\Money::format($topSummaryValue) }}</div>
+                                                                <div class="td w-[11%]">{{ $isSupplierStatement ? \App\Support\Money::format($topSummaryValue) : '' }}</div>
+                                                                <div class="td w-[11%]"></div>
+                                                            </div>
+                                                            <hr class="w-full my-1.5 border-gray-700 border-dashed">
+                                                        @endif
+                                                        @if (!$showTopSummary)
+                                                            <hr class="w-full my-1.5 border-gray-700 border-dashed">
+                                                        @endif
                                                         <div class="tr flex justify-between w-full px-2.5 gap-1 text-center font-bold">
                                                             <div class="td w-[2.5%]"></div>
                                                             <div class="td w-[11.5%] text-left">Total</div>

@@ -38,14 +38,14 @@
     @endphp
 
     {{-- header --}}
-    <div class="w-[80%] mx-auto">
+    <div class="w-[90%] mx-auto">
         <x-search-header heading="Bilties" :search_fields=$searchFields/>
     </div>
 
     <!-- Main Content -->
     <section class="text-center mx-auto ">
         <div
-            class="show-box mx-auto w-[80%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
+            class="show-box mx-auto w-[90%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
             <x-form-title-bar printBtn layout="table" title="Show Bilties" resetSortBtn />
 
             <div class="absolute bottom-0 right-0 flex items-center justify-between gap-2 w-fll z-50 p-3 w-full pointer-events-none">
@@ -56,10 +56,11 @@
             <div class="details h-full z-40">
                 <div class="container-parent h-full">
                     <div class="card_container px-3 h-full flex flex-col">
-                        <div id="table-head" class="grid grid-cols-6 bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4">
+                        <div id="table-head" class="grid grid-cols-7 bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4">
                             <div class="cursor-pointer" onclick="sortByThis(this)">Date</div>
                             <div class="cursor-pointer col-span-2" onclick="sortByThis(this)">Customer Name</div>
                             <div class="cursor-pointer" onclick="sortByThis(this)">Invoice No.</div>
+                            <div class="cursor-pointer" onclick="sortByThis(this)">Amount</div>
                             <div class="cursor-pointer" onclick="sortByThis(this)">Cargo Name</div>
                             <div class="cursor-pointer" onclick="sortByThis(this)">Bilty No.</div>
                         </div>

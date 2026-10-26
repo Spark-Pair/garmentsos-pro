@@ -40,7 +40,7 @@ class ArticleController extends Controller
         $authLayout = $this->getAuthLayout($request->route()->getName());
 
         if ($request->ajax()) {
-            $articles = $branches->applyScope(Article::orderByDesc('id'), 'articles')
+            $articles = $branches->applyScope(Article::with('creator')->orderByDesc('id'), 'articles')
                 ->applyFilters($request);
 
             return response()->json(['data' => $articles, 'authLayout' => $authLayout]);

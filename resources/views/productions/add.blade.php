@@ -2,7 +2,9 @@
 @section('title', 'Add Production | ' . $client_company->name)
 @section('content')
 @php
-    $productionType = Auth::user()->production_type;
+    $editingProduction = $editingProduction ?? null;
+    $productionType = $productionType ?? Auth::user()->production_type;
+    $isEditing = $editingProduction !== null;
 @endphp
 
 @php
@@ -254,6 +256,12 @@
     ];
 @endphp
 
+@php
+    $editingRecords = $editingRecords ?? [];
+    $hasEditIssue = isset($editingRecords['issue']);
+    $hasEditReceive = isset($editingRecords['receive']);
+@endphp
+
     <div class="switch-btn-container flex absolute top-3 md:top-17 left-3 md:left-5 z-40">
         <div class="switch-btn relative flex border-3 border-[var(--secondary-bg-color)] bg-[var(--secondary-bg-color)] rounded-2xl overflow-hidden">
             <!-- Highlight rectangle -->
@@ -263,8 +271,9 @@
             <button
                 id="issueBtn"
                 type="button"
+                @if ($isEditing) onclick="switchProductionEditRecord('issue')" @else onclick="setProductionType(this, 'issue')" @endif
+                @if ($isEditing && !$hasEditIssue) disabled @endif
                 class="relative z-10 px-3.5 md:px-5 py-1.5 md:py-2 cursor-pointer rounded-xl transition-colors duration-300"
-                onclick="setProductionType(this, 'issue')"
             >
                 <div class="hidden md:block">Issue</div>
                 <div class="block md:hidden"><i class="fas fa-cart-shopping text-xs"></i></div>
@@ -272,8 +281,9 @@
             <button
                 id="receiveBtn"
                 type="button"
+                @if ($isEditing) onclick="switchProductionEditRecord('receive')" @else onclick="setProductionType(this, 'receive')" @endif
+                @if ($isEditing && !$hasEditReceive) disabled @endif
                 class="relative z-10 px-3.5 md:px-5 py-1.5 md:py-2 cursor-pointer rounded-xl transition-colors duration-300"
-                onclick="setProductionType(this, 'receive')"
             >
                 <div class="hidden md:block">Receive</div>
                 <div class="block md:hidden"><i class="fas fa-box-open text-xs"></i></div>
@@ -284,15 +294,16 @@
     @if ($productionType == 'issue')
         <!-- Main Content -->
         <div class="max-w-4xl mx-auto">
-            <x-search-header heading="Issue Production" link linkText="Show Productions" linkHref="{{ route('productions.index') }}"/>
+            <x-search-header heading="{{ $isEditing ? 'Edit Issue Production' : 'Issue Production' }}" link linkText="Show Productions" linkHref="{{ route('productions.index') }}"/>
             <x-progress-bar :steps="['Master Information', 'Details']" :currentStep="1" />
         </div>
 
         <!-- Form -->
-        <form id="form" action="{{ route('productions.store') }}" method="post"
+        <form id="form" action="{{ $isEditing ? route('productions.update', $editingProduction) : route('productions.store') }}" method="post"
             class="bg-[var(--secondary-bg-color)] text-sm rounded-xl shadow-lg p-8 border border-[var(--glass-border-color)]/20 pt-14 max-w-4xl mx-auto relative overflow-hidden">
             @csrf
-            <x-form-title-bar title="Issue Production" />
+            @if ($isEditing) @method('PUT') @endif
+            <x-form-title-bar title="{{ $isEditing ? 'Edit Issue Production' : 'Issue Production' }}" />
 
             <div class="step1 space-y-4 ">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -339,15 +350,16 @@
     @else
         <!-- Main Content -->
         <div class="max-w-4xl mx-auto">
-            <x-search-header heading="Add Production" link linkText="Show Productions" linkHref="{{ route('productions.index') }}"/>
+            <x-search-header heading="{{ $isEditing ? 'Edit Receive Production' : 'Add Production' }}" link linkText="Show Productions" linkHref="{{ route('productions.index') }}"/>
             <x-progress-bar :steps="['Master Information', 'Details']" :currentStep="1" />
         </div>
 
         <!-- Form -->
-        <form id="form" action="{{ route('productions.store') }}" method="post"
+        <form id="form" action="{{ $isEditing ? route('productions.update', $editingProduction) : route('productions.store') }}" method="post"
             class="bg-[var(--secondary-bg-color)] text-sm rounded-xl shadow-lg p-8 border border-[var(--glass-border-color)]/20 pt-14 max-w-4xl mx-auto relative overflow-hidden">
             @csrf
-            <x-form-title-bar title="Add Production" />
+            @if ($isEditing) @method('PUT') @endif
+            <x-form-title-bar title="{{ $isEditing ? 'Edit Receive Production' : 'Add Production' }}" />
 
             <div class="step1 space-y-4 ">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -415,6 +427,9 @@
         };
         window.__productionsAdd = {
             productionType: @json($productionType),
+            editing: @json($isEditing),
+            existing: @json($editingPayload ?? null),
+            editingRecords: @json($editingRecords),
             csrfToken: @json(csrf_token()),
             templates: @json($templates),
             todayDate: @json($todayDate),

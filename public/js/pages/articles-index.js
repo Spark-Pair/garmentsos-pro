@@ -73,6 +73,8 @@
                 method: "POST",
                 image: data.image,
                 name: data.name,
+                creator: data.creator,
+                creatorButtonHtml: config.creatorButtonHtml,
                 status: data.status,
                 class: "p-5 max-w-5xl h-[27rem]",
                 details: {

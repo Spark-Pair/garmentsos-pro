@@ -1,6 +1,13 @@
 @extends('app')
 @section('title', 'Generate CR | ' . $client_company->name)
 @section('content')
+    @php $isEdit = isset($cr); @endphp
+    @php
+        $editData = $isEdit ? [
+            'return_payments' => $cr->return_payments,
+            'new_payments' => $cr->new_payments,
+        ] : null;
+    @endphp
     @php
         $method_options = [
             'cheque' => ['text' => 'Cheque'],
@@ -28,19 +35,20 @@
     <!-- Main Content -->
     <!-- Progress Bar -->
     <div class="mb-5 max-w-5xl mx-auto">
-        <x-search-header heading="Generate CR" link linkText="Show CR" linkHref="{{ route('cr.index') }}"/>
+        <x-search-header heading="{{ $isEdit ? 'Edit CR' : 'Generate CR' }}" link linkText="Show CR" linkHref="{{ route('cr.index') }}"/>
         <x-progress-bar :steps="['Select Payment', 'Add Payment']" :currentStep="1" />
     </div>
 
     <!-- Form -->
-    <form id="form" action="{{ route('cr.store') }}" method="post" enctype="multipart/form-data"
+    <form id="form" action="{{ $isEdit ? url('/cr/' . $cr->id) : route('cr.store') }}" method="post" enctype="multipart/form-data" {{ $isEdit ? 'data-skip-validation novalidate' : '' }}
         class="bg-[var(--secondary-bg-color)] text-sm rounded-xl shadow-lg p-8 border border-[var(--glass-border-color)]/20 pt-14 max-w-5xl mx-auto  relative overflow-hidden">
         @csrf
-        <x-form-title-bar title="Generate CR" />
+        @if ($isEdit) @method('PUT') @endif
+        <x-form-title-bar title="{{ $isEdit ? 'Edit CR' : 'Generate CR' }}" />
 
         <!-- Step 1: Generate cargo list -->
         <div class="step1 space-y-4 ">
-            <div class="grid grid-cols-4 gap-4">
+            <div class="grid grid-cols-3 gap-4 items-end">
                 <!-- voucher_no -->
                 <x-input
                     label="Voucher No."
@@ -48,12 +56,10 @@
                     name="voucher_no"
                     placeholder="Enter Voucher No."
                     required
+                    value="{{ $isEdit ? $cr->voucher?->voucher_no : '' }}"
                     onkeydown="trackVoucherState(event)"
                 />
-                <input type="hidden" name="voucher_id" id="voucher_id">
-
-                {{-- cargo date --}}
-                <x-input label="Date" name="date" id="date" type="date" validateMax max="{{ today()->toDateString() }}" required disabled/>
+                <input type="hidden" name="voucher_id" id="voucher_id" value="{{ $isEdit ? $cr->voucher_id : '' }}">
 
                 <!-- supplier_name -->
                 <x-input
@@ -61,10 +67,16 @@
                     id="supplier_name"
                     disabled
                     placeholder="Supplier Name"
+                    value="{{ $isEdit ? $cr->voucher?->supplier?->supplier_name : '' }}"
                 />
 
                 {{-- c_r_no --}}
-                <x-input label="CR No." name="c_r_no" id="c_r_no" required value=""/>
+                <x-input label="CR No." name="c_r_no" id="c_r_no" required value="{{ $isEdit ? $cr->c_r_no : '' }}"/>
+
+                {{-- cargo date: kept in the form flow but does not disturb the three-field header row --}}
+                <div class="col-span-3">
+                    <x-input label="Date" name="date" id="date" type="date" validateMax max="{{ today()->toDateString() }}" required value="{{ $isEdit ? $cr->date?->format('Y-m-d') : '' }}" :disabled="!$isEdit" />
+                </div>
             </div>
             <input type="hidden" name="returnPayments" id="selectedPaymentsArray">
             {{-- show-payment-table --}}
@@ -166,12 +178,13 @@
 @endsection
 
 @push('page-scripts')
-<script defer src="{{ asset('js/pages/cr-generate.js') }}"></script>
 <script>
         window.__crGenerate = {
+            editData: @json($editData),
             voucherErrorAlertTemplate: @json($voucherErrorAlertTemplate),
             selectPaymentAlertHtml: @json($selectPaymentAlertHtml),
             amountMismatchAlertHtml: @json($amountMismatchAlertHtml),
         };
     </script>
+<script defer src="{{ asset('js/pages/cr-generate.js') }}?v={{ filemtime(public_path('js/pages/cr-generate.js')) }}"></script>
 @endpush

@@ -164,6 +164,7 @@ trait PaymentProgramComputed
             $scope['branch_ids'],
             $scope['include_null_branch_records'],
         );
+        $customerTotalBalance = $customerBalance + $orderBalance;
 
         return [
             'id' => $this->id,
@@ -178,6 +179,7 @@ trait PaymentProgramComputed
              * Selected Payment Programs branch ka customer balance.
              */
             'customer_balance' => $customerBalance,
+            'customer_total_balance' => $customerTotalBalance,
 
             'o_p_no' => $this->order_no ?? $this->program_no,
             'category' => $this->category,
@@ -211,6 +213,7 @@ trait PaymentProgramComputed
                  * Modal mein bhi available hoga.
                  */
                 'customer_balance' => $customerBalance,
+                'customer_total_balance' => $customerTotalBalance,
                 'order_balance' => $orderBalance,
             ],
 

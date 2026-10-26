@@ -56,13 +56,6 @@
             }
         }
 
-        window.togglePhysicalQuantityMode = function togglePhysicalQuantityMode() {
-            const mode = getHiddenSelectValue("mode") || "all_articles";
-
-            setSelectDisabledState("articleFilterWrap", "article_id", mode !== "article_wise");
-            setInputDisabledState("proceedByFilterWrap", "proceed_by", mode !== "proceed_by_wise");
-        };
-
         window.setPhysicalQuantityReportType = function setPhysicalQuantityReportType(btn, reportType) {
             doHide = true;
             if (reportTypeGlobal === reportType) {
@@ -117,28 +110,18 @@
         }
 
         function validateFilters() {
-            const mode = getHiddenSelectValue("mode") || "all_articles";
-            const articleId = getHiddenSelectValue("article_id");
-            const proceedBy = getInputValue("proceed_by");
-
-            if (mode === "article_wise" && !articleId) {
-                appAlert("Please select an article.");
-                return false;
-            }
-
-            if (mode === "proceed_by_wise" && !proceedBy) {
-                appAlert("Please type a Proceed By value.");
-                return false;
-            }
-
             return true;
         }
 
         function fetchReportPreview() {
             const reportType = getDirectValue("report_type") || reportTypeGlobal || "altration";
-            const mode = getHiddenSelectValue("mode") || "all_articles";
-            const articleId = getHiddenSelectValue("article_id");
-            const proceedBy = getInputValue("proceed_by");
+            const filterData = {};
+            ["article_id", "season", "size", "category", "processed_by", "shipment"].forEach((id) => {
+                const value = getHiddenSelectValue(id);
+                if (value) {
+                    filterData[id] = value;
+                }
+            });
 
             $.ajax({
                 url: reportUrl,
@@ -146,9 +129,8 @@
                 data: {
                     withData: 1,
                     report_type: reportType,
-                    mode: mode,
-                    article_id: articleId,
-                    proceed_by: proceedBy,
+                    mode: "all_articles",
+                    ...filterData,
                 },
                 success: function (response) {
                     renderPreview(response);
@@ -245,8 +227,6 @@
             fetchReportPreview();
             return true;
         };
-
-        togglePhysicalQuantityMode();
 
         const activeBtn =
             reportTypeGlobal === "stock"

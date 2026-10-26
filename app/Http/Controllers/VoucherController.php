@@ -113,6 +113,7 @@ class VoucherController extends Controller
                     ->with('customer.city')
                     ->whereDoesntHave('cheque')
                     ->whereNull('bank_account_id')
+                    ->whereNull('d_r_id')
                     ->get();
 
                 $payments_options = $cheques->map(function ($cheque) {
@@ -128,6 +129,7 @@ class VoucherController extends Controller
                     ->with('customer.city')
                     ->whereDoesntHave('slip')
                     ->whereNull('bank_account_id')
+                    ->whereNull('d_r_id')
                     ->get();
 
                 $payments_options = $slips->map(function ($slip) {
@@ -490,7 +492,7 @@ class VoucherController extends Controller
         ]);
 
         if ($voucher->supplier && $voucher->date) {
-            $voucher->supplier->balance_at_date = $this->supplierBalance($voucher->supplier, $voucher->date);
+            $voucher->supplier->balance_at_date = $this->supplierBalance($voucher->supplier, $voucher->date, $voucher->id);
         }
 
         $branches = app(ModuleBranchService::class);
@@ -498,6 +500,7 @@ class VoucherController extends Controller
             ->with('customer.city')
             ->whereDoesntHave('cheque')
             ->whereNull('bank_account_id')
+            ->whereNull('d_r_id')
             ->get();
         $cheques_options = [];
 
@@ -513,6 +516,7 @@ class VoucherController extends Controller
             ->with('customer.city')
             ->whereDoesntHave('slip')
             ->whereNull('bank_account_id')
+            ->whereNull('d_r_id')
             ->get();
         $slips_options = [];
 

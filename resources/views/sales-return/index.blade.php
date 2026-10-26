@@ -3,6 +3,12 @@
 @section('content')
     @php
         $searchFields = [
+            "Return No." => [
+                "id" => "return_no",
+                "type" => "text",
+                "placeholder" => "Enter return no",
+                "dataFilterPath" => "return_no",
+            ],
             "ID" => [
                 "id" => "id",
                 "type" => "text",
@@ -38,14 +44,14 @@
         ];
     @endphp
 
-    <div class="w-[80%] mx-auto">
+    <div class="w-[90%] mx-auto">
         <x-search-header heading="Sales Return" :search_fields=$searchFields />
     </div>
 
     <!-- Main Content -->
     <section class="text-center mx-auto ">
         <div
-            class="show-box mx-auto w-[80%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
+            class="show-box mx-auto w-[90%] h-[70vh] bg-[var(--secondary-bg-color)] border border-[var(--glass-border-color)]/20 rounded-xl shadow pt-8.5 relative">
             <x-form-title-bar printBtn layout="table" title="Show Sales Return" resetSortBtn />
 
             <div class="absolute bottom-14 right-0 flex items-center justify-end gap-2 w-fll z-50 p-3 w-full pointer-events-none">
@@ -56,12 +62,10 @@
             <div class="details h-full z-40">
                 <div class="container-parent h-full">
                     <div class="card_container px-3 pb-3 h-full flex flex-col">
-                        <div id="table-head" class="grid grid-cols-[0.5fr_1.25fr_1.8fr_1.15fr_1.15fr_0.85fr_0.9fr_1.05fr] items-center bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4">
-                            <div class="cursor-pointer" onclick="sortByThis(this)">ID</div>
+                            <div id="table-head" class="grid grid-cols-[1.25fr_1.25fr_2.2fr_0.95fr_1fr_1.15fr] items-center bg-[var(--h-bg-color)] rounded-lg font-medium py-2 hidden mt-4">
+                            <div class="cursor-pointer" onclick="sortByThis(this)">Return No.</div>
                             <div class="cursor-pointer" onclick="sortByThis(this)">Date</div>
                             <div class="cursor-pointer" onclick="sortByThis(this)">Customer</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Article No.</div>
-                            <div class="cursor-pointer" onclick="sortByThis(this)">Invoice No.</div>
                             <div class="cursor-pointer" onclick="sortByThis(this)">Type</div>
                             <div class="cursor-pointer" onclick="sortByThis(this)">Quantity</div>
                             <div class="cursor-pointer" onclick="sortByThis(this)">Amount</div>
@@ -86,7 +90,7 @@
 @endsection
 
 @push('page-scripts')
-<script defer src="{{ asset('js/pages/sales-return-index.js') }}"></script>
+<script defer src="{{ asset('js/pages/sales-return-index.js') }}?v={{ config('app.version', 'local') }}-{{ filemtime(public_path('js/pages/sales-return-index.js')) }}"></script>
 <script>
         window.__salesReturnIndex = {
             authLayout: @json($authLayout),

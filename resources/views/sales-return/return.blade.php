@@ -1,11 +1,19 @@
 @php
     $authUser = Auth::user();
+    $initialLines = ($editReturnLines ?? collect())->map(function ($line) {
+        return [
+            'key' => $line->invoice_id . '-' . $line->article_id,
+            'invoice_id' => (int) $line->invoice_id,
+            'article_id' => (int) $line->article_id,
+            'quantity' => (int) $line->quantity,
+        ];
+    })->values();
 @endphp
 
 @extends('app')
 @section('title', 'Sales Return | ' . $client_company->name)
 @section('content')
-    <div class="switch-btn-container flex absolute top-3 md:top-17 left-3 md:left-5 z-[100]">
+    {{-- <div class="switch-btn-container flex absolute top-3 md:top-17 left-3 md:left-5 z-[100]">
         <div class="switch-btn relative flex border-3 border-[var(--secondary-bg-color)] bg-[var(--secondary-bg-color)] rounded-2xl overflow-hidden">
             <div id="returnTypeHighlight" class="absolute h-full rounded-xl bg-[var(--bg-color)] transition-all duration-300 ease-in-out z-0"></div>
             <button id="returnTypeBtn" type="button"
@@ -15,26 +23,30 @@
                 class="relative z-10 px-3.5 md:px-5 py-1.5 md:py-2 cursor-pointer rounded-xl"
                 onclick="setSalesReturnType(this, 'adjustment')">Adjustment</button>
         </div>
-    </div>
+    </div> --}}
 
     <div class="mb-5 max-w-4xl mx-auto fade-in">
         <x-search-header heading="Sales Return" link linkText="Show Returns" linkHref="{{ route('sales-returns.index') }}"/>
     </div>
 
     <!-- Form -->
-    <form id="form" action="{{ route('sales-returns.store') }}" method="post" enctype="multipart/form-data"
+    <form id="form" action="{{ !empty($editReturn) ? route('sales-returns.update', $editReturn) : route('sales-returns.store') }}" method="post" enctype="multipart/form-data"
         class="bg-[var(--secondary-bg-color)] text-sm rounded-xl shadow-lg p-8 border border-[var(--h-bg-color)] pt-12 max-w-4xl mx-auto relative overflow-hidden">
         @csrf
-        <input type="hidden" name="type" id="salesReturnType" value="{{ old('type', 'return') }}">
+        @if (!empty($editingReturnNo))
+            @method('PUT')
+        @endif
+        <input type="hidden" name="return_no" value="{{ $editingReturnNo ?? '' }}">
+        <input type="hidden" name="type" id="salesReturnType" value="{{ old('type', $editReturn->type ?? 'return') }}">
         <x-form-title-bar title="Sales Return" />
         <!-- Step 1: Basic Information -->
         <div class="step1 space-y-4 ">
             <div class="grid grid-cols-1 md:grid-cols-[1fr_12rem_auto] gap-4 items-end">
                 {{-- Customer --}}
-                <x-select label="Customer" name="customer_id" id="customer" :options="$customerOptions" showDefault onchange="onCustomerSelect(this)" />
+                <x-select label="Customer" name="customer_id" id="customer" :value="$editingCustomerId ?? ''" :options="$customerOptions" showDefault onchange="onCustomerSelect(this)" />
 
                 {{-- Date --}}
-                <x-input label="Date" name="date" id="date" type="date" max="{{ now()->toDateString() }}" required disabled />
+                <x-input label="Date" name="date" id="date" type="date" value="{{ old('date', isset($editReturn) ? optional($editReturn->date)->toDateString() : '') }}" max="{{ now()->toDateString() }}" required disabled />
 
                 <button id="selectReturnArticlesBtn" type="button" onclick="openReturnLinesModal()" disabled
                     class="h-[2.45rem] px-4 bg-[var(--primary-color)] rounded-lg hover:bg-[var(--h-primary-color)] transition-all duration-300 ease-in-out cursor-pointer text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
@@ -94,6 +106,10 @@
         window.__salesReturnReturn = {
             detailsUrl: @json(route('sales-returns.get-details')),
             csrfToken: @json(csrf_token()),
+            editingReturnNo: @json($editingReturnNo ?? null),
+            editingCustomerId: @json($editingCustomerId ?? null),
+            initialDate: @json(isset($editReturn) ? optional($editReturn->date)->toDateString() : null),
+            initialLines: @json($initialLines),
         };
     </script>
 @endpush
