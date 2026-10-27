@@ -20,6 +20,7 @@
     let articles = [];
 
     let customerData;
+    let selectedCustomerId;
     const customerSelectDom = document.getElementById('customer_id');
     const generateOrderBtn = document.getElementById('generateOrderBtn');
 
@@ -285,6 +286,12 @@
 
             try {
                 customerData = JSON.parse(customerDataDom || '{}') || order.customer;
+                const nextCustomerId = String(customerData?.id || elem.value || '');
+                if (selectedCustomerId !== undefined && nextCustomerId !== selectedCustomerId) {
+                    const orderNoteInput = document.getElementById('order_note');
+                    if (orderNoteInput) orderNoteInput.value = customerData?.order_note || '';
+                }
+                selectedCustomerId = nextCustomerId;
                 fetchCustomerArticleHistory(customerData?.id || elem.value);
             } catch (_) {
                 customerData = order?.customer || null;
@@ -318,6 +325,10 @@
     }
 
     document.getElementById('deliver_to')?.addEventListener('input', () => {
+        generateOrder();
+    });
+
+    document.getElementById('order_note')?.addEventListener('input', () => {
         generateOrder();
     });
 
@@ -768,7 +779,8 @@
                         created_at: order?.created_at,
                         creator: order?.creator,
                         customer: customerData,
-                        deliver_to: document.getElementById('deliver_to')?.value || order?.deliver_to || '',
+                        deliver_to: document.getElementById('deliver_to')?.value ?? order?.deliver_to ?? '',
+                        order_note: document.getElementById('order_note')?.value ?? order?.order_note ?? '',
                         discount: discountDOM?.value || 0,
                         netAmount: parseFormattedNumber(finalNetAmount?.value ?? netAmount ?? 0),
                         branch_branding: companyData,
@@ -879,6 +891,7 @@
         order = data?.order || null;
         companyData = data?.companyData || null;
         customerData = order?.customer || null;
+        selectedCustomerId = String(order?.customer?.id || '');
         fetchCustomerArticleHistory(order?.customer?.id);
 
         if (order?.articles?.length) {

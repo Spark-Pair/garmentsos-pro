@@ -79,6 +79,7 @@
         let orderedArticles = Array.isArray(config.articles) ? config.articles : [];
         let customerData = config.customer || null;
         let orderDeliverTo = config.deliverTo || '';
+        let orderNote = config.orderNote || '';
         let discount = Number(config.discount || 0);
         let totalQuantityPcs = 0;
         let totalAmount = 0;
@@ -188,6 +189,7 @@
                         discount = Number(response.discount ?? 0);
                         customerData = response.customer;
                         orderDeliverTo = response.deliver_to || '';
+                        orderNote = response.order_note || '';
                         renderCustomerDisplay();
                     } else {
                         renderError(config, response.error);
@@ -413,6 +415,7 @@
                     invoice_no: invoiceNo,
                     order_no: selectedOrderNo(),
                     deliver_to: orderDeliverTo,
+                    order_note: orderNote,
                     carton_count: 0,
                     discount: discount || 0,
                     netAmount: netAmount || null,

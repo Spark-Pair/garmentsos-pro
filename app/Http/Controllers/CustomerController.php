@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
@@ -113,6 +114,10 @@ class CustomerController extends Controller
             'address' => 'required|string|max:255',
         ]);
 
+        if (Schema::hasColumn('customers', 'order_note')) {
+            $validator->addRules(['order_note' => 'nullable|string|max:500']);
+        }
+
         // Check for validation errors
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator)->withInput();
@@ -148,7 +153,7 @@ class CustomerController extends Controller
         }
 
         // Create a new customer
-        $customer = Customer::create([
+        $customerData = [
             'user_id' => $user->id,
             'branch_id' => app(ModuleBranchService::class)->branchIdForCreate('customers'),
             'customer_name' => $user->name,
@@ -159,7 +164,13 @@ class CustomerController extends Controller
             'category' => $data['category'],
             'city_id' => $data['city'],
             'address' => $data['address'],
-        ]);
+        ];
+
+        if (Schema::hasColumn('customers', 'order_note')) {
+            $customerData['order_note'] = $data['order_note'] ?? null;
+        }
+
+        $customer = Customer::create($customerData);
 
         Cache::forget('category_data:customer');
         return redirect()->route('customers.create')->with('success', 'Customer created successfully.');
@@ -222,6 +233,10 @@ class CustomerController extends Controller
             'image_upload' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
         ];
 
+        if (Schema::hasColumn('customers', 'order_note')) {
+            $rules['order_note'] = 'nullable|string|max:500';
+        }
+
         if ($isDeveloper) {
             $rules['customer_name'] = [
                 'required',
@@ -278,6 +293,10 @@ class CustomerController extends Controller
             'city_id' => $request->city,
             'address' => $request->address,
         ];
+
+        if (Schema::hasColumn('customers', 'order_note')) {
+            $updateData['order_note'] = $request->order_note;
+        }
 
         if ($isDeveloper) {
             $updateData['customer_name'] = $request->customer_name;

@@ -9,33 +9,32 @@
     @endphp
     <!-- Main Content -->
     <!-- Progress Bar -->
-    <div class="mb-5 max-w-5xl mx-auto">
+    <div class="mb-5 max-w-6xl mx-auto">
         <x-search-header heading="Generate Order" link linkText="Show Orders" linkHref="{{ route('orders.index') }}"/>
         <x-progress-bar :steps="['Generate Order', 'Preview']" :currentStep="1" />
     </div>
 
     <!-- Form -->
     <form id="form" action="{{ route('orders.store') }}" method="post" enctype="multipart/form-data"
-        class="bg-[var(--secondary-bg-color)] text-sm rounded-xl shadow-lg p-8 border border-[var(--glass-border-color)]/20 pt-14 max-w-5xl mx-auto  relative overflow-hidden">
+        class="bg-[var(--secondary-bg-color)] text-sm rounded-xl shadow-lg p-8 border border-[var(--glass-border-color)]/20 pt-14 max-w-6xl mx-auto relative overflow-hidden">
         @csrf
         <x-form-title-bar title="Generate Order" />
 
         <!-- Step 1: Generate order -->
         <div class="step1 space-y-4 ">
-            <div class="flex justify-between gap-4">
-                {{-- order date --}}
-                <div class="w-1/2 grid grid-cols-2 gap-4">
-                    <x-input label="Date" name="date" id="date" type="date" onchange="getDataByDate(this)" validateMax max='{{ now()->toDateString() }}' validateMin min="2024-01-01" required />
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[0.8fr_1fr_1.35fr_1.75fr] xl:items-end">
+                <x-input label="Date" name="date" id="date" type="date" onchange="getDataByDate(this)" validateMax max='{{ now()->toDateString() }}' validateMin min="2024-01-01" required />
 
-                    <x-input label="Deliver To" name="deliver_to" id="deliver_to" placeholder="Optional delivery address / person" />
-                </div>
+                <x-input label="Deliver To" name="deliver_to" id="deliver_to" placeholder="Optional delivery address / person" />
+
+                <x-input label="Order Note" name="order_note" id="order_note" value="{{ old('order_note') }}" placeholder="Optional customer order note" maxlength="500" />
 
                 <input type="hidden" name="generateInvoiceAfterSave" id="generateInvoiceAfterSave" value="0">
 
                 {{-- title --}}
-                <div class="grow">
+                <div class="min-w-0">
                     <x-select label="Customer" name="customer_id" id="customer_id" :options="[]" required showDefault onchange="trackCustomerState(this)"
-                        class="grow" withButton btnId="generateOrderBtn" btnText="Select Articles" />
+                        class="min-w-0 grow" withButton btnId="generateOrderBtn" btnText="Select Articles" />
                 </div>
             </div>
             {{-- rate showing --}}

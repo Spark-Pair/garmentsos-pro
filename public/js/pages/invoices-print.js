@@ -114,6 +114,11 @@
                             invoice.order?.deliver_to ||
                             '',
 
+                        order_note:
+                            invoice.order_note ||
+                            invoice.order?.order_note ||
+                            '',
+
                         carton_count:
                             cartonCount,
 

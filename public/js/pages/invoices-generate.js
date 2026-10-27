@@ -1005,6 +1005,7 @@
             let orderedArticles = [];
             let customerData;
             let orderDeliverTo = '';
+            let orderNote = '';
             const articleModalDom = document.getElementById("articleModal");
             const quantityModalDom = document.getElementById("quantityModal");
             const orderNoDom = document.getElementById("order_no");
@@ -1061,11 +1062,13 @@
                             discount = response.discount ?? 0;
                             customerData = response.customer;
                             orderDeliverTo = response.deliver_to || '';
+                            orderNote = response.order_note || '';
                         } else {
                             orderedArticles = [];
                             discount = 0;
                             customerData = "";
                             orderDeliverTo = '';
+                            orderNote = '';
                             renderError(response.error);
                         }
                         renderList();
@@ -1280,6 +1283,7 @@
                         invoice_no: invoiceNo,
                         order_no: selectedOrderNo(),
                         deliver_to: orderDeliverTo,
+                        order_note: orderNote,
                         carton_count: 0,
                         discount: discount || 0,
                         netAmount: netAmount || null,

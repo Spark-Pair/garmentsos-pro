@@ -126,7 +126,7 @@
     $suppressPageFlashMessages = request()->route()?->getActionMethod() === 'edit';
 @endphp
 <!DOCTYPE html>
-<html lang="en" data-theme="{{ $preferredTheme }}">
+<html lang="en-PK" data-theme="{{ $preferredTheme }}">
 
 <head>
     <meta charset="UTF-8" />

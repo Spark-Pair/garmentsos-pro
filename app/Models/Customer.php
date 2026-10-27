@@ -30,6 +30,7 @@ class Customer extends Model
         'category',
         'city_id',
         'address',
+        'order_note',
     ];
 
     protected $hidden = [

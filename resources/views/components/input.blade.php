@@ -119,6 +119,7 @@
                 id="{{ $id }}"
                 type="{{ $type }}"
                 name="{{ $name }}"
+                @if ($type === 'date') lang="en-PK" @endif
                 @if ($value !== '') value="{{ old($name, $value) }}" @endif
                 placeholder="{{ $placeholder }}"
                 autocomplete="{{ $autocomplete }}"

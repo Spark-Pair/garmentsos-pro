@@ -134,8 +134,8 @@ class OrderController extends Controller
                     ->whereHas('user', function ($query) {
                         $query->where('status', 'active');
                     })
-                    ->where('date', '<=', $request->date)
-                    ->select('id', 'customer_name', 'person_name', 'urdu_title', 'phone_number', 'date', 'city_id', 'address')
+                    ->whereDate('date', '<=', $request->date)
+                    ->select($this->customerOptionColumns())
                     ->get();
             }
 
@@ -153,7 +153,7 @@ class OrderController extends Controller
                 $customers_options[(int) $customer->id] = $this->customerOption($customer);
             }
 
-            $articles = $branches->applyRelatedScope(Article::where('date', '<=', $request->date), 'articles', 'orders')
+            $articles = $branches->applyRelatedScope(Article::whereDate('date', '<=', $request->date), 'articles', 'orders')
                 ->where('sales_rate', '>', 0)
                 ->whereNotNull(['category', 'fabric_type'])
                 ->orderByDesc('id')
@@ -244,6 +244,10 @@ class OrderController extends Controller
             $rules['deliver_to'] = 'nullable|string|max:255';
         }
 
+        if ($this->supportsOrderNoteColumn()) {
+            $rules['order_note'] = 'nullable|string|max:500';
+        }
+
         $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
@@ -271,6 +275,10 @@ class OrderController extends Controller
 
             if ($this->supportsOrderDeliverToColumn()) {
                 $orderData['deliver_to'] = $request->deliver_to;
+            }
+
+            if ($this->supportsOrderNoteColumn()) {
+                $orderData['order_note'] = $request->order_note;
             }
 
             $order = Order::create($orderData);
@@ -409,12 +417,14 @@ class OrderController extends Controller
             ] : null,
             'netAmount' => $order->netAmount,
             'deliver_to' => $order->deliver_to,
+            'order_note' => $order->order_note,
             'customer' => [
                 'id' => $order->customer?->id,
                 'customer_name' => $order->customer?->customer_name,
                 'urdu_title' => $order->customer?->urdu_title,
                 'address' => $order->customer?->address,
                 'phone_number' => $order->customer?->phone_number,
+                'order_note' => $order->customer?->order_note,
                 'city' => [
                     'title' => $order->customer?->city?->title,
                 ],
@@ -451,8 +461,8 @@ class OrderController extends Controller
                 ->whereHas('user', function ($query) {
                     $query->where('status', 'active');
                 })
-                ->where('date', '<=', $order->date?->format('Y-m-d') ?? now()->toDateString())
-                ->select('id', 'customer_name', 'person_name', 'urdu_title', 'phone_number', 'date', 'city_id', 'address')
+                ->whereDate('date', '<=', $order->date?->format('Y-m-d') ?? now()->toDateString())
+                ->select($this->customerOptionColumns())
                 ->get();
 
             foreach ($customers->sortBy('customer_name') as $customer) {
@@ -489,6 +499,10 @@ class OrderController extends Controller
             $rules['deliver_to'] = 'nullable|string|max:255';
         }
 
+        if ($this->supportsOrderNoteColumn()) {
+            $rules['order_note'] = 'nullable|string|max:500';
+        }
+
         $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
@@ -513,6 +527,10 @@ class OrderController extends Controller
 
             if ($this->supportsOrderDeliverToColumn()) {
                 $orderUpdates['deliver_to'] = $request->deliver_to;
+            }
+
+            if ($this->supportsOrderNoteColumn()) {
+                $orderUpdates['order_note'] = $request->order_note;
             }
 
             if ($isDeveloper) {
@@ -670,6 +688,7 @@ class OrderController extends Controller
                 'urdu_title' => $customer->urdu_title,
                 'phone_number' => $customer->phone_number,
                 'address' => $customer->address,
+                'order_note' => $customer->order_note,
                 'date' => $customer->date?->format('Y-m-d'),
                 'city' => [
                     'id' => $customer->city?->id,
@@ -680,11 +699,29 @@ class OrderController extends Controller
         ];
     }
 
+    private function customerOptionColumns(): array
+    {
+        $columns = ['id', 'customer_name', 'person_name', 'urdu_title', 'phone_number', 'date', 'city_id', 'address'];
+
+        if (Schema::hasColumn('customers', 'order_note')) {
+            $columns[] = 'order_note';
+        }
+
+        return $columns;
+    }
+
     private function supportsOrderDeliverToColumn(): bool
     {
         static $supports = null;
 
         return $supports ??= Schema::hasColumn('orders', 'deliver_to');
+    }
+
+    private function supportsOrderNoteColumn(): bool
+    {
+        static $supports = null;
+
+        return $supports ??= Schema::hasColumn('orders', 'order_note');
     }
 
     public function customerArticleHistory(Request $request)

@@ -62,7 +62,7 @@ class ShipmentController extends Controller
         if ($request->date) {
             $customers = $branches->applyRelatedScope(Customer::with('city'), 'customers', 'shipments')
                 ->whereHas('user', fn($query) => $query->where('status', 'active'))
-                ->where('date', '<=', $request->date)
+                ->whereDate('date', '<=', $request->date)
                 ->select('id', 'customer_name', 'person_name', 'urdu_title', 'phone_number', 'date', 'city_id', 'address')
                 ->get();
 
@@ -86,7 +86,7 @@ class ShipmentController extends Controller
                 ];
             }
 
-            $articles = $branches->applyRelatedScope(Article::where('date', '<=', $request->date), 'articles', 'shipments')
+            $articles = $branches->applyRelatedScope(Article::whereDate('date', '<=', $request->date), 'articles', 'shipments')
                 ->where('sales_rate', '>', 0)
                 ->whereNotNull(['category', 'fabric_type'])
                 ->orderByDesc('id')

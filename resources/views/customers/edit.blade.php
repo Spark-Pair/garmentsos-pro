@@ -127,6 +127,15 @@
                         capitalized
                         required
                     />
+
+                    <x-input
+                        label="Default Order Note"
+                        name="order_note"
+                        id="order_note"
+                        value="{{ old('order_note', $customer->order_note) }}"
+                        placeholder="Optional note for orders and invoices"
+                        maxlength="500"
+                    />
                 </div>
             </div>
 

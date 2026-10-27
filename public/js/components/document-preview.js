@@ -46,7 +46,10 @@
         const deliverTo = String(
             previewData?.deliver_to ?? previewData?.order?.deliver_to ?? "",
         ).trim();
-        return `Deliver To: ${deliverTo || "-"}`;
+        const orderNote = String(
+            previewData?.order_note ?? previewData?.order?.order_note ?? "",
+        ).trim();
+        return `Deliver To: ${previewText(deliverTo || "-")}${orderNote ? ` | ${previewText(orderNote)}` : ""}`;
     };
 
     const previewText = (value) =>

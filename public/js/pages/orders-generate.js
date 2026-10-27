@@ -99,6 +99,8 @@
                 ?.getAttribute('data-option');
 
             customerData = JSON.parse(customerDataDom || '{}');
+            const orderNoteInput = document.getElementById('order_note');
+            if (orderNoteInput) orderNoteInput.value = customerData?.order_note || '';
             fetchCustomerArticleHistory(customerData?.id || elem.value);
             selectedArticles = [];
             totalOrderedQuantity = 0;
@@ -134,6 +136,10 @@
     }
 
     document.getElementById('deliver_to')?.addEventListener('input', () => {
+        generateOrder();
+    });
+
+    document.getElementById('order_note')?.addEventListener('input', () => {
         generateOrder();
     });
 
@@ -642,6 +648,7 @@
                         date: document.getElementById('date')?.value,
                         customer: customerData,
                         deliver_to: document.getElementById('deliver_to')?.value || '',
+                        order_note: document.getElementById('order_note')?.value || '',
                         discount: discountDOM?.value || 0,
                         netAmount: parseFormattedNumber(finalNetAmount?.value ?? netAmount ?? 0),
                         branch_branding: companyData,

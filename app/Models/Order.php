@@ -28,6 +28,7 @@ class Order extends Model
         'netAmount',
         'order_no',
         'deliver_to',
+        'order_note',
         'status',
     ];
 

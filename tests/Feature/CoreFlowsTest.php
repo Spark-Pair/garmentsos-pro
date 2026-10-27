@@ -49,6 +49,47 @@ class CoreFlowsTest extends TestCase
         $response->assertStatus(200);
     }
 
+    public function test_orders_create_includes_customer_joined_on_selected_date(): void
+    {
+        $developer = $this->actingDeveloper();
+
+        $city = Setup::create([
+            'title' => 'Karachi',
+            'short_title' => 'KHI',
+            'type' => 'city',
+        ]);
+
+        $customerUser = User::create([
+            'name' => 'Same Day Customer',
+            'username' => 'same_day_customer',
+            'password' => Hash::make('password'),
+            'role' => 'customer',
+            'status' => 'active',
+        ]);
+
+        $customer = Customer::create([
+            'user_id' => $customerUser->id,
+            'customer_name' => 'Same Day Customer',
+            'person_name' => 'Test Person',
+            'phone_number' => '03001234567',
+            'date' => '2026-02-26',
+            'category' => 'regular',
+            'city_id' => $city->id,
+            'address' => 'Test Address',
+            'creator_id' => $developer->id,
+        ]);
+
+        $response = $this->getJson('/orders/create?date=2026-02-26', [
+            'X-Requested-With' => 'XMLHttpRequest',
+        ]);
+
+        $response->assertOk();
+        $this->assertContains(
+            $customer->id,
+            collect($response->json('customers_options'))->pluck('data_option.id')->all()
+        );
+    }
+
     public function test_shipments_create_with_date_returns_success(): void
     {
         $this->actingDeveloper();
