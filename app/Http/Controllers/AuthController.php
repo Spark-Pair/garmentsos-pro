@@ -4,10 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\UserSession;
+use App\Services\Navigation\MenuCategoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
@@ -212,6 +215,32 @@ class AuthController extends Controller
             'status' => 'success',
             'saved' => true,
             'sidebar_expanded' => $expanded,
+        ]);
+    }
+
+    public function updateMenuCategories(Request $request, MenuCategoryService $menuCategories)
+    {
+        abort_unless(Auth::user()?->role === 'developer', 403);
+
+        $data = $request->validate([
+            'assignments' => ['required', 'array'],
+            'assignments.*' => ['required', 'string', Rule::in($menuCategories->categoryIds())],
+        ]);
+
+        $unknownModuleIds = array_diff(array_keys($data['assignments']), $menuCategories->moduleIds());
+        if ($unknownModuleIds !== []) {
+            throw ValidationException::withMessages([
+                'assignments' => 'One or more menu modules are not supported.',
+            ]);
+        }
+
+        $assignments = $menuCategories->saveAssignments($data['assignments']);
+
+        return response()->json([
+            'status' => 'success',
+            'saved' => true,
+            'assignments' => $assignments,
+            'message' => 'Menu categories updated successfully.',
         ]);
     }
 }

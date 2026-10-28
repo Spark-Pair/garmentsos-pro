@@ -721,7 +721,7 @@ class ModuleBranchService
         'auth' => [
             'label' => 'Login / Session',
             'group' => 'System',
-            'route_prefixes' => ['login', 'logout', 'update-last-activity', 'update-menu-shortcuts', 'update-theme'],
+            'route_prefixes' => ['login', 'logout', 'update-last-activity', 'update-menu-shortcuts', 'update-menu-categories', 'update-theme'],
             'page_reference' => 'auth',
             'branchable' => false,
             'can_filter_records' => false,

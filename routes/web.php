@@ -296,4 +296,5 @@ Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensur
     Route::post('update-last-activity', [AuthController::class, 'updateLastActivity'])->name('update-last-activity');
     Route::post('update-menu-shortcuts', [AuthController::class, 'updateMenuShortcuts'])->name('updateMenuShortcuts');
     Route::post('update-sidebar-state', [AuthController::class, 'updateSidebarState'])->name('updateSidebarState');
+    Route::post('update-menu-categories', [AuthController::class, 'updateMenuCategories'])->name('updateMenuCategories');
 });

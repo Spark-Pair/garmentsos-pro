@@ -352,48 +352,79 @@ function createModal(data, animate = 'animate') {
     }
 
     if (data.cards && isMenuModal) {
+        const menuCategoryButtons = Array.isArray(data.menuCategories)
+            ? [
+                { id: 'all', name: 'All' },
+                ...data.menuCategories,
+            ].map(category => {
+                const isActive = (data.activeMenuCategory || 'all') === category.id;
+                return `
+                    <button type="button"
+                        data-menu-category="${modalText(category.id)}"
+                        aria-pressed="${isActive ? 'true' : 'false'}"
+                        onclick="filterMenuCategory('${htmlAttr(category.id)}')"
+                        class="menu-category-filter ${isActive ? 'is-active' : ''}">
+                        ${modalText(category.name)}
+                    </button>
+                `;
+            }).join('')
+            : '';
         clutter += `
             <div class="flex-1 flex flex-col ${data.image ? 'ml-8' : ''} h-full w-full overflow-hidden">
                 <div class="rounded-3xl border border-[var(--glass-border-color)]/25 bg-[var(--h-secondary-bg-color)] shadow-sm overflow-hidden flex h-full flex-col">
-                    <div class="flex flex-col gap-4 border-b border-[var(--glass-border-color)]/20 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-                        <div class="flex items-center gap-3">
-                            <span class="h-10 w-1.5 shrink-0 rounded-full bg-[var(--primary-color)]/80"></span>
-                            <div>
-                                <h5 id="name" class="text-lg font-semibold uppercase tracking-wide text-[var(--text-color)]">${data.cards.name}</h5>
-                                <p class="text-xs text-[var(--secondary-text)]">Choose the modules shown as quick shortcuts in the left menu.</p>
+                    <div class="border-b border-[var(--glass-border-color)]/20 bg-[var(--h-secondary-bg-color)] px-5 py-4">
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                            <div class="flex items-center gap-3">
+                                <span class="h-10 w-1.5 shrink-0 rounded-full bg-[var(--primary-color)]/80"></span>
+                                <div>
+                                    <h5 id="name" class="text-lg font-semibold uppercase tracking-wide text-[var(--text-color)]">${data.cards.name}</h5>
+                                    <p class="text-xs text-[var(--secondary-text)]">Browse actions by section or pin modules as quick shortcuts.</p>
+                                </div>
+                            </div>
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                                ${data.basicSearch ? `<div class="form-group relative" id="basicSearch">
+                                    <div class="relative flex gap-2 w-full sm:min-w-[19rem] pt-0.5">
+                                        <input
+                                            type="text"
+                                            placeholder="Search modules or actions..."
+                                            autocomplete="off"
+                                            class="${appInputClassFor('text')}"
+                                            oninput="${data.onBasicSearch}"
+                                        />
+
+                                        <button
+                                            type="button"
+                                            aria-label="Search menu"
+                                            class="bg-[var(--primary-color)] px-4 rounded-lg hover:bg-[var(--h-primary-color)] transition-all duration-300 ease-in-out cursor-pointer text-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <i class="text-xs fa-solid fa-magnifying-glass"></i>
+                                        </button>
+                                    </div>
+
+                                    <div
+                                        id="search_box-error"
+                                        class="text-[var(--border-error)] text-xs mt-1 hidden transition-all duration-300 ease-in-out"
+                                    ></div>
+                                </div>
+                                ` : ''}
+                                ${data.canManageMenuCategories ? `
+                                    <div id="menuCategoryManagerActions" class="flex shrink-0 items-center gap-2">
+                                        <button type="button" onclick="toggleMenuCategoryManagement()" class="menu-category-manage-button">
+                                            <i class="fa-solid fa-grip"></i>
+                                            Manage Categories
+                                        </button>
+                                    </div>
+                                ` : ''}
                             </div>
                         </div>
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                            ${!isMenuModal && data.info ? `<div class="${data.id}Info rounded-lg border border-[var(--glass-border-color)]/20 bg-[var(--h-bg-color)] px-3 py-2 text-xs font-semibold text-[var(--secondary-text)] shadow-sm">
-                                ${data.info || ''}
-                            </div>` : ''}
-                            ${data.basicSearch ? `<div class="form-group relative" id="basicSearch">
-                                <div class="relative flex gap-2 min-w-[17rem] pt-0.5">
-                                    <input
-                                        type="text"
-                                        placeholder="Search menu..."
-                                        autocomplete="off"
-                                        class="${appInputClassFor('text')}"
-                                        oninput="${data.onBasicSearch}"
-                                    />
-
-                                    <button
-                                        type="button"
-                                        class="bg-[var(--primary-color)] px-4 rounded-lg hover:bg-[var(--h-primary-color)] transition-all duration-300 ease-in-out cursor-pointer text-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <i class="text-xs fa-solid fa-magnifying-glass"></i>
-                                    </button>
-                                </div>
-
-                                <div
-                                    id="search_box-error"
-                                    class="text-[var(--border-error)] text-xs mt-1 hidden transition-all duration-300 ease-in-out"
-                                ></div>
-                            </div>` : ''}
+                        ${menuCategoryButtons ? `
+                            <div class="menu-category-filters mt-4 flex gap-2 overflow-x-auto pb-1 my-scrollbar-2" role="group" aria-label="Menu categories">
+                                ${menuCategoryButtons}
+                            </div>
+                        ` : ''}
                         </div>
-                    </div>
                     <div class="flex-1 overflow-y-auto my-scrollbar-2 p-4">
-                        <div class="${data.id}CardsContainer grid grid-cols-1 md:grid-cols-2 xl:grid-cols-${data.cards.count} w-full gap-3 text-sm">
+                        <div class="${data.id}CardsContainer ${data.cards.groupByCategory ? 'flex flex-col gap-5' : `grid grid-cols-1 md:grid-cols-2 xl:grid-cols-${data.cards.count} gap-3`} w-full text-sm">
                             ${returnCardsInModal(data)}
                         </div>
                     </div>
@@ -919,7 +950,7 @@ function createMenuModalCard(data) {
                     <div class="circle"></div>
                 </div>
             </div>
-            <div class="mt-4 flex items-center justify-between border-t border-[var(--glass-border-color)]/15 pt-3">
+            <div class="menu-card-actions-footer mt-4 flex items-center justify-between border-t border-[var(--glass-border-color)]/15 pt-3">
                 <span class="inline-flex h-7 items-center rounded-lg bg-[var(--h-bg-color)] px-2.5 text-[11px] font-semibold text-[var(--secondary-text)]">
                     ${actionMetaText}
                 </span>
@@ -941,13 +972,48 @@ function returnCardsInModal(data) {
         ? window.baseCreateCard
         : createCard;
 
-    if (data.cards.data.length > 0) {
+    if (data.cards.data.length > 0 && data.cards.groupByCategory && Array.isArray(data.cards.categories)) {
+        const categories = data.cards.categories.filter(category =>
+            data.cards.showEmptyCategories || data.cards.data.some(item => item.category === category.id)
+        );
+        const categoryGridClass = Number(data.cards.count) === 1
+            ? 'grid-cols-1'
+            : Number(data.cards.count) === 2
+                ? 'grid-cols-1 md:grid-cols-2'
+                : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3';
+
+        categories.forEach(category => {
+            const categoryItems = data.cards.data.filter(item => item.category === category.id);
+            cardsHTML += `
+                <section class="menu-category-section" data-menu-category-section="${modalText(category.id)}">
+                    <div class="mb-2.5 flex items-center justify-between gap-3 px-1">
+                        <div class="flex min-w-0 items-center gap-2.5">
+                            <span class="size-2 shrink-0 rounded-full bg-[var(--primary-color)]"></span>
+                            <h6 class="truncate text-xs font-bold uppercase tracking-[0.12em] text-[var(--text-color)]">${modalText(category.name)}</h6>
+                        </div>
+                        <span class="shrink-0 rounded-lg border border-[var(--glass-border-color)]/20 bg-[var(--h-bg-color)] px-2 py-1 text-[10px] font-semibold text-[var(--secondary-text)]">
+                            ${categoryItems.length} ${categoryItems.length === 1 ? 'module' : 'modules'}
+                        </span>
+                    </div>
+                    <div class="grid ${categoryGridClass} gap-3">
+                        ${categoryItems.map(item => cardRenderer(item)).join('')}
+                    </div>
+                </section>
+            `;
+        });
+    } else if (data.cards.data.length > 0) {
         data.cards.data.forEach(item => {
             cardsHTML += cardRenderer(item);
         });
     } else {
         cardsHTML= `
-            <div class="col-span-full text-center text-[var(--border-error)] text-md mt-4">No ${data.cards.name} yet</div>
+            <div class="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--glass-border-color)]/30 bg-[var(--secondary-bg-color)] px-6 text-center">
+                <span class="mb-3 flex size-11 items-center justify-center rounded-xl bg-[var(--h-bg-color)] text-[var(--secondary-text)]">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </span>
+                <p class="font-semibold text-[var(--text-color)]">${modalText(data.cards.emptyMessage || `No ${data.cards.name} yet`)}</p>
+                <p class="mt-1 text-xs text-[var(--secondary-text)]">Try another category, module, or action name.</p>
+            </div>
         `;
     }
     return cardsHTML;

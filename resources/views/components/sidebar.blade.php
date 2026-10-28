@@ -368,12 +368,17 @@
         'type' => 'error',
         'messages' => 'An error occurred while updating the theme. Please try again later.',
     ])->render();
+    $menuCategoryService = app(\App\Services\Navigation\MenuCategoryService::class);
 @endphp
 <script defer src="{{ asset('js/components/sidebar.js') }}"></script>
 <script>
     window.__sidebar = {
         expanded: @json((bool) Auth::user()->sidebar_expanded),
         updateStateUrl: @json(route('updateSidebarState')),
+        canManageMenuCategories: @json(Auth::user()->role === 'developer'),
+        updateMenuCategoriesUrl: @json(route('updateMenuCategories')),
+        menuCategories: @json($menuCategoryService->categories()),
+        menuCategoryAssignments: @json($menuCategoryService->assignments()),
         menuData: [
         @if (app_menu_can('users', ['developer', 'owner', 'admin', 'accountant']))
             {

@@ -170,3 +170,155 @@
         pointer-events: auto;
     }
 }
+.menu-category-filter {
+    display: inline-flex;
+    min-height: 2.25rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid color-mix(in srgb, var(--glass-border-color) 35%, transparent);
+    border-radius: 0.65rem;
+    background: var(--h-bg-color);
+    padding: 0.45rem 0.8rem;
+    color: var(--secondary-text);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+}
+
+.menu-category-filter:hover,
+.menu-category-filter:focus-visible {
+    border-color: color-mix(in srgb, var(--primary-color) 45%, transparent);
+    color: var(--text-color);
+    outline: none;
+}
+
+.menu-category-filter.is-active {
+    border-color: var(--primary-color);
+    background: var(--primary-color);
+    color: white;
+    box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--primary-color) 20%, transparent);
+}
+
+.menu-category-manage-button,
+.menu-category-cancel-button,
+.menu-category-save-button {
+    display: inline-flex;
+    min-height: 2.4rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border-radius: 0.65rem;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 180ms ease, border-color 180ms ease, background-color 180ms ease;
+}
+
+.menu-category-manage-button,
+.menu-category-cancel-button {
+    border: 1px solid color-mix(in srgb, var(--glass-border-color) 40%, transparent);
+    background: var(--h-bg-color);
+    color: var(--text-color);
+}
+
+.menu-category-save-button {
+    border: 1px solid var(--primary-color);
+    background: var(--primary-color);
+    color: white;
+}
+
+.menu-category-manage-button:hover,
+.menu-category-cancel-button:hover {
+    border-color: color-mix(in srgb, var(--primary-color) 55%, transparent);
+}
+
+.menu-category-manage-button:disabled,
+.menu-category-cancel-button:disabled,
+.menu-category-save-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.is-managing-menu-categories .menu-category-filter {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.is-managing-menu-categories .menu-category-section {
+    min-height: 8rem;
+    border: 1px dashed color-mix(in srgb, var(--glass-border-color) 45%, transparent);
+    border-radius: 1rem;
+    padding: 0.75rem;
+    transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.is-managing-menu-categories .menu-category-section.is-menu-drop-target {
+    border-color: var(--primary-color);
+    background: color-mix(in srgb, var(--primary-color) 7%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary-color) 28%, transparent);
+}
+
+.menu-modal-card.is-category-draggable {
+    cursor: grab;
+    user-select: none;
+}
+
+.menu-modal-card.is-category-draggable:active {
+    cursor: grabbing;
+}
+
+.menu-modal-card.is-dragging {
+    opacity: 0.45;
+}
+
+.is-managing-menu-categories .menu-modal-card .switchBtn,
+.is-managing-menu-categories .menu-modal-card .menu-card-actions-footer {
+    pointer-events: none;
+    opacity: 0.55;
+}
+
+.menu-card-drag-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin: -0.25rem -0.25rem 0.75rem;
+    border-bottom: 1px dashed color-mix(in srgb, var(--glass-border-color) 35%, transparent);
+    padding: 0 0.25rem 0.65rem;
+    color: var(--secondary-text);
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.menu-card-category-select-label {
+    display: none;
+    align-items: center;
+    gap: 0.4rem;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.menu-card-category-select-label select {
+    max-width: 10rem;
+    border: 1px solid color-mix(in srgb, var(--glass-border-color) 45%, transparent);
+    border-radius: 0.5rem;
+    background: var(--h-bg-color);
+    padding: 0.3rem 0.45rem;
+    color: var(--text-color);
+    font-size: 0.7rem;
+}
+
+@media (max-width: 767px) {
+    .menu-card-category-select-label {
+        display: inline-flex;
+    }
+
+    .menu-card-drag-controls > span:first-child {
+        display: none;
+    }
+}

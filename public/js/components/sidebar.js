@@ -13,10 +13,36 @@
 
         const config = window.__sidebar || {};
         const menuData = config.menuData || [];
+        const menuCategories = Array.isArray(config.menuCategories)
+            ? config.menuCategories.map(category => ({
+                id: category.id,
+                name: category.name,
+                moduleIds: Array.isArray(category.module_ids) ? category.module_ids : [],
+            }))
+            : [];
+        const categoryByModuleId = new Map(
+            menuCategories.flatMap(category => category.moduleIds.map(moduleId => [moduleId, category.id]))
+        );
+        const configuredCategoryAssignments = config.menuCategoryAssignments && typeof config.menuCategoryAssignments === 'object'
+            ? config.menuCategoryAssignments
+            : {};
+        Object.entries(configuredCategoryAssignments).forEach(([moduleId, categoryId]) => {
+            if (categoryByModuleId.has(moduleId) && menuCategories.some(category => category.id === categoryId)) {
+                categoryByModuleId.set(moduleId, categoryId);
+            }
+        });
+        menuData.forEach(module => {
+            module.category = categoryByModuleId.get(module.id) || 'administration';
+        });
+        const availableMenuCategories = config.canManageMenuCategories === true
+            ? menuCategories
+            : menuCategories.filter(category => menuData.some(module => module.category === category.id));
         const pageName = window.location.href.toLowerCase().split('/')[3];
         const sidebarShell = document.getElementById('desktopSidebarShell');
         const sidebarToggle = document.getElementById('sidebarToggle');
         const sidebarStateUrl = config.updateStateUrl;
+        const canManageMenuCategories = config.canManageMenuCategories === true;
+        const updateMenuCategoriesUrl = config.updateMenuCategoriesUrl;
         let preferredSidebarExpanded = config.expanded === true;
         let sidebarSaveQueue = Promise.resolve();
         let sidebarCollapseTimer;
@@ -275,15 +301,227 @@
             id: 'menuModal',
             class: 'h-[82%] w-[96vw]',
             menuModal: true,
-            cards: { name: 'Menu', count: 3, data: menuData, useMenuCard: true },
+            cards: {
+                name: 'Menu',
+                count: 3,
+                data: menuData,
+                useMenuCard: true,
+                groupByCategory: true,
+                categories: availableMenuCategories,
+                emptyMessage: 'No matching module found.',
+            },
+            menuCategories: availableMenuCategories,
+            activeMenuCategory: 'all',
+            canManageMenuCategories,
             basicSearch: true,
             onBasicSearch: 'menuBasicSearch(this.value)',
             info: `Enabled: ${getMenuShortcuts().length}/${typeof maxShortcutsLimit !== 'undefined' ? maxShortcutsLimit : 7}`,
             flex_col: true,
         };
 
+        let activeMenuCategory = 'all';
+        let menuSearchValue = '';
+        let isManagingMenuCategories = false;
+        let isSavingMenuCategories = false;
+        let savedCategoryAssignments = Object.fromEntries(categoryByModuleId);
+        let workingCategoryAssignments = { ...savedCategoryAssignments };
+
+        function syncMenuItemCategories(assignments) {
+            menuData.forEach(item => {
+                item.category = assignments[item.id] || categoryByModuleId.get(item.id) || 'administration';
+            });
+        }
+
+        function menuItemMatchesSearch(item, searchValue) {
+            const normalizedSearch = searchValue.trim().toLowerCase();
+            if (!normalizedSearch) return true;
+
+            const description = item.details && typeof item.details === 'object'
+                ? Object.values(item.details).join(' ')
+                : '';
+            const actions = Array.isArray(item.subMenu)
+                ? item.subMenu.map(action => action.name).join(' ')
+                : '';
+
+            return `${item.name} ${description} ${actions}`.toLowerCase().includes(normalizedSearch);
+        }
+
+        function filteredMenuData() {
+            if (isManagingMenuCategories) {
+                return menuData;
+            }
+
+            return menuData.filter(item => {
+                const inSelectedCategory = activeMenuCategory === 'all' || item.category === activeMenuCategory;
+                return inSelectedCategory && menuItemMatchesSearch(item, menuSearchValue);
+            });
+        }
+
+        function refreshMenuModalContent() {
+            modalData.activeMenuCategory = activeMenuCategory;
+            modalData.cards.data = filteredMenuData();
+            modalData.cards.showEmptyCategories = isManagingMenuCategories;
+            renderCardsInModal(modalData);
+
+            document.querySelectorAll('#menuModal [data-menu-category]').forEach(button => {
+                const isActive = button.dataset.menuCategory === activeMenuCategory;
+                button.classList.toggle('is-active', isActive);
+                button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            });
+
+            applyMenuCategoryManagementState();
+        }
+
+        function menuCategoryManagerButton() {
+            return `
+                <button type="button" onclick="toggleMenuCategoryManagement()"
+                    class="menu-category-manage-button">
+                    <i class="fa-solid fa-grip"></i>
+                    Manage Categories
+                </button>
+            `;
+        }
+
+        function menuCategorySaveButtons() {
+            return `
+                <button type="button" onclick="cancelMenuCategoryManagement()"
+                    class="menu-category-cancel-button" ${isSavingMenuCategories ? 'disabled' : ''}>
+                    Cancel
+                </button>
+                <button type="button" onclick="saveMenuCategoryManagement()"
+                    class="menu-category-save-button" ${isSavingMenuCategories ? 'disabled' : ''}>
+                    <i class="fa-solid ${isSavingMenuCategories ? 'fa-spinner fa-spin' : 'fa-check'}"></i>
+                    ${isSavingMenuCategories ? 'Saving...' : 'Save Categories'}
+                </button>
+            `;
+        }
+
+        function updateMenuCategoryManagerActions() {
+            const actions = document.getElementById('menuCategoryManagerActions');
+            if (!actions || !canManageMenuCategories) return;
+            actions.innerHTML = isManagingMenuCategories
+                ? menuCategorySaveButtons()
+                : menuCategoryManagerButton();
+        }
+
+        function categorySelectHtml(moduleId) {
+            return `
+                <label class="menu-card-category-select-label">
+                    <span>Move to</span>
+                    <select data-menu-category-select="${escapeHtml(moduleId)}">
+                        ${availableMenuCategories.map(category => `
+                            <option value="${escapeHtml(category.id)}" ${workingCategoryAssignments[moduleId] === category.id ? 'selected' : ''}>
+                                ${escapeHtml(category.name)}
+                            </option>
+                        `).join('')}
+                    </select>
+                </label>
+            `;
+        }
+
+        function applyMenuCategoryManagementState() {
+            const modal = document.getElementById('menuModal');
+            if (!modal) return;
+
+            modal.classList.toggle('is-managing-menu-categories', isManagingMenuCategories);
+            modal.querySelectorAll('[data-menu-category]').forEach(button => {
+                button.disabled = isManagingMenuCategories;
+            });
+
+            const searchInput = modal.querySelector('#basicSearch input');
+            if (searchInput) searchInput.disabled = isManagingMenuCategories;
+
+            modal.querySelectorAll('.menu-modal-card').forEach(card => {
+                card.draggable = isManagingMenuCategories;
+                card.classList.toggle('is-category-draggable', isManagingMenuCategories);
+
+                if (isManagingMenuCategories && !card.querySelector('.menu-card-drag-controls')) {
+                    card.removeAttribute('onclick');
+                    card.removeAttribute('oncontextmenu');
+                    card.insertAdjacentHTML('afterbegin', `
+                        <div class="menu-card-drag-controls">
+                            <span><i class="fa-solid fa-grip-vertical"></i> Drag module</span>
+                            ${categorySelectHtml(card.id)}
+                        </div>
+                    `);
+                }
+            });
+
+            updateMenuCategoryManagerActions();
+        }
+
+        function bindMenuCategoryManagementEvents() {
+            const modal = document.getElementById('menuModal');
+            if (!modal || modal.dataset.categoryManagerBound === 'true') return;
+            modal.dataset.categoryManagerBound = 'true';
+
+            modal.addEventListener('dragstart', event => {
+                const card = event.target.closest('.menu-modal-card');
+                if (!isManagingMenuCategories || !card) {
+                    event.preventDefault();
+                    return;
+                }
+
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', card.id);
+                card.classList.add('is-dragging');
+            });
+
+            modal.addEventListener('dragend', event => {
+                event.target.closest('.menu-modal-card')?.classList.remove('is-dragging');
+                modal.querySelectorAll('.menu-category-section').forEach(section => {
+                    section.classList.remove('is-menu-drop-target');
+                });
+            });
+
+            modal.addEventListener('dragover', event => {
+                if (!isManagingMenuCategories) return;
+                const section = event.target.closest('.menu-category-section');
+                if (!section) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+                section.classList.add('is-menu-drop-target');
+            });
+
+            modal.addEventListener('dragleave', event => {
+                const section = event.target.closest('.menu-category-section');
+                if (section && !section.contains(event.relatedTarget)) {
+                    section.classList.remove('is-menu-drop-target');
+                }
+            });
+
+            modal.addEventListener('drop', event => {
+                if (!isManagingMenuCategories) return;
+                const section = event.target.closest('.menu-category-section');
+                const moduleId = event.dataTransfer.getData('text/plain');
+                const categoryId = section?.dataset.menuCategorySection;
+                if (!section || !moduleId || !availableMenuCategories.some(category => category.id === categoryId)) return;
+
+                event.preventDefault();
+                workingCategoryAssignments[moduleId] = categoryId;
+                syncMenuItemCategories(workingCategoryAssignments);
+                refreshMenuModalContent();
+            });
+
+            modal.addEventListener('change', event => {
+                const select = event.target.closest('[data-menu-category-select]');
+                if (!isManagingMenuCategories || !select) return;
+
+                workingCategoryAssignments[select.dataset.menuCategorySelect] = select.value;
+                syncMenuItemCategories(workingCategoryAssignments);
+                refreshMenuModalContent();
+            });
+
+        }
+
         window.generateMenuModal = function generateMenuModal() {
             const shortcuts = getMenuShortcuts();
+            activeMenuCategory = 'all';
+            menuSearchValue = '';
+            isManagingMenuCategories = false;
+            isSavingMenuCategories = false;
+            workingCategoryAssignments = { ...savedCategoryAssignments };
+            syncMenuItemCategories(savedCategoryAssignments);
             menuData.forEach(item => {
                 if (!item.switchBtn) {
                     item.switchBtn = { active: false };
@@ -291,8 +529,90 @@
                 item.switchBtn.active = shortcuts.includes(item.id);
             });
             modalData.cards.data = menuData;
+            modalData.activeMenuCategory = activeMenuCategory;
             modalData.info = `Enabled: ${shortcuts.length}/${typeof maxShortcutsLimit !== 'undefined' ? maxShortcutsLimit : 7}`;
             createModal(modalData);
+            bindMenuCategoryManagementEvents();
+            applyMenuCategoryManagementState();
+        };
+
+        window.toggleMenuCategoryManagement = function toggleMenuCategoryManagement() {
+            if (!canManageMenuCategories || isManagingMenuCategories) return;
+            if (window.__appConfig?.readonlySession) {
+                if (typeof showMessageBox === 'function') {
+                    showMessageBox('warning', 'Read-only mode is enabled. Menu categories cannot be updated.');
+                }
+                return;
+            }
+
+            activeMenuCategory = 'all';
+            menuSearchValue = '';
+            isManagingMenuCategories = true;
+            workingCategoryAssignments = { ...savedCategoryAssignments };
+            syncMenuItemCategories(workingCategoryAssignments);
+
+            const searchInput = document.querySelector('#menuModal #basicSearch input');
+            if (searchInput) searchInput.value = '';
+            refreshMenuModalContent();
+        };
+
+        window.cancelMenuCategoryManagement = function cancelMenuCategoryManagement() {
+            if (!isManagingMenuCategories || isSavingMenuCategories) return;
+            workingCategoryAssignments = { ...savedCategoryAssignments };
+            syncMenuItemCategories(savedCategoryAssignments);
+            isManagingMenuCategories = false;
+            refreshMenuModalContent();
+        };
+
+        window.saveMenuCategoryManagement = async function saveMenuCategoryManagement() {
+            if (!canManageMenuCategories || !isManagingMenuCategories || isSavingMenuCategories) return;
+            isSavingMenuCategories = true;
+            updateMenuCategoryManagerActions();
+
+            try {
+                const response = await fetch(updateMenuCategoriesUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify({ assignments: workingCategoryAssignments }),
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || payload.saved !== true) {
+                    throw new Error(payload.message || 'Menu categories could not be saved.');
+                }
+
+                savedCategoryAssignments = { ...payload.assignments };
+                workingCategoryAssignments = { ...savedCategoryAssignments };
+                Object.entries(savedCategoryAssignments).forEach(([moduleId, categoryId]) => {
+                    categoryByModuleId.set(moduleId, categoryId);
+                });
+                syncMenuItemCategories(savedCategoryAssignments);
+                isManagingMenuCategories = false;
+                if (typeof showMessageBox === 'function') {
+                    showMessageBox('success', payload.message || 'Menu categories updated successfully.');
+                }
+            } catch (error) {
+                if (typeof showMessageBox === 'function') {
+                    showMessageBox('error', error.message || 'Menu categories could not be saved.');
+                }
+            } finally {
+                isSavingMenuCategories = false;
+                refreshMenuModalContent();
+            }
+        };
+
+        window.filterMenuCategory = function filterMenuCategory(categoryId) {
+            if (isManagingMenuCategories) return;
+            const isAvailableCategory = categoryId === 'all'
+                || availableMenuCategories.some(category => category.id === categoryId);
+            if (!isAvailableCategory) return;
+
+            activeMenuCategory = categoryId;
+            refreshMenuModalContent();
         };
 
         document.addEventListener('app:config:ready', () => {
@@ -313,8 +633,9 @@
         });
 
         window.menuBasicSearch = function menuBasicSearch(searchValue) {
-            modalData.cards.data = menuData.filter(item => item.name.toLowerCase().includes(searchValue.toLowerCase()));
-            renderCardsInModal(modalData);
+            if (isManagingMenuCategories) return;
+            menuSearchValue = searchValue || '';
+            refreshMenuModalContent();
         };
 
         function getDropdownItems(menu) {
