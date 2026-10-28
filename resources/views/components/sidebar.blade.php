@@ -379,6 +379,7 @@
         updateMenuCategoriesUrl: @json(route('updateMenuCategories')),
         menuCategories: @json($menuCategoryService->categories()),
         menuCategoryAssignments: @json($menuCategoryService->assignments()),
+        sidebarMode: @json($menuCategoryService->sidebarMode()),
         menuData: [
         @if (app_menu_can('users', ['developer', 'owner', 'admin', 'accountant']))
             {

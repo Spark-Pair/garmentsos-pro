@@ -50,6 +50,27 @@
             </div>
         </section>
 
+        <section id="sidebar-navigation" class="{{ $panel }}">
+            <x-developer-panel-title title="Sidebar Navigation" description="Choose what appears in the sidebar for every user." />
+
+            <form method="POST" action="{{ route('developer.settings.sidebar-mode.save') }}" class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                @csrf
+                <div class="flex-1">
+                    <x-select
+                        label="Sidebar content"
+                        name="sidebar_mode"
+                        id="sidebar_mode"
+                        :value="$sidebarMode"
+                        :options="[
+                            'modules' => ['text' => 'Selected modules (up to 7)'],
+                            'categories' => ['text' => 'Categories'],
+                        ]"
+                    />
+                </div>
+                <button type="submit" class="{{ $primaryButton }}">Save</button>
+            </form>
+        </section>
+
         <section id="branding" class="{{ $panel }}">
             <x-developer-panel-title title="Branding" description="Saved settings override config defaults and supply branding values to document previews.">
                 <span class="{{ $badge }} border-[var(--border-success)] bg-[var(--bg-success)] text-[var(--text-success)]">Safe text/color only</span>

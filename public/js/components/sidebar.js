@@ -183,6 +183,15 @@
         function renderMenuShortcuts() {
             const customMenuShortcutsDom = document.getElementById('customMenuShortcuts');
             if (!customMenuShortcutsDom) return;
+            if (config.sidebarMode === 'categories') {
+                customMenuShortcutsDom.innerHTML = availableMenuCategories.map(category => {
+                    const firstModule = menuData.find(module => module.category === category.id);
+                    const icon = firstModule?.svgIcon || '<i class="fas fa-folder text-[var(--text-color)]"></i>';
+                    return `<div class="relative group"><button type="button" onclick="openSidebarMenuCategory('${escapeHtml(category.id)}')" aria-label="${escapeHtml(category.name)}" class="nav-link text-[var(--text-color)] p-3 rounded-[41.5%] group-hover:bg-[var(--h-bg-color)] transition-all duration-300 ease-in-out w-10 h-10 flex items-center justify-center cursor-pointer relative">${icon}<span class="sidebar-nav-label absolute shadow-xl left-18 top-1/2 transform -translate-y-1/2 bg-[var(--h-secondary-bg-color)] border border-gray-600 text-[var(--text-color)] text-xs rounded-lg px-2 py-1 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none text-nowrap">${escapeHtml(category.name)}</span></button></div>`;
+                }).join('');
+                renderMobileMenuShortcuts();
+                return;
+            }
             const shortcuts = getMenuShortcuts();
             window.menu_shortcuts = shortcuts;
             const filteredModules = menuData.filter(module => shortcuts.includes(module.id));
@@ -283,6 +292,11 @@
             const mobileShortcutsDom = document.getElementById('mobileMenuShortcuts');
             if (!mobileShortcutsDom) return;
 
+            if (config.sidebarMode === 'categories') {
+                mobileShortcutsDom.innerHTML = availableMenuCategories.map(category => `<button type="button" onclick="openSidebarMenuCategory('${escapeHtml(category.id)}'); window.closeMobileMenu && window.closeMobileMenu();" class="w-full rounded-xl border border-gray-600/45 bg-[var(--secondary-bg-color)] p-4 text-left font-semibold text-[var(--text-color)]"><i class="fas fa-folder mr-2 text-[var(--primary-color)]"></i>${escapeHtml(category.name)}</button>`).join('');
+                return;
+            }
+
             const shortcuts = getMenuShortcuts();
             const filteredModules = menuData.filter(module => shortcuts.includes(module.id));
             const modules = filteredModules.length ? filteredModules : menuData.slice(0, 4);
@@ -292,6 +306,10 @@
                 : `<button type="button" class="rounded-xl border border-gray-600 bg-[var(--secondary-bg-color)] px-4 py-3 text-left text-[var(--text-color)]" onclick="generateMenuModal(); window.closeMobileMenu && window.closeMobileMenu();">Open Menu</button>`;
         }
         window.renderMobileMenuShortcuts = renderMobileMenuShortcuts;
+        window.openSidebarMenuCategory = function (categoryId) {
+            window.generateMenuModal();
+            window.filterMenuCategory(categoryId);
+        };
         renderMenuShortcuts();
 
         let modalData = {

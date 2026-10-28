@@ -164,6 +164,7 @@ Route::group(['middleware' => ['setup.complete', 'auth', 'activeSession', 'ensur
     Route::post('developer/settings/branding', [SettingsController::class, 'saveBranding'])->name('developer.settings.branding.save');
     Route::post('developer/settings/branding/{key}/reset', [SettingsController::class, 'resetBranding'])->name('developer.settings.branding.reset');
     Route::post('developer/settings/modules', [SettingsController::class, 'saveModule'])->name('developer.settings.modules.save');
+    Route::post('developer/settings/sidebar-mode', [SettingsController::class, 'saveSidebarMode'])->name('developer.settings.sidebar-mode.save');
 
     Route::resource('suppliers', SupplierController::class)->middleware('moduleEnabled:suppliers');
     Route::post('update-supplier-category', [SupplierController::class, 'updateSupplierCategory'])->middleware('moduleEnabled:suppliers')->name('update-supplier-category');

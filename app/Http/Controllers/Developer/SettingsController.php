@@ -12,6 +12,8 @@ use App\Services\Settings\FeatureFlagService;
 use App\Services\Settings\LabelSettingsService;
 use App\Services\Settings\ModuleAvailabilityService;
 use App\Services\Settings\ModuleSettingsService;
+use App\Services\Navigation\MenuCategoryService;
+use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 
 class SettingsController extends Controller
@@ -21,6 +23,7 @@ class SettingsController extends Controller
         ModuleAvailabilityService $modules,
         FeatureAvailabilityService $features,
         BrandingSettingsService $branding,
+        MenuCategoryService $menuCategories,
     ) {
         if ($resp = $this->denyIfNoRole(['developer'])) {
             return $resp;
@@ -31,7 +34,23 @@ class SettingsController extends Controller
             'modules' => $modules->all(),
             'features' => $features->all(),
             'branding' => $branding->all(),
+            'sidebarMode' => $menuCategories->sidebarMode(),
         ]);
+    }
+
+    public function saveSidebarMode(Request $request, MenuCategoryService $menuCategories): RedirectResponse
+    {
+        if ($resp = $this->denyIfNoRole(['developer'])) {
+            return $resp;
+        }
+
+        $data = $request->validate([
+            'sidebar_mode' => ['required', 'in:modules,categories'],
+        ]);
+
+        $menuCategories->saveSidebarMode($data['sidebar_mode']);
+
+        return redirect()->route('developer.settings')->with('success', 'Sidebar navigation mode saved.');
     }
 
     public function saveLabel(SaveLabelOverrideRequest $request, LabelSettingsService $labels): RedirectResponse

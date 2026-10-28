@@ -8,6 +8,7 @@ class MenuCategoryService
 {
     public const SETTING_KEY = 'menu_category_assignments';
     public const CATEGORIES_SETTING_KEY = 'menu_categories';
+    public const SIDEBAR_MODE_SETTING_KEY = 'sidebar_navigation_mode';
 
     public function __construct(protected AppSettingService $settings)
     {
@@ -22,6 +23,18 @@ class MenuCategoryService
         }
 
         return $this->defaultCategories();
+    }
+
+    public function sidebarMode(): string
+    {
+        $mode = $this->settings->get(self::SIDEBAR_MODE_SETTING_KEY, 'modules', 'installation');
+
+        return in_array($mode, ['modules', 'categories'], true) ? $mode : 'modules';
+    }
+
+    public function saveSidebarMode(string $mode): void
+    {
+        $this->settings->set(self::SIDEBAR_MODE_SETTING_KEY, $mode, 'string', 'installation');
     }
 
     public function defaultCategories(): array
