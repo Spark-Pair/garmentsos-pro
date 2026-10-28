@@ -31,6 +31,34 @@
         menuData.forEach(module => {
             module.category = categoryByModuleId.get(module.id) ?? null;
         });
+        const defaultMenuActions = menuData.flatMap(module => (module.subMenu || []).map((action, index) => ({
+            ...action,
+            sourceModuleId: module.id,
+            defaultIndex: index,
+        })));
+        let savedActionNavigation = config.menuActionNavigation || { assignments: {}, order: {} };
+        let workingActionAssignments = { ...(savedActionNavigation.assignments || {}) };
+        let workingActionOrder = Object.fromEntries(Object.entries(savedActionNavigation.order || {}).map(([id, hrefs]) => [id, [...hrefs]]));
+
+        function applyMenuActionNavigation(assignments = workingActionAssignments, order = workingActionOrder) {
+            const validModuleIds = new Set(menuData.map(module => module.id));
+            menuData.forEach(module => { module.subMenu = []; });
+            defaultMenuActions.forEach(action => {
+                const destination = validModuleIds.has(assignments[action.href]) ? assignments[action.href] : action.sourceModuleId;
+                menuData.find(module => module.id === destination)?.subMenu.push({ name: action.name, href: action.href });
+            });
+            menuData.forEach(module => {
+                const positions = new Map((order[module.id] || []).map((href, index) => [href, index]));
+                module.subMenu.sort((a, b) => {
+                    const aPosition = positions.has(a.href) ? positions.get(a.href) : Number.MAX_SAFE_INTEGER;
+                    const bPosition = positions.has(b.href) ? positions.get(b.href) : Number.MAX_SAFE_INTEGER;
+                    if (aPosition !== bPosition) return aPosition - bPosition;
+                    return defaultMenuActions.findIndex(action => action.href === a.href)
+                        - defaultMenuActions.findIndex(action => action.href === b.href);
+                });
+            });
+        }
+        applyMenuActionNavigation();
         let availableMenuCategories = config.canManageMenuCategories === true
             ? menuCategories
             : menuCategories.filter(category => menuData.some(module => module.category === category.id));
@@ -337,6 +365,7 @@
         let activeMenuCategory = 'all';
         let menuSearchValue = '';
         let isManagingMenuCategories = false;
+        let isManagingMenuActions = false;
         let isSavingMenuCategories = false;
         let savedCategoryAssignments = { ...configuredCategoryAssignments };
         menuData.forEach(item => {
@@ -368,7 +397,7 @@
         }
 
         function filteredMenuData() {
-            if (isManagingMenuCategories) {
+            if (isManagingMenuCategories || isManagingMenuActions) {
                 return menuData;
             }
 
@@ -418,6 +447,11 @@
                     <i class="fa-solid fa-grip"></i>
                     Manage Categories
                 </button>
+                <button type="button" onclick="toggleMenuActionManagement()"
+                    class="menu-category-manage-button">
+                    <i class="fa-solid fa-list-check"></i>
+                    Manage Actions
+                </button>
             `;
         }
 
@@ -434,7 +468,7 @@
                 <button type="button" onclick="saveMenuCategoryManagement()"
                     class="menu-category-save-button" ${isSavingMenuCategories ? 'disabled' : ''}>
                     <i class="fa-solid ${isSavingMenuCategories ? 'fa-spinner fa-spin' : 'fa-check'}"></i>
-                    ${isSavingMenuCategories ? 'Saving...' : 'Save Categories'}
+                    ${isSavingMenuCategories ? 'Saving...' : (isManagingMenuActions ? 'Save Actions' : 'Save Categories')}
                 </button>
             `;
         }
@@ -453,9 +487,13 @@
             if (!actions || !canManageMenuCategories) return;
             actions.innerHTML = isAddingMenuCategory
                 ? menuCategoryAddForm()
-                : isManagingMenuCategories
+                : (isManagingMenuCategories || isManagingMenuActions)
                     ? menuCategorySaveButtons()
                     : menuCategoryManagerButton();
+            if (isManagingMenuActions) {
+                const addButton = actions.querySelector('.menu-category-add-button');
+                addButton?.remove();
+            }
 
             if (isAddingMenuCategory) {
                 document.getElementById('newMenuCategoryName')?.focus();
@@ -463,19 +501,39 @@
         }
 
         function categorySelectHtml(moduleId) {
+            const choices = [
+                { id: '', name: 'Uncategorized' },
+                ...availableMenuCategories,
+            ];
             return `
                 <label class="menu-card-category-select-label">
                     <span>Move to</span>
-                    <select data-menu-category-select="${escapeHtml(moduleId)}">
-                        <option value="" ${workingCategoryAssignments[moduleId] == null ? 'selected' : ''}>Uncategorized</option>
-                        ${availableMenuCategories.map(category => `
-                            <option value="${escapeHtml(category.id)}" ${workingCategoryAssignments[moduleId] === category.id ? 'selected' : ''}>
-                                ${escapeHtml(category.name)}
-                            </option>
-                        `).join('')}
-                    </select>
+                    ${menuReusableSelect(`category_${moduleId}`, workingCategoryAssignments[moduleId] ?? '', `data-menu-category-select="${htmlAttr(moduleId)}"`, choices, 'Choose category')}
                 </label>
             `;
+        }
+
+        let actionSelectCounter = 0;
+        function menuReusableSelect(id, value, marker, choices, searchPlaceholder) {
+            const selectId = `menu_navigation_${id}_${++actionSelectCounter}`;
+            const selected = choices.find(option => option.id === value);
+            return `
+                <div class="form-group menu-action-select">
+                    <div class="selectParent flex gap-1">
+                        <input id="${selectId}" data-for="${selectId}" data-sort-direction="asc" autocomplete="off" value="${escapeHtml(selected?.name || '')}" onfocus="selectClicked(this); sortSelectOptions(this)" class="w-full min-w-0 rounded-lg border border-gray-600 bg-[var(--h-bg-color)] px-2 py-1 text-[var(--text-color)] text-xs" aria-label="${escapeHtml(searchPlaceholder)}">
+                        <input type="hidden" class="dbInput" data-for="${selectId}" ${marker} value="${htmlAttr(value)}">
+                        <div class="dropDownParent fixed z-[60] mt-2 w-52 rounded-xl border border-gray-600 bg-[var(--secondary-bg-color)] p-1.5 text-[var(--text-color)] shadow-xl">
+                            <input data-for="${selectId}" autocomplete="off" placeholder="${escapeHtml(searchPlaceholder)}" oninput="searchSelect(this)" onblur="validateSelectInput(this)" onkeydown="selectKeyDown(event, this)" class="w-full rounded-lg border border-gray-600 bg-[var(--h-bg-color)] px-2 py-1 text-xs text-[var(--text-color)]">
+                            <ul class="optionsDropdown my-scrollbar-2 max-h-40 space-y-0.5 overflow-auto" data-for="${selectId}">
+                                ${choices.map(option => `<li data-for="${selectId}" data-value="${htmlAttr(option.id)}" onmousedown="selectThisOption(this)" class="cursor-pointer rounded-lg px-2 py-1.5 text-xs transition hover:bg-[var(--h-bg-color)] ${String(option.id) === String(value) ? 'selected' : ''}">${escapeHtml(option.name)}</li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function menuActionDestinationSelect(action, currentModuleId) {
+            return menuReusableSelect(`action_${actionSelectCounter}`, currentModuleId, `data-menu-action-select="${htmlAttr(action.href)}"`, menuData.map(module => ({ id: module.id, name: module.name })), 'Search modules...');
         }
 
         function applyMenuCategoryManagementState() {
@@ -483,16 +541,18 @@
             if (!modal) return;
 
             modal.classList.toggle('is-managing-menu-categories', isManagingMenuCategories);
+            modal.classList.toggle('is-managing-menu-actions', isManagingMenuActions);
             modal.querySelectorAll('[data-menu-category]').forEach(button => {
-                button.disabled = isManagingMenuCategories;
+                button.disabled = isManagingMenuCategories || isManagingMenuActions;
             });
 
             const searchInput = modal.querySelector('#basicSearch input');
-            if (searchInput) searchInput.disabled = isManagingMenuCategories;
+            if (searchInput) searchInput.disabled = isManagingMenuCategories || isManagingMenuActions;
 
             modal.querySelectorAll('.menu-modal-card').forEach(card => {
                 card.draggable = isManagingMenuCategories;
                 card.classList.toggle('is-category-draggable', isManagingMenuCategories);
+                card.classList.toggle('is-action-editing', isManagingMenuActions);
 
                 if (isManagingMenuCategories && !card.querySelector('.menu-card-drag-controls')) {
                     card.removeAttribute('onclick');
@@ -503,6 +563,18 @@
                             ${categorySelectHtml(card.id)}
                         </div>
                     `);
+                }
+                if (isManagingMenuActions && !card.querySelector('.menu-card-action-controls')) {
+                    card.removeAttribute('onclick');
+                    card.removeAttribute('oncontextmenu');
+                    const actions = menuData.find(module => module.id === card.id)?.subMenu || [];
+                    card.insertAdjacentHTML('afterbegin', `<div class="menu-card-action-controls"><strong>Actions</strong>${actions.map((action, index) => `
+                        <div class="menu-card-action-row">
+                            <span>${escapeHtml(action.name)}</span>
+                            ${menuActionDestinationSelect(action, card.id)}
+                            <button type="button" onclick="moveMenuAction('${htmlAttr(action.href)}', -1, '${htmlAttr(card.id)}')" aria-label="Move ${escapeHtml(action.name)} up" ${index === 0 ? 'disabled' : ''}>&#8593;</button>
+                            <button type="button" onclick="moveMenuAction('${htmlAttr(action.href)}', 1, '${htmlAttr(card.id)}')" aria-label="Move ${escapeHtml(action.name)} down" ${index === actions.length - 1 ? 'disabled' : ''}>&#8595;</button>
+                        </div>`).join('')}</div>`);
                 }
             });
 
@@ -572,6 +644,15 @@
                 refreshMenuModalContent();
             });
 
+            modal.addEventListener('change', event => {
+                const select = event.target.closest('.dbInput[data-menu-action-select]');
+                if (!isManagingMenuActions || !select) return;
+                event.stopPropagation();
+                workingActionAssignments[select.dataset.menuActionSelect] = select.value;
+                applyMenuActionNavigation();
+                refreshMenuModalContent();
+            });
+
         }
 
         window.generateMenuModal = function generateMenuModal() {
@@ -579,10 +660,14 @@
             activeMenuCategory = 'all';
             menuSearchValue = '';
             isManagingMenuCategories = false;
+            isManagingMenuActions = false;
             isSavingMenuCategories = false;
             isAddingMenuCategory = false;
             workingCategoryAssignments = { ...savedCategoryAssignments };
+            workingActionAssignments = { ...(savedActionNavigation.assignments || {}) };
+            workingActionOrder = Object.fromEntries(Object.entries(savedActionNavigation.order || {}).map(([id, hrefs]) => [id, [...hrefs]]));
             syncMenuItemCategories(savedCategoryAssignments);
+            applyMenuActionNavigation();
             menuData.forEach(item => {
                 if (!item.switchBtn) {
                     item.switchBtn = { active: false };
@@ -670,6 +755,7 @@
             activeMenuCategory = 'all';
             menuSearchValue = '';
             isManagingMenuCategories = true;
+            isManagingMenuActions = false;
             workingCategoryAssignments = { ...savedCategoryAssignments };
             syncMenuItemCategories(workingCategoryAssignments);
 
@@ -678,16 +764,53 @@
             refreshMenuModalContent();
         };
 
+        window.toggleMenuActionManagement = function toggleMenuActionManagement() {
+            if (!canManageMenuCategories || isManagingMenuCategories || isManagingMenuActions) return;
+            if (window.__appConfig?.readonlySession) {
+                if (typeof showMessageBox === 'function') showMessageBox('warning', 'Read-only mode is enabled. Menu actions cannot be updated.');
+                return;
+            }
+
+            activeMenuCategory = 'all';
+            menuSearchValue = '';
+            isManagingMenuActions = true;
+            workingActionAssignments = { ...(savedActionNavigation.assignments || {}) };
+            workingActionOrder = Object.fromEntries(Object.entries(savedActionNavigation.order || {}).map(([id, hrefs]) => [id, [...hrefs]]));
+            applyMenuActionNavigation();
+            const searchInput = document.querySelector('#menuModal #basicSearch input');
+            if (searchInput) searchInput.value = '';
+            refreshMenuModalContent();
+        };
+
+        window.moveMenuAction = function (href, direction, moduleId) {
+            if (!isManagingMenuActions) return;
+            const module = menuData.find(item => item.id === moduleId);
+            if (!module) return;
+            const actions = module.subMenu || [];
+            const index = actions.findIndex(action => action.href === href);
+            const nextIndex = index + direction;
+            if (index < 0 || nextIndex < 0 || nextIndex >= actions.length) return;
+            const hrefs = actions.map(action => action.href);
+            [hrefs[index], hrefs[nextIndex]] = [hrefs[nextIndex], hrefs[index]];
+            workingActionOrder[moduleId] = hrefs;
+            applyMenuActionNavigation();
+            refreshMenuModalContent();
+        };
+
         window.cancelMenuCategoryManagement = function cancelMenuCategoryManagement() {
-            if (!isManagingMenuCategories || isSavingMenuCategories) return;
+            if ((!isManagingMenuCategories && !isManagingMenuActions) || isSavingMenuCategories) return;
             workingCategoryAssignments = { ...savedCategoryAssignments };
             syncMenuItemCategories(savedCategoryAssignments);
+            workingActionAssignments = { ...(savedActionNavigation.assignments || {}) };
+            workingActionOrder = Object.fromEntries(Object.entries(savedActionNavigation.order || {}).map(([id, hrefs]) => [id, [...hrefs]]));
             isManagingMenuCategories = false;
+            isManagingMenuActions = false;
+            applyMenuActionNavigation();
             refreshMenuModalContent();
         };
 
         window.saveMenuCategoryManagement = async function saveMenuCategoryManagement() {
-            if (!canManageMenuCategories || !isManagingMenuCategories || isSavingMenuCategories) return;
+            if (!canManageMenuCategories || (!isManagingMenuCategories && !isManagingMenuActions) || isSavingMenuCategories) return;
             isSavingMenuCategories = true;
             updateMenuCategoryManagerActions();
 
@@ -703,6 +826,7 @@
                     body: JSON.stringify({
                         categories: menuCategories,
                         assignments: workingCategoryAssignments,
+                        ...(isManagingMenuActions ? { action_assignments: workingActionAssignments, action_order: Object.fromEntries(menuData.map(module => [module.id, (module.subMenu || []).map(action => action.href)])) } : {}),
                     }),
                 });
                 const payload = await response.json().catch(() => ({}));
@@ -712,6 +836,9 @@
 
                 savedCategoryAssignments = { ...payload.assignments };
                 workingCategoryAssignments = { ...savedCategoryAssignments };
+                savedActionNavigation = payload.actionNavigation || savedActionNavigation;
+                workingActionAssignments = { ...(savedActionNavigation.assignments || {}) };
+                workingActionOrder = Object.fromEntries(Object.entries(savedActionNavigation.order || {}).map(([id, hrefs]) => [id, [...hrefs]]));
                 menuCategories = payload.categories.map(category => ({ id: category.id, name: category.name }));
                 availableMenuCategories = menuCategories;
                 modalData.menuCategories = availableMenuCategories;
@@ -720,6 +847,8 @@
                 });
                 syncMenuItemCategories(savedCategoryAssignments);
                 isManagingMenuCategories = false;
+                isManagingMenuActions = false;
+                applyMenuActionNavigation();
                 if (typeof showMessageBox === 'function') {
                     showMessageBox('success', payload.message || 'Menu categories updated successfully.');
                 }
@@ -734,7 +863,7 @@
         };
 
         window.filterMenuCategory = function filterMenuCategory(categoryId) {
-            if (isManagingMenuCategories) return;
+            if (isManagingMenuCategories || isManagingMenuActions) return;
             const isAvailableCategory = categoryId === 'all'
                 || availableMenuCategories.some(category => category.id === categoryId);
             if (!isAvailableCategory) return;
@@ -761,7 +890,7 @@
         });
 
         window.menuBasicSearch = function menuBasicSearch(searchValue) {
-            if (isManagingMenuCategories) return;
+            if (isManagingMenuCategories || isManagingMenuActions) return;
             menuSearchValue = searchValue || '';
             refreshMenuModalContent();
         };

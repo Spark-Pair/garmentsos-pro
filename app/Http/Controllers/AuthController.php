@@ -227,6 +227,11 @@ class AuthController extends Controller
             'categories.*.name' => ['required', 'string', 'max:80'],
             'assignments' => ['required', 'array'],
             'assignments.*' => ['nullable', 'string', 'max:60'],
+            'action_assignments' => ['sometimes', 'array'],
+            'action_assignments.*' => ['required', 'string', 'max:60'],
+            'action_order' => ['sometimes', 'array'],
+            'action_order.*' => ['array'],
+            'action_order.*.*' => ['required', 'string', 'max:2048'],
         ]);
 
         $categoryIds = array_column($data['categories'], 'id');
@@ -252,13 +257,19 @@ class AuthController extends Controller
         }
 
         $configuration = $menuCategories->saveConfiguration($data['categories'], $data['assignments']);
+        $actionNavigation = array_key_exists('action_assignments', $data)
+            ? $menuCategories->saveActionNavigation($data['action_assignments'], $data['action_order'] ?? [])
+            : $menuCategories->actionNavigation();
 
         return response()->json([
             'status' => 'success',
             'saved' => true,
             'categories' => $configuration['categories'],
             'assignments' => $configuration['assignments'],
-            'message' => 'Menu categories updated successfully.',
+            'actionNavigation' => $actionNavigation,
+            'message' => array_key_exists('action_assignments', $data)
+                ? 'Menu actions updated successfully.'
+                : 'Menu categories updated successfully.',
         ]);
     }
 }

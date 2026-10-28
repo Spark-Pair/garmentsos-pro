@@ -9,6 +9,7 @@ class MenuCategoryService
     public const SETTING_KEY = 'menu_category_assignments';
     public const CATEGORIES_SETTING_KEY = 'menu_categories';
     public const SIDEBAR_MODE_SETTING_KEY = 'sidebar_navigation_mode';
+    public const ACTIONS_SETTING_KEY = 'menu_action_navigation';
 
     public function __construct(protected AppSettingService $settings)
     {
@@ -87,6 +88,39 @@ class MenuCategoryService
             'categories' => $sanitizedCategories,
             'assignments' => $sanitizedAssignments,
         ];
+    }
+
+    public function actionNavigation(): array
+    {
+        $saved = $this->settings->get(self::ACTIONS_SETTING_KEY, [], 'installation');
+
+        return is_array($saved) ? [
+            'assignments' => is_array($saved['assignments'] ?? null) ? $saved['assignments'] : [],
+            'order' => is_array($saved['order'] ?? null) ? $saved['order'] : [],
+        ] : ['assignments' => [], 'order' => []];
+    }
+
+    public function saveActionNavigation(array $assignments, array $order): array
+    {
+        $cleanAssignments = [];
+        foreach ($assignments as $href => $moduleId) {
+            if (is_string($href) && $href !== '' && strlen($href) <= 2048 && is_string($moduleId) && preg_match('/^[a-z0-9][a-z0-9_-]{0,59}$/', $moduleId)) {
+                $cleanAssignments[$href] = $moduleId;
+            }
+        }
+
+        $cleanOrder = [];
+        foreach ($order as $moduleId => $hrefs) {
+            if (!is_string($moduleId) || !preg_match('/^[a-z0-9][a-z0-9_-]{0,59}$/', $moduleId) || !is_array($hrefs)) {
+                continue;
+            }
+            $cleanOrder[$moduleId] = array_values(array_filter($hrefs, fn ($href) => is_string($href) && $href !== '' && strlen($href) <= 2048));
+        }
+
+        $configuration = ['assignments' => $cleanAssignments, 'order' => $cleanOrder];
+        $this->settings->set(self::ACTIONS_SETTING_KEY, $configuration, 'json', 'installation');
+
+        return $configuration;
     }
 
     private function sanitizeCategories(array $categories): array

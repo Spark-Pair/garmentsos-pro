@@ -295,9 +295,69 @@
 }
 
 .is-managing-menu-categories .menu-modal-card .switchBtn,
-.is-managing-menu-categories .menu-modal-card .menu-card-actions-footer {
+.is-managing-menu-categories .menu-modal-card .menu-card-actions-footer,
+.is-managing-menu-actions .menu-modal-card .switchBtn,
+.is-managing-menu-actions .menu-modal-card .menu-card-actions-footer {
     pointer-events: none;
     opacity: 0.55;
+}
+
+.menu-card-action-controls {
+    display: flex;
+    max-height: 12rem;
+    flex-direction: column;
+    gap: 0.4rem;
+    overflow-y: auto;
+    margin: -0.25rem -0.25rem 0.75rem;
+    border-bottom: 1px dashed color-mix(in srgb, var(--glass-border-color) 35%, transparent);
+    padding: 0 0.25rem 0.65rem;
+    color: var(--secondary-text);
+    font-size: 0.68rem;
+}
+
+.menu-card-action-controls > strong {
+    color: var(--text-color);
+    font-size: 0.7rem;
+}
+
+.menu-card-action-row {
+    display: grid;
+    grid-template-columns: minmax(5rem, 1fr) minmax(6rem, 1.2fr) auto auto;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.menu-card-action-row > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.menu-card-action-row .menu-action-select,
+.menu-card-action-row button {
+    min-width: 0;
+    border: 1px solid color-mix(in srgb, var(--glass-border-color) 38%, transparent);
+    border-radius: 0.45rem;
+    background: var(--h-bg-color);
+    padding: 0.25rem 0.35rem;
+    color: var(--text-color);
+    font-size: 0.65rem;
+}
+
+.menu-card-action-row .menu-action-select {
+    border: 0;
+    background: transparent;
+    padding: 0;
+}
+
+.menu-card-action-row button {
+    width: 1.7rem;
+    cursor: pointer;
+}
+
+.menu-card-action-row button:disabled {
+    cursor: default;
+    opacity: 0.4;
 }
 
 .menu-card-drag-controls {
@@ -377,14 +437,12 @@
     letter-spacing: normal;
 }
 
-.menu-card-category-select-label select {
+.menu-card-category-select-label .menu-action-select {
+    width: 10rem;
     max-width: 10rem;
-    border: 1px solid color-mix(in srgb, var(--glass-border-color) 45%, transparent);
-    border-radius: 0.5rem;
-    background: var(--h-bg-color);
-    padding: 0.3rem 0.45rem;
-    color: var(--text-color);
-    font-size: 0.7rem;
+    border: 0;
+    background: transparent;
+    padding: 0;
 }
 
 @media (max-width: 767px) {
