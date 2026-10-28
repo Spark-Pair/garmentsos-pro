@@ -24,12 +24,16 @@ use App\Services\Branches\ModuleBranchService;
 use App\Services\Orders\OrderBalanceService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class OwnerDashboardService
 {
+    private array $branchColumnCache = [];
+
     public function __construct(
         private readonly ModuleBranchService $branches,
         private readonly OrderBalanceService $orderBalances,
@@ -40,13 +44,13 @@ class OwnerDashboardService
     {
         $from = $from->copy()->startOfDay();
         $to = $to->copy()->endOfDay();
-        $cacheKey = 'owner-dashboard:'.$from->toDateString().':'.$to->toDateString();
+        $cacheKey = 'owner-dashboard:v2:'.$from->toDateString().':'.$to->toDateString();
 
         if ($fresh) {
             Cache::forget($cacheKey);
         }
 
-        return Cache::remember($cacheKey, now()->addMinute(), fn () => $this->build($from, $to));
+        return Cache::remember($cacheKey, now()->addMinutes(5), fn () => $this->build($from, $to));
     }
 
     private function build(Carbon $from, Carbon $to): array
@@ -58,8 +62,12 @@ class OwnerDashboardService
             'sales_returns',
         ])->mapWithKeys(fn (string $key) => [$key => $this->branches->isClientModuleEnabled($key)])->all();
 
-        $customers = $modules['customers'] && $modules['invoices'] ? Customer::query()->get() : collect();
-        $suppliers = $modules['suppliers'] ? Supplier::query()->get() : collect();
+        $customers = $modules['customers'] && $modules['invoices']
+            ? Customer::query()->get(['id', 'customer_name', 'person_name'])
+            : collect();
+        $suppliers = $modules['suppliers']
+            ? Supplier::query()->withoutGlobalScope('withCreator')->get(['id', 'supplier_name', 'person_name', 'worker_id'])
+            : collect();
         $customerBalances = $this->partyBalances($customers, 'customer');
         $supplierBalances = $this->partyBalances($suppliers, 'supplier');
 
@@ -71,10 +79,11 @@ class OwnerDashboardService
         $cashAccounts = $modules['bank_accounts']
             ? BankAccount::query()->where('category', 'self')->where('status', 'active')->get()
             : collect();
+        $cashBalances = $this->bankAccountBalanceTotals();
         $cashRows = $cashAccounts->map(fn (BankAccount $account) => [
             'name' => $account->account_title ?: 'Account #'.$account->id,
             'detail' => ucfirst((string) $account->sub_category),
-            'amount' => (float) $account->calculateBalance(),
+            'amount' => (float) ($cashBalances->get($account->id) ?? 0),
         ])->sortByDesc('amount')->values();
         $cashBalance = (float) $cashRows->sum('amount');
 
@@ -95,10 +104,10 @@ class OwnerDashboardService
             ? $this->pendingInstruments()
             : collect();
         $programs = $modules['payment_programs']
-            ? PaymentProgram::query()->with(['customer:id,customer_name', 'customerPayments:id,program_id,amount'])->get()
+            ? PaymentProgram::query()->with('customer:id,customer_name')->withSum('customerPayments as paid_amount', 'amount')->get()
             : collect();
         $unpaidPrograms = $programs->map(function (PaymentProgram $program) {
-            $balance = max(0, (float) $program->amount - (float) $program->customerPayments->sum('amount'));
+            $balance = max(0, (float) $program->amount - (float) ($program->paid_amount ?? 0));
 
             return [
                 'name' => $program->program_no ?: 'Program #'.$program->id,
@@ -157,17 +166,17 @@ class OwnerDashboardService
                 'orders_count' => $periodOrders?->count() ?? 0,
                 'orders_value' => (float) ($periodOrders?->sum('netAmount') ?? 0),
             ],
-            'receivables' => $customerBalances->where('balance', '>', 0)->sortByDesc('balance')->take(10)->values()->all(),
-            'payables' => $supplierBalances->where('balance', '>', 0)->sortByDesc('balance')->take(10)->values()->all(),
+            'receivables' => $customerBalances->where('balance', '>', 0)->sortByDesc('balance')->values()->all(),
+            'payables' => $supplierBalances->where('balance', '>', 0)->sortByDesc('balance')->values()->all(),
             'cash_accounts' => $cashRows->all(),
-            'pending_instruments' => $pendingInstruments->take(10)->values()->all(),
-            'unpaid_programs' => $unpaidPrograms->take(10)->values()->all(),
+            'pending_instruments' => $pendingInstruments->values()->all(),
+            'unpaid_programs' => $unpaidPrograms->values()->all(),
             'orders' => [
                 'pending_count' => $pendingOrders->count(),
                 'pending_pcs' => (int) $pendingOrders->sum('quantity'),
                 'pending_value' => (float) $pendingOrders->sum('amount'),
                 'partial_count' => $orders->where('status', 'partially_invoiced')->count(),
-                'rows' => $pendingOrders->take(10)->values()->all(),
+                'rows' => $pendingOrders->values()->all(),
             ],
             'stock' => $stock,
             'inventory' => $inventory,
@@ -180,8 +189,12 @@ class OwnerDashboardService
 
     private function partyBalances(Collection $parties, string $type, ?array $branchIds = null, bool $includeNull = false): Collection
     {
-        return $parties->map(function ($party) use ($type, $branchIds, $includeNull) {
-            $balance = (float) $party->calculateBalance(null, null, false, true, $branchIds, $includeNull);
+        $balances = $type === 'customer'
+            ? $this->customerBalanceTotals($branchIds, $includeNull)
+            : $this->supplierBalanceTotals($branchIds, $includeNull);
+
+        return $parties->map(function ($party) use ($type, $balances) {
+            $balance = (float) ($balances->get($party->id) ?? 0);
             $name = $type === 'customer' ? $party->customer_name : $party->supplier_name;
 
             return [
@@ -191,6 +204,207 @@ class OwnerDashboardService
                 'amount' => $balance,
                 'balance' => $balance,
             ];
+        });
+    }
+
+    private function customerBalanceTotals(?array $branchIds, bool $includeNull): Collection
+    {
+        $invoices = $this->groupedSum(
+            $this->applyBranchConstraint(DB::table('invoices'), 'invoices', $branchIds, $includeNull),
+            'customer_id',
+            'netAmount'
+        );
+        $payments = $this->groupedSum(
+            $this->applyBranchConstraint(
+                DB::table('customer_payments')->where('type', '!=', 'DR')->where('type', '!=', 'sales_return'),
+                'customer_payments',
+                $branchIds,
+                $includeNull
+            ),
+            'customer_id',
+            'amount'
+        );
+
+        $returnsQuery = DB::table('sales_returns')
+            ->join('invoices', 'invoices.id', '=', 'sales_returns.invoice_id');
+        $returns = $this->groupedSum(
+            $this->applyBranchConstraint($returnsQuery, 'sales_returns', $branchIds, $includeNull),
+            'invoices.customer_id',
+            'sales_returns.amount'
+        );
+        $adjustments = $this->groupedSignedAdjustments(Customer::class, $branchIds, $includeNull);
+
+        return $this->combineBalanceMaps(
+            [$invoices, $adjustments],
+            [$payments, $returns]
+        );
+    }
+
+    private function supplierBalanceTotals(?array $branchIds, bool $includeNull): Collection
+    {
+        $expenses = $this->groupedSum(
+            $this->applyBranchConstraint(DB::table('expenses'), 'expenses', $branchIds, $includeNull),
+            'supplier_id',
+            'amount'
+        );
+
+        $inventoryQuery = $this->applyBranchConstraint(
+            DB::table('inventory_transactions')->whereNotNull('supplier_id'),
+            'inventory_transactions',
+            $branchIds,
+            $includeNull
+        );
+        $inventory = $inventoryQuery
+            ->select('supplier_id')
+            ->selectRaw("SUM(CASE WHEN direction = 'out' THEN -COALESCE(amount, 0) ELSE COALESCE(amount, 0) END) AS total")
+            ->groupBy('supplier_id')
+            ->pluck('total', 'supplier_id');
+
+        $paymentsQuery = DB::table('supplier_payments')
+            ->whereNotNull('supplier_id')
+            ->whereNotNull('voucher_id')
+            ->whereIn(DB::raw('LOWER(method)'), [
+                'cheque', 'cash', 'slip', 'atm', 'self cheque', 'program', 'p. return', 'adjustment',
+            ]);
+        $payments = $this->groupedSum(
+            $this->applyBranchConstraint($paymentsQuery, 'supplier_payments', $branchIds, $includeNull),
+            'supplier_id',
+            'amount'
+        );
+
+        $productionQuery = DB::table('productions')
+            ->join('suppliers', 'suppliers.worker_id', '=', 'productions.worker_id')
+            ->whereNotNull('suppliers.worker_id');
+        $productions = $this->groupedSum(
+            $this->applyBranchConstraint($productionQuery, 'productions', $branchIds, $includeNull),
+            'suppliers.id',
+            'productions.amount'
+        );
+        $adjustments = $this->groupedSignedAdjustments(Supplier::class, $branchIds, $includeNull);
+
+        return $this->combineBalanceMaps(
+            [$expenses, $inventory, $productions, $adjustments],
+            [$payments]
+        );
+    }
+
+    private function bankAccountBalanceTotals(): Collection
+    {
+        $normalInflows = $this->groupedSum(
+            DB::table('customer_payments')
+                ->whereNotNull('bank_account_id')
+                ->where('is_return', false)
+                ->whereNull('cheque_no')
+                ->whereNull('slip_no'),
+            'bank_account_id',
+            'amount'
+        );
+
+        $chequeInflows = $this->groupedSum(
+            DB::table('customer_payments')
+                ->join('supplier_payments', 'supplier_payments.cheque_id', '=', 'customer_payments.id')
+                ->join('vouchers', 'vouchers.id', '=', 'supplier_payments.voucher_id')
+                ->whereNotNull('customer_payments.bank_account_id')
+                ->where('customer_payments.is_return', false)
+                ->whereNotNull('customer_payments.cheque_no')
+                ->where('supplier_payments.is_return', false),
+            'customer_payments.bank_account_id',
+            'customer_payments.amount'
+        );
+
+        $slipInflows = $this->groupedSum(
+            DB::table('customer_payments')
+                ->join('supplier_payments', 'supplier_payments.slip_id', '=', 'customer_payments.id')
+                ->join('vouchers', 'vouchers.id', '=', 'supplier_payments.voucher_id')
+                ->whereNotNull('customer_payments.bank_account_id')
+                ->where('customer_payments.is_return', false)
+                ->whereNotNull('customer_payments.slip_no')
+                ->where('supplier_payments.is_return', false),
+            'customer_payments.bank_account_id',
+            'customer_payments.amount'
+        );
+
+        $unpairedTransferInflows = $this->groupedSum(
+            DB::table('supplier_payments')
+                ->leftJoin('customer_payments', 'customer_payments.id', '=', 'supplier_payments.cheque_id')
+                ->whereNotNull('supplier_payments.self_account_id')
+                ->whereIn('supplier_payments.method', ['Self Cheque', 'ATM'])
+                ->where('supplier_payments.is_return', false)
+                ->where(function (QueryBuilder $query) {
+                    $query->whereNull('supplier_payments.cheque_id')->orWhereNull('customer_payments.id');
+                }),
+            'supplier_payments.self_account_id',
+            'supplier_payments.amount'
+        );
+
+        $outflows = $this->groupedSum(
+            DB::table('supplier_payments')
+                ->whereNotNull('bank_account_id')
+                ->where('is_return', false)
+                ->where(function (QueryBuilder $query) {
+                    $query->whereNotNull('voucher_id')->orWhereNotNull('c_r_id');
+                }),
+            'bank_account_id',
+            'amount'
+        );
+        $adjustments = $this->groupedSignedAdjustments(BankAccount::class, null, false);
+
+        return $this->combineBalanceMaps(
+            [$normalInflows, $chequeInflows, $slipInflows, $unpairedTransferInflows, $adjustments],
+            [$outflows]
+        );
+    }
+
+    private function groupedSum(QueryBuilder $query, string $groupColumn, string $amountColumn): Collection
+    {
+        return $query
+            ->whereNotNull($groupColumn)
+            ->select($groupColumn)
+            ->selectRaw("SUM(COALESCE({$amountColumn}, 0)) AS total")
+            ->groupBy($groupColumn)
+            ->pluck('total', $groupColumn);
+    }
+
+    private function groupedSignedAdjustments(string $type, ?array $branchIds, bool $includeNull): Collection
+    {
+        $query = DB::table('statement_adjustments')->where('adjustable_type', $type);
+        $query = $this->applyBranchConstraint($query, 'statement_adjustments', $branchIds, $includeNull);
+
+        return $query
+            ->select('adjustable_id')
+            ->selectRaw("SUM(CASE WHEN direction = 'minus' THEN -COALESCE(amount, 0) ELSE COALESCE(amount, 0) END) AS total")
+            ->groupBy('adjustable_id')
+            ->pluck('total', 'adjustable_id');
+    }
+
+    private function combineBalanceMaps(array $credits, array $debits): Collection
+    {
+        $totals = collect();
+
+        foreach ($credits as $values) {
+            $values->each(fn ($value, $id) => $totals->put($id, (float) ($totals->get($id) ?? 0) + (float) $value));
+        }
+        foreach ($debits as $values) {
+            $values->each(fn ($value, $id) => $totals->put($id, (float) ($totals->get($id) ?? 0) - (float) $value));
+        }
+
+        return $totals;
+    }
+
+    private function applyBranchConstraint(QueryBuilder $query, string $table, ?array $branchIds, bool $includeNull): QueryBuilder
+    {
+        $branchIds = collect($branchIds ?? [])->filter()->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $hasBranchColumn = $this->branchColumnCache[$table] ??= Schema::hasColumn($table, 'branch_id');
+        if ($branchIds === [] || ! $hasBranchColumn) {
+            return $query;
+        }
+
+        return $query->where(function (QueryBuilder $scope) use ($table, $branchIds, $includeNull) {
+            $column = $table.'.branch_id';
+            $scope->whereIn($column, $branchIds);
+            if ($includeNull) {
+                $scope->orWhereNull($column);
+            }
         });
     }
 
@@ -251,7 +465,7 @@ class OwnerDashboardService
             'b_pcs' => (int) $rows->sum('b'),
             'c_pcs' => (int) $rows->sum('c'),
             'zero_count' => $rows->where('quantity', '<=', 0)->count(),
-            'rows' => $rows->take(10)->all(),
+            'rows' => $rows->all(),
         ];
     }
 
@@ -284,7 +498,7 @@ class OwnerDashboardService
                 'unit' => $unit,
                 'quantity' => (float) $group->sum('quantity'),
             ])->values()->all(),
-            'rows' => $rows->take(10)->all(),
+            'rows' => $rows->all(),
         ];
     }
 
@@ -299,13 +513,13 @@ class OwnerDashboardService
             'detail' => ($production->article?->article_no ?? 'No article').' · '.($production->worker?->employee_name ?? 'No worker'),
             'date' => optional($production->issue_date)->format('d-M-Y'),
             'amount' => (float) $production->amount,
-        ])->take(10)->values()->all();
+        ])->values()->all();
 
         $unshipped = $modules['invoices'] && $modules['shipments']
             ? Invoice::query()->whereNull('shipment_no')->count()
             : 0;
         $withoutBilty = $modules['invoices'] && $modules['bilties']
-            ? Invoice::query()->whereDoesntHave('bilty')->count()
+            ? max(0, Invoice::query()->count() - Bilty::query()->whereNotNull('invoice_id')->distinct()->count('invoice_id'))
             : 0;
 
         return [
@@ -404,7 +618,9 @@ class OwnerDashboardService
 
     private function period(Builder $query, string $column, Carbon $from, Carbon $to): Builder
     {
-        return $query->whereDate($column, '>=', $from->toDateString())->whereDate($column, '<=', $to->toDateString());
+        return $query
+            ->where($column, '>=', $from->toDateString())
+            ->where($column, '<', $to->copy()->addDay()->toDateString());
     }
 
     private function scopeBranch(Builder $query, string $table, int $branchId, bool $includeNull): Builder

@@ -47,19 +47,23 @@
         </div>
     </div>
 </div>
-<div class="relative w-full md:w-auto md:z-40">
+<div id="desktopSidebarShell" class="relative w-full md:w-16 md:z-40 {{ Auth::user()->sidebar_expanded ? 'is-expanded' : '' }}">
     <aside
+        id="desktopSidebar"
         class="w-full md:w-16 flex justify-between md:flex-col items-center px-5 py-3 md:px-0 md:py-3 h-full md:h-screen transition-all duration-300 ease-in-out fade-in relative z-40">
         <!-- Logo -->
-        <a href="/"
-            class="text-[var(--text-color)] p-3 w-14 h-14 flex items-center justify-center group cursor-normal relative"
-            aria-label="{{ $sidebarLogoText }}" title="{{ $sidebarLogoText }}">
+        <button type="button" id="sidebarToggle"
+            class="sidebar-brand text-[var(--text-color)] p-3 w-14 h-14 flex items-center justify-center group cursor-pointer relative"
+            aria-label="{{ Auth::user()->sidebar_expanded ? 'Collapse sidebar' : 'Expand sidebar' }}"
+            aria-expanded="{{ Auth::user()->sidebar_expanded ? 'true' : 'false' }}"
+            title="{{ Auth::user()->sidebar_expanded ? 'Collapse sidebar' : 'Expand sidebar' }}">
             @if ($logoSvg)
                 {!! $logoSvg !!}
+                <span class="sidebar-brand-label">{{ $sidebarLogoText }}</span>
             @else
                 <span class="text-xs font-bold leading-none text-center">{{ $sidebarLogoText }}</span>
             @endif
-        </a>
+        </button>
 
         <!-- Mobile Menu Toggle Button -->
         <button id="menuToggle" type="button"
@@ -68,7 +72,7 @@
         </button>
 
         <!-- Navigation Menu -->
-        <nav class="space-y-4 hidden md:flex flex-col my-auto">
+        <nav class="sidebar-navigation space-y-4 hidden md:flex flex-col my-auto">
             <div class="relative group">
                 <x-nav-link-item label="Home"
                 {{-- icon="fas fa-home" --}}
@@ -87,11 +91,11 @@
             </div>
         </nav>
 
-        <div class="relative hidden md:flex group md:pt-3 md:ml-0 md:mt-4 dropdown-trigger">
+        <div class="sidebar-user relative hidden md:flex group md:pt-3 md:ml-0 md:mt-4 dropdown-trigger">
             <!-- User Avatar -->
             <button type="button" onclick="openDropDown(event, this)" onkeydown="handleSidebarDropdownKeydown(event, this)"
                 aria-haspopup="menu" aria-expanded="false" aria-label="User menu"
-                class="w-10 h-10 ml-1.5 mb-1 flex items-center justify-center rounded-[41.5%] cursor-pointer transition-all duration-300 ease-in-out text-[var(--text-color)] font-semibold text-lg overflow-hidden">
+                class="sidebar-user-button w-10 h-10 ml-1.5 mb-1 flex items-center justify-center rounded-[41.5%] cursor-pointer transition-all duration-300 ease-in-out text-[var(--text-color)] font-semibold text-lg overflow-hidden">
                 @if (Auth::user()->profile_picture == 'default_avatar.png')
                     <img src="{{ asset('images/default_avatar.png') }}" class="w-full h-full object-cover"
                         alt="Avatar">
@@ -100,7 +104,7 @@
                         class="w-full h-full object-cover" alt="Avatar">
                 @endif
                 <span
-                    class="absolute shadow-xl capitalize text-nowrap left-18 bottom-1.5 bg-[var(--h-secondary-bg-color)] text-[var(--text-color)] border border-gray-600 text-sm rounded-lg px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                    class="sidebar-user-label absolute shadow-xl capitalize text-nowrap left-18 bottom-1.5 bg-[var(--h-secondary-bg-color)] text-[var(--text-color)] border border-gray-600 text-sm rounded-lg px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
                     {{ Auth::user()->name }}
                 </span>
             </button>
@@ -368,6 +372,8 @@
 <script defer src="{{ asset('js/components/sidebar.js') }}"></script>
 <script>
     window.__sidebar = {
+        expanded: @json((bool) Auth::user()->sidebar_expanded),
+        updateStateUrl: @json(route('updateSidebarState')),
         menuData: [
         @if (app_menu_can('users', ['developer', 'owner', 'admin', 'accountant']))
             {

@@ -33,3 +33,140 @@
     color: var(--text-color) !important;
     opacity: 1 !important;
 }
+
+@media (min-width: 768px) {
+    #desktopSidebarShell {
+        width: 4rem;
+        flex: 0 0 4rem;
+        transition: width 220ms ease, flex-basis 220ms ease;
+    }
+
+    #desktopSidebarShell.is-expanded {
+        width: 10rem;
+        flex-basis: 10rem;
+    }
+
+    #desktopSidebarShell.is-expanded #desktopSidebar {
+        width: 100%;
+    }
+
+    #desktopSidebarShell.is-collapsing :is(.sidebar-brand-label, .sidebar-nav-label, .sidebar-user-label) {
+        opacity: 0 !important;
+        visibility: hidden !important;
+        transition: none !important;
+    }
+
+    #desktopSidebarShell .sidebar-brand-label {
+        position: absolute;
+        left: 3.5rem;
+        top: 50%;
+        max-width: 0;
+        opacity: 0;
+        transform: translateY(-50%);
+        overflow: hidden;
+        white-space: nowrap;
+        font-size: 0.75rem;
+        font-weight: 700;
+        transition: max-width 180ms ease, opacity 140ms ease;
+    }
+
+    #desktopSidebarShell.is-expanded .sidebar-brand-label {
+        max-width: 6.75rem;
+        opacity: 1;
+    }
+
+    #desktopSidebarShell.is-expanded .sidebar-navigation > div,
+    #desktopSidebarShell.is-expanded #customMenuShortcuts,
+    #desktopSidebarShell.is-expanded #customMenuShortcuts > div {
+        width: 100%;
+    }
+
+    #desktopSidebarShell.is-expanded .sidebar-navigation {
+        width: 100%;
+        align-items: flex-start;
+    }
+
+    #desktopSidebarShell.is-expanded .sidebar-navigation .nav-link {
+        margin-left: 0.75rem;
+        width: calc(100% - 1.5rem);
+        justify-content: flex-start;
+        border-radius: 0.75rem;
+        overflow: hidden;
+    }
+
+    #desktopSidebarShell.is-expanded .sidebar-navigation .nav-link > svg {
+        width: 1rem;
+        height: 1rem;
+        flex: 0 0 1rem;
+    }
+
+    #desktopSidebarShell.is-expanded .sidebar-navigation .nav-link > i {
+        width: 1rem;
+        flex: 0 0 1rem;
+        text-align: center;
+    }
+
+    #desktopSidebarShell.is-expanded .sidebar-nav-label {
+        position: static;
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: none;
+        margin-left: 1rem;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        opacity: 1;
+        transform: none;
+        translate: none;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-align: left;
+        line-height: 1.2;
+        font-size: 0.8125rem;
+        pointer-events: auto;
+    }
+
+    #desktopSidebarShell.is-expanded .dropdownMenu {
+        left: calc(100% + 0.5rem);
+    }
+
+    #desktopSidebarShell.is-expanded .sidebar-user {
+        width: 100%;
+    }
+
+    #desktopSidebarShell.is-expanded .sidebar-user-button {
+        margin-left: 0.9375rem;
+        width: calc(100% - 1.875rem);
+        justify-content: flex-start;
+        border-radius: 0.75rem;
+        overflow: visible;
+    }
+
+    #desktopSidebarShell.is-expanded .sidebar-user-button img {
+        width: 2.5rem;
+        height: 2.5rem;
+        flex: 0 0 2.5rem;
+        border-radius: 41.5%;
+    }
+
+    #desktopSidebarShell.is-expanded .sidebar-user-label {
+        position: static;
+        min-width: 0;
+        max-width: 5.5rem;
+        margin-left: 1rem;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        opacity: 1;
+        transform: none;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.2;
+        font-size: 0.8125rem;
+        pointer-events: auto;
+    }
+}

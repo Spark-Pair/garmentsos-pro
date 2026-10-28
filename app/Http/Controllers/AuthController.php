@@ -191,4 +191,27 @@ class AuthController extends Controller
 
         return response()->json(['status' => 'unauthorized'], 401);
     }
+
+    public function updateSidebarState(Request $request)
+    {
+        $data = $request->validate([
+            'expanded' => ['required', 'boolean'],
+        ]);
+
+        $user = Auth::user();
+        $expanded = (bool) $data['expanded'];
+
+        User::whereKey($user->id)->update([
+            'sidebar_expanded' => $expanded,
+        ]);
+
+        $user->sidebar_expanded = $expanded;
+        Auth::setUser($user);
+
+        return response()->json([
+            'status' => 'success',
+            'saved' => true,
+            'sidebar_expanded' => $expanded,
+        ]);
+    }
 }

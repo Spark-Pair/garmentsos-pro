@@ -47,6 +47,7 @@ class User extends Authenticatable
         'physical_quantity_report_type',
         'fabric_report_type',
         'menu_shortcuts',
+        'sidebar_expanded',
     ];
 
     protected $attributes = [
@@ -57,6 +58,7 @@ class User extends Authenticatable
 
     protected $casts = [
         'menu_shortcuts' => 'array',
+        'sidebar_expanded' => 'boolean',
     ];
 
     /**

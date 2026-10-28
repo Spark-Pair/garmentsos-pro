@@ -151,6 +151,40 @@ class OwnerDashboardTest extends TestCase
             ->assertDontSee('Material inventory');
     }
 
+    public function test_dashboard_detail_payload_is_not_truncated_to_ten_rows(): void
+    {
+        $this->actingAs($this->user('developer'));
+        $city = Setup::create(['type' => 'city', 'title' => 'Full Dashboard City', 'short_title' => 'FULL-CITY']);
+
+        foreach (range(1, 12) as $index) {
+            $customerUser = $this->user('customer');
+            $customer = Customer::create([
+                'user_id' => $customerUser->id,
+                'customer_name' => 'Full Dashboard Buyer '.$index,
+                'person_name' => 'Buyer '.$index,
+                'phone_number' => '0300'.str_pad((string) $index, 7, '0', STR_PAD_LEFT),
+                'date' => today(),
+                'category' => 'retail',
+                'city_id' => $city->id,
+                'address' => 'Dashboard Test Address',
+            ]);
+            Invoice::create([
+                'invoice_no' => 'FULL-DASH-INV-'.str_pad((string) $index, 3, '0', STR_PAD_LEFT),
+                'customer_id' => $customer->id,
+                'date' => today(),
+                'netAmount' => 100 + $index,
+            ]);
+        }
+
+        $this->getJson(route('home.dashboard-data', [
+            'from' => today()->toDateString(),
+            'to' => today()->toDateString(),
+            'refresh' => 1,
+        ]))
+            ->assertOk()
+            ->assertJsonCount(12, 'summary.receivables');
+    }
+
     private function user(string $role): User
     {
         return User::create([

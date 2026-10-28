@@ -14,6 +14,92 @@
         const config = window.__sidebar || {};
         const menuData = config.menuData || [];
         const pageName = window.location.href.toLowerCase().split('/')[3];
+        const sidebarShell = document.getElementById('desktopSidebarShell');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebarStateUrl = config.updateStateUrl;
+        let preferredSidebarExpanded = config.expanded === true;
+        let sidebarSaveQueue = Promise.resolve();
+        let sidebarCollapseTimer;
+
+        function setSidebarExpanded(expanded) {
+            const isDesktop = window.matchMedia('(min-width: 768px)').matches;
+            const shouldExpand = isDesktop && expanded;
+            const wasExpanded = sidebarShell?.classList.contains('is-expanded');
+
+            window.clearTimeout(sidebarCollapseTimer);
+            if (shouldExpand) {
+                sidebarShell?.classList.remove('is-collapsing');
+                sidebarShell?.classList.add('is-expanded');
+            } else if (wasExpanded) {
+                sidebarShell?.classList.add('is-collapsing');
+                sidebarShell?.classList.remove('is-expanded');
+                sidebarCollapseTimer = window.setTimeout(() => {
+                    sidebarShell?.classList.remove('is-collapsing');
+                }, 240);
+            } else {
+                sidebarShell?.classList.remove('is-expanded', 'is-collapsing');
+            }
+
+            sidebarToggle?.setAttribute('aria-expanded', shouldExpand ? 'true' : 'false');
+            sidebarToggle?.setAttribute('aria-label', shouldExpand ? 'Collapse sidebar' : 'Expand sidebar');
+            if (sidebarToggle) sidebarToggle.title = shouldExpand ? 'Collapse sidebar' : 'Expand sidebar';
+
+            closeAllDropdowns();
+        }
+
+        function persistSidebarState(expanded, previousState) {
+            sidebarSaveQueue = sidebarSaveQueue
+                .catch(() => {})
+                .then(async () => {
+                    const response = await fetch(sidebarStateUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: JSON.stringify({ expanded }),
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Sidebar preference could not be saved.');
+                    }
+                })
+                .catch(error => {
+                    if (preferredSidebarExpanded === expanded) {
+                        preferredSidebarExpanded = previousState;
+                        setSidebarExpanded(previousState);
+                    }
+
+                    if (typeof showMessageBox === 'function') {
+                        showMessageBox('error', error.message || 'Sidebar preference could not be saved.');
+                    }
+                });
+        }
+
+        setSidebarExpanded(preferredSidebarExpanded);
+
+        sidebarToggle?.addEventListener('click', event => {
+            if (!window.matchMedia('(min-width: 768px)').matches) return;
+            event.preventDefault();
+
+            if (window.__appConfig?.readonlySession) {
+                if (typeof showMessageBox === 'function') {
+                    showMessageBox('warning', 'Read-only mode is enabled. You cannot update the sidebar preference.');
+                }
+                return;
+            }
+
+            const previousState = preferredSidebarExpanded;
+            preferredSidebarExpanded = !sidebarShell?.classList.contains('is-expanded');
+            setSidebarExpanded(preferredSidebarExpanded);
+            persistSidebarState(preferredSidebarExpanded, previousState);
+        });
+
+        window.addEventListener('resize', () => {
+            setSidebarExpanded(preferredSidebarExpanded);
+        });
 
         function escapeHtml(value) {
             return String(value ?? '')
@@ -96,7 +182,7 @@
                             ${shortcut.svgIcon}
 
                             <span
-                                class="absolute shadow-xl left-18 top-1/2 transform -translate-y-1/2 bg-[var(--h-secondary-bg-color)] border border-gray-600 text-[var(--text-color)] text-xs rounded-lg px-2 py-1 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none text-nowrap"
+                                class="sidebar-nav-label absolute shadow-xl left-18 top-1/2 transform -translate-y-1/2 bg-[var(--h-secondary-bg-color)] border border-gray-600 text-[var(--text-color)] text-xs rounded-lg px-2 py-1 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none text-nowrap"
                             >
                                 ${shortcut.name}
                             </span>
