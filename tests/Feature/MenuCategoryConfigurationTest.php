@@ -19,6 +19,10 @@ class MenuCategoryConfigurationTest extends TestCase
         $developer = $this->user('menu_developer', 'developer');
 
         $response = $this->actingAs($developer)->postJson(route('updateMenuCategories'), [
+            'categories' => [
+                ['id' => 'sales', 'name' => 'Sales'],
+                ['id' => 'purchase', 'name' => 'Purchase & Suppliers'],
+            ],
             'assignments' => [
                 'customers' => 'purchase',
                 'orders' => 'sales',
@@ -47,6 +51,7 @@ class MenuCategoryConfigurationTest extends TestCase
         $owner = $this->user('menu_owner', 'owner');
 
         $this->actingAs($owner)->postJson(route('updateMenuCategories'), [
+            'categories' => [],
             'assignments' => ['customers' => 'purchase'],
         ])->assertForbidden();
 
@@ -61,6 +66,7 @@ class MenuCategoryConfigurationTest extends TestCase
         $developer = $this->user('menu_validation_developer', 'developer');
 
         $this->actingAs($developer)->postJson(route('updateMenuCategories'), [
+            'categories' => [['id' => 'sales', 'name' => 'Sales']],
             'assignments' => ['unknown-module' => 'sales'],
         ])->assertUnprocessable()
             ->assertJsonValidationErrors('assignments');

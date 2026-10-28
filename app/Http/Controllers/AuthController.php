@@ -9,7 +9,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -223,9 +222,27 @@ class AuthController extends Controller
         abort_unless(Auth::user()?->role === 'developer', 403);
 
         $data = $request->validate([
+            'categories' => ['required', 'array', 'max:30'],
+            'categories.*.id' => ['required', 'string', 'regex:/^[a-z0-9][a-z0-9_-]*$/', 'max:60'],
+            'categories.*.name' => ['required', 'string', 'max:80'],
             'assignments' => ['required', 'array'],
-            'assignments.*' => ['required', 'string', Rule::in($menuCategories->categoryIds())],
+            'assignments.*' => ['nullable', 'string', 'max:60'],
         ]);
+
+        $categoryIds = array_column($data['categories'], 'id');
+        if (count($categoryIds) !== count(array_unique($categoryIds))) {
+            throw ValidationException::withMessages([
+                'categories' => 'Category IDs must be unique.',
+            ]);
+        }
+
+        $invalidAssignments = collect($data['assignments'])
+            ->filter(fn ($categoryId) => $categoryId !== null && !in_array($categoryId, $categoryIds, true));
+        if ($invalidAssignments->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'assignments' => 'Every module must use an existing category or remain uncategorized.',
+            ]);
+        }
 
         $unknownModuleIds = array_diff(array_keys($data['assignments']), $menuCategories->moduleIds());
         if ($unknownModuleIds !== []) {
@@ -234,12 +251,13 @@ class AuthController extends Controller
             ]);
         }
 
-        $assignments = $menuCategories->saveAssignments($data['assignments']);
+        $configuration = $menuCategories->saveConfiguration($data['categories'], $data['assignments']);
 
         return response()->json([
             'status' => 'success',
             'saved' => true,
-            'assignments' => $assignments,
+            'categories' => $configuration['categories'],
+            'assignments' => $configuration['assignments'],
             'message' => 'Menu categories updated successfully.',
         ]);
     }

@@ -13,28 +13,25 @@
 
         const config = window.__sidebar || {};
         const menuData = config.menuData || [];
-        const menuCategories = Array.isArray(config.menuCategories)
+        let menuCategories = Array.isArray(config.menuCategories)
             ? config.menuCategories.map(category => ({
                 id: category.id,
                 name: category.name,
-                moduleIds: Array.isArray(category.module_ids) ? category.module_ids : [],
             }))
             : [];
-        const categoryByModuleId = new Map(
-            menuCategories.flatMap(category => category.moduleIds.map(moduleId => [moduleId, category.id]))
-        );
+        const categoryByModuleId = new Map();
         const configuredCategoryAssignments = config.menuCategoryAssignments && typeof config.menuCategoryAssignments === 'object'
             ? config.menuCategoryAssignments
             : {};
         Object.entries(configuredCategoryAssignments).forEach(([moduleId, categoryId]) => {
-            if (categoryByModuleId.has(moduleId) && menuCategories.some(category => category.id === categoryId)) {
+            if (menuCategories.some(category => category.id === categoryId)) {
                 categoryByModuleId.set(moduleId, categoryId);
             }
         });
         menuData.forEach(module => {
-            module.category = categoryByModuleId.get(module.id) || 'administration';
+            module.category = categoryByModuleId.get(module.id) ?? null;
         });
-        const availableMenuCategories = config.canManageMenuCategories === true
+        let availableMenuCategories = config.canManageMenuCategories === true
             ? menuCategories
             : menuCategories.filter(category => menuData.some(module => module.category === category.id));
         const pageName = window.location.href.toLowerCase().split('/')[3];
@@ -323,12 +320,18 @@
         let menuSearchValue = '';
         let isManagingMenuCategories = false;
         let isSavingMenuCategories = false;
-        let savedCategoryAssignments = Object.fromEntries(categoryByModuleId);
+        let savedCategoryAssignments = { ...configuredCategoryAssignments };
+        menuData.forEach(item => {
+            if (!Object.prototype.hasOwnProperty.call(savedCategoryAssignments, item.id)) {
+                savedCategoryAssignments[item.id] = item.category;
+            }
+        });
         let workingCategoryAssignments = { ...savedCategoryAssignments };
+        let isAddingMenuCategory = false;
 
         function syncMenuItemCategories(assignments) {
             menuData.forEach(item => {
-                item.category = assignments[item.id] || categoryByModuleId.get(item.id) || 'administration';
+                item.category = assignments[item.id] ?? null;
             });
         }
 
@@ -361,15 +364,33 @@
             modalData.activeMenuCategory = activeMenuCategory;
             modalData.cards.data = filteredMenuData();
             modalData.cards.showEmptyCategories = isManagingMenuCategories;
+            modalData.cards.categoryManagement = isManagingMenuCategories;
+            modalData.cards.categories = availableMenuCategories;
             renderCardsInModal(modalData);
 
-            document.querySelectorAll('#menuModal [data-menu-category]').forEach(button => {
-                const isActive = button.dataset.menuCategory === activeMenuCategory;
-                button.classList.toggle('is-active', isActive);
-                button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-            });
+            renderMenuCategoryFilters();
 
             applyMenuCategoryManagementState();
+        }
+
+        function renderMenuCategoryFilters() {
+            const filters = document.querySelector('#menuModal .menu-category-filters');
+            if (!filters) return;
+
+            filters.innerHTML = [
+                { id: 'all', name: 'All' },
+                ...availableMenuCategories,
+            ].map(category => {
+                const isActive = category.id === activeMenuCategory;
+                return `
+                    <button type="button" data-menu-category="${escapeHtml(category.id)}"
+                        aria-pressed="${isActive ? 'true' : 'false'}"
+                        onclick="filterMenuCategory('${htmlAttr(category.id)}')"
+                        class="menu-category-filter ${isActive ? 'is-active' : ''}">
+                        ${escapeHtml(category.name)}
+                    </button>
+                `;
+            }).join('');
         }
 
         function menuCategoryManagerButton() {
@@ -384,6 +405,10 @@
 
         function menuCategorySaveButtons() {
             return `
+                <button type="button" onclick="addMenuCategory()" class="menu-category-add-button">
+                    <i class="fa-solid fa-plus"></i>
+                    Add Category
+                </button>
                 <button type="button" onclick="cancelMenuCategoryManagement()"
                     class="menu-category-cancel-button" ${isSavingMenuCategories ? 'disabled' : ''}>
                     Cancel
@@ -396,12 +421,27 @@
             `;
         }
 
+        function menuCategoryAddForm() {
+            return `
+                <input id="newMenuCategoryName" type="text" maxlength="80" placeholder="Category name..."
+                    class="menu-category-add-input" onkeydown="if (event.key === 'Enter') confirmAddMenuCategory()" />
+                <button type="button" onclick="confirmAddMenuCategory()" class="menu-category-save-button">Add</button>
+                <button type="button" onclick="cancelAddMenuCategory()" class="menu-category-cancel-button">Cancel</button>
+            `;
+        }
+
         function updateMenuCategoryManagerActions() {
             const actions = document.getElementById('menuCategoryManagerActions');
             if (!actions || !canManageMenuCategories) return;
-            actions.innerHTML = isManagingMenuCategories
-                ? menuCategorySaveButtons()
-                : menuCategoryManagerButton();
+            actions.innerHTML = isAddingMenuCategory
+                ? menuCategoryAddForm()
+                : isManagingMenuCategories
+                    ? menuCategorySaveButtons()
+                    : menuCategoryManagerButton();
+
+            if (isAddingMenuCategory) {
+                document.getElementById('newMenuCategoryName')?.focus();
+            }
         }
 
         function categorySelectHtml(moduleId) {
@@ -409,6 +449,7 @@
                 <label class="menu-card-category-select-label">
                     <span>Move to</span>
                     <select data-menu-category-select="${escapeHtml(moduleId)}">
+                        <option value="" ${workingCategoryAssignments[moduleId] == null ? 'selected' : ''}>Uncategorized</option>
                         ${availableMenuCategories.map(category => `
                             <option value="${escapeHtml(category.id)}" ${workingCategoryAssignments[moduleId] === category.id ? 'selected' : ''}>
                                 ${escapeHtml(category.name)}
@@ -495,10 +536,11 @@
                 const section = event.target.closest('.menu-category-section');
                 const moduleId = event.dataTransfer.getData('text/plain');
                 const categoryId = section?.dataset.menuCategorySection;
-                if (!section || !moduleId || !availableMenuCategories.some(category => category.id === categoryId)) return;
+                const isUncategorized = categoryId === '__uncategorized__';
+                if (!section || !moduleId || (!isUncategorized && !availableMenuCategories.some(category => category.id === categoryId))) return;
 
                 event.preventDefault();
-                workingCategoryAssignments[moduleId] = categoryId;
+                workingCategoryAssignments[moduleId] = isUncategorized ? null : categoryId;
                 syncMenuItemCategories(workingCategoryAssignments);
                 refreshMenuModalContent();
             });
@@ -520,6 +562,7 @@
             menuSearchValue = '';
             isManagingMenuCategories = false;
             isSavingMenuCategories = false;
+            isAddingMenuCategory = false;
             workingCategoryAssignments = { ...savedCategoryAssignments };
             syncMenuItemCategories(savedCategoryAssignments);
             menuData.forEach(item => {
@@ -534,6 +577,67 @@
             createModal(modalData);
             bindMenuCategoryManagementEvents();
             applyMenuCategoryManagementState();
+        };
+
+        window.addMenuCategory = function addMenuCategory() {
+            if (!isManagingMenuCategories || isSavingMenuCategories) return;
+            isAddingMenuCategory = true;
+            updateMenuCategoryManagerActions();
+        };
+
+        window.cancelAddMenuCategory = function cancelAddMenuCategory() {
+            isAddingMenuCategory = false;
+            updateMenuCategoryManagerActions();
+        };
+
+        window.confirmAddMenuCategory = function confirmAddMenuCategory() {
+            const input = document.getElementById('newMenuCategoryName');
+            const name = input?.value.trim() || '';
+            if (!name) return;
+
+            const baseId = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'category';
+            let id = baseId;
+            let suffix = 2;
+            while (menuCategories.some(category => category.id === id)) {
+                id = `${baseId}-${suffix++}`;
+            }
+
+            menuCategories.push({ id, name });
+            availableMenuCategories = menuCategories;
+            isAddingMenuCategory = false;
+            activeMenuCategory = 'all';
+            refreshMenuModalContent();
+        };
+
+        window.renameMenuCategory = function renameMenuCategory(categoryId, name) {
+            const category = menuCategories.find(item => item.id === categoryId);
+            const nextName = String(name || '').trim();
+            if (category && nextName) {
+                category.name = nextName;
+                renderMenuCategoryFilters();
+            }
+        };
+
+        window.deleteMenuCategory = function deleteMenuCategory(categoryId) {
+            if (!isManagingMenuCategories || isSavingMenuCategories) return;
+            menuCategories = menuCategories.filter(category => category.id !== categoryId);
+            menuData.forEach(item => {
+                if (workingCategoryAssignments[item.id] === categoryId) {
+                    workingCategoryAssignments[item.id] = null;
+                }
+            });
+            availableMenuCategories = menuCategories;
+            activeMenuCategory = 'all';
+            refreshMenuModalContent();
+        };
+
+        window.moveMenuCategory = function moveMenuCategory(categoryId, direction) {
+            const index = menuCategories.findIndex(category => category.id === categoryId);
+            const nextIndex = index + direction;
+            if (index < 0 || nextIndex < 0 || nextIndex >= menuCategories.length) return;
+            [menuCategories[index], menuCategories[nextIndex]] = [menuCategories[nextIndex], menuCategories[index]];
+            availableMenuCategories = menuCategories;
+            refreshMenuModalContent();
         };
 
         window.toggleMenuCategoryManagement = function toggleMenuCategoryManagement() {
@@ -578,7 +682,10 @@
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
                         'X-Requested-With': 'XMLHttpRequest',
                     },
-                    body: JSON.stringify({ assignments: workingCategoryAssignments }),
+                    body: JSON.stringify({
+                        categories: menuCategories,
+                        assignments: workingCategoryAssignments,
+                    }),
                 });
                 const payload = await response.json().catch(() => ({}));
                 if (!response.ok || payload.saved !== true) {
@@ -587,6 +694,9 @@
 
                 savedCategoryAssignments = { ...payload.assignments };
                 workingCategoryAssignments = { ...savedCategoryAssignments };
+                menuCategories = payload.categories.map(category => ({ id: category.id, name: category.name }));
+                availableMenuCategories = menuCategories;
+                modalData.menuCategories = availableMenuCategories;
                 Object.entries(savedCategoryAssignments).forEach(([moduleId, categoryId]) => {
                     categoryByModuleId.set(moduleId, categoryId);
                 });

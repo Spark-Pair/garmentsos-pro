@@ -972,7 +972,9 @@ function returnCardsInModal(data) {
         ? window.baseCreateCard
         : createCard;
 
-    if (data.cards.data.length > 0 && data.cards.groupByCategory && Array.isArray(data.cards.categories)) {
+    if (data.cards.data.length > 0 && data.cards.groupByCategory && Array.isArray(data.cards.categories) && data.cards.categories.length === 0) {
+        cardsHTML = `<div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">${data.cards.data.map(item => cardRenderer(item)).join('')}</div>`;
+    } else if (data.cards.data.length > 0 && data.cards.groupByCategory && Array.isArray(data.cards.categories)) {
         const categories = data.cards.categories.filter(category =>
             data.cards.showEmptyCategories || data.cards.data.some(item => item.category === category.id)
         );
@@ -982,14 +984,30 @@ function returnCardsInModal(data) {
                 ? 'grid-cols-1 md:grid-cols-2'
                 : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3';
 
-        categories.forEach(category => {
+        categories.forEach((category, categoryIndex) => {
             const categoryItems = data.cards.data.filter(item => item.category === category.id);
+            const managementControls = data.cards.categoryManagement ? `
+                <div class="menu-category-management-controls">
+                    <input type="text" value="${htmlAttr(category.name)}" maxlength="80"
+                        aria-label="Category name"
+                        onchange="renameMenuCategory('${htmlAttr(category.id)}', this.value)" />
+                    <button type="button" title="Move category up" onclick="moveMenuCategory('${htmlAttr(category.id)}', -1)" ${categoryIndex === 0 ? 'disabled' : ''}>
+                        <i class="fa-solid fa-chevron-up"></i>
+                    </button>
+                    <button type="button" title="Move category down" onclick="moveMenuCategory('${htmlAttr(category.id)}', 1)" ${categoryIndex === categories.length - 1 ? 'disabled' : ''}>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </button>
+                    <button type="button" title="Delete category" onclick="deleteMenuCategory('${htmlAttr(category.id)}')">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            ` : `<h6 class="truncate text-xs font-bold uppercase tracking-[0.12em] text-[var(--text-color)]">${modalText(category.name)}</h6>`;
             cardsHTML += `
                 <section class="menu-category-section" data-menu-category-section="${modalText(category.id)}">
                     <div class="mb-2.5 flex items-center justify-between gap-3 px-1">
                         <div class="flex min-w-0 items-center gap-2.5">
                             <span class="size-2 shrink-0 rounded-full bg-[var(--primary-color)]"></span>
-                            <h6 class="truncate text-xs font-bold uppercase tracking-[0.12em] text-[var(--text-color)]">${modalText(category.name)}</h6>
+                            ${managementControls}
                         </div>
                         <span class="shrink-0 rounded-lg border border-[var(--glass-border-color)]/20 bg-[var(--h-bg-color)] px-2 py-1 text-[10px] font-semibold text-[var(--secondary-text)]">
                             ${categoryItems.length} ${categoryItems.length === 1 ? 'module' : 'modules'}
@@ -1001,6 +1019,26 @@ function returnCardsInModal(data) {
                 </section>
             `;
         });
+
+        const uncategorizedItems = data.cards.data.filter(item => !item.category);
+        if (uncategorizedItems.length) {
+            cardsHTML += `
+                <section class="menu-category-section" data-menu-category-section="__uncategorized__">
+                    <div class="mb-2.5 flex items-center justify-between gap-3 px-1">
+                        <div class="flex min-w-0 items-center gap-2.5">
+                            <span class="size-2 shrink-0 rounded-full bg-[var(--secondary-text)]"></span>
+                            <h6 class="truncate text-xs font-bold uppercase tracking-[0.12em] text-[var(--secondary-text)]">${data.cards.categoryManagement ? 'Uncategorized Modules' : 'Other Modules'}</h6>
+                        </div>
+                        <span class="shrink-0 rounded-lg border border-[var(--glass-border-color)]/20 bg-[var(--h-bg-color)] px-2 py-1 text-[10px] font-semibold text-[var(--secondary-text)]">
+                            ${uncategorizedItems.length} ${uncategorizedItems.length === 1 ? 'module' : 'modules'}
+                        </span>
+                    </div>
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        ${uncategorizedItems.map(item => cardRenderer(item)).join('')}
+                    </div>
+                </section>
+            `;
+        }
     } else if (data.cards.data.length > 0) {
         data.cards.data.forEach(item => {
             cardsHTML += cardRenderer(item);

@@ -202,6 +202,7 @@
 }
 
 .menu-category-manage-button,
+.menu-category-add-button,
 .menu-category-cancel-button,
 .menu-category-save-button {
     display: inline-flex;
@@ -218,6 +219,7 @@
 }
 
 .menu-category-manage-button,
+.menu-category-add-button,
 .menu-category-cancel-button {
     border: 1px solid color-mix(in srgb, var(--glass-border-color) 40%, transparent);
     background: var(--h-bg-color);
@@ -231,6 +233,7 @@
 }
 
 .menu-category-manage-button:hover,
+.menu-category-add-button:hover,
 .menu-category-cancel-button:hover {
     border-color: color-mix(in srgb, var(--primary-color) 55%, transparent);
 }
@@ -240,6 +243,23 @@
 .menu-category-save-button:disabled {
     cursor: not-allowed;
     opacity: 0.55;
+}
+
+.menu-category-add-input {
+    min-height: 2.4rem;
+    width: 10rem;
+    border: 1px solid color-mix(in srgb, var(--glass-border-color) 45%, transparent);
+    border-radius: 0.65rem;
+    background: var(--h-bg-color);
+    padding: 0.5rem 0.7rem;
+    color: var(--text-color);
+    font-size: 0.75rem;
+    outline: none;
+}
+
+.menu-category-add-input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 18%, transparent);
 }
 
 .is-managing-menu-categories .menu-category-filter {
@@ -293,6 +313,60 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
+}
+
+.menu-category-management-controls {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.menu-category-management-controls input {
+    min-width: 8rem;
+    max-width: 17rem;
+    border: 1px solid color-mix(in srgb, var(--glass-border-color) 38%, transparent);
+    border-radius: 0.55rem;
+    background: var(--h-bg-color);
+    padding: 0.35rem 0.55rem;
+    color: var(--text-color);
+    font-size: 0.75rem;
+    font-weight: 700;
+    outline: none;
+}
+
+.menu-category-management-controls input:focus {
+    border-color: var(--primary-color);
+}
+
+.menu-category-management-controls button {
+    display: inline-flex;
+    width: 1.8rem;
+    height: 1.8rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid color-mix(in srgb, var(--glass-border-color) 35%, transparent);
+    border-radius: 0.5rem;
+    background: var(--h-bg-color);
+    padding: 0.38rem;
+    color: var(--secondary-text);
+    font-size: 0.65rem;
+    cursor: pointer;
+}
+
+.menu-category-management-controls button:hover {
+    border-color: color-mix(in srgb, var(--primary-color) 45%, transparent);
+    color: var(--text-color);
+}
+
+.menu-category-management-controls button:last-child:hover {
+    border-color: var(--border-error);
+    color: var(--text-error);
+}
+
+.menu-category-management-controls button:disabled {
+    cursor: not-allowed;
+    opacity: 0.35;
 }
 
 .menu-card-category-select-label {

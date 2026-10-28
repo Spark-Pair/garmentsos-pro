@@ -7,6 +7,7 @@ use App\Services\Settings\AppSettingService;
 class MenuCategoryService
 {
     public const SETTING_KEY = 'menu_category_assignments';
+    public const CATEGORIES_SETTING_KEY = 'menu_categories';
 
     public function __construct(protected AppSettingService $settings)
     {
@@ -14,15 +15,26 @@ class MenuCategoryService
 
     public function categories(): array
     {
+        $saved = $this->settings->get(self::CATEGORIES_SETTING_KEY, null, 'installation');
+
+        if (is_array($saved)) {
+            return $this->sanitizeCategories($saved);
+        }
+
+        return $this->defaultCategories();
+    }
+
+    public function defaultCategories(): array
+    {
         return [
-            ['id' => 'sales', 'name' => 'Sales', 'module_ids' => ['customers', 'orders', 'invoices', 'sales-returns', 'customer-payments']],
-            ['id' => 'purchase', 'name' => 'Purchase & Suppliers', 'module_ids' => ['suppliers', 'vouchers']],
-            ['id' => 'inventory', 'name' => 'Inventory & Production', 'module_ids' => ['articles', 'physical-quantities', 'inventory', 'fabrics', 'productions']],
-            ['id' => 'logistics', 'name' => 'Dispatch & Logistics', 'module_ids' => ['shipments', 'cargos', 'bilties']],
-            ['id' => 'finance', 'name' => 'Accounts & Finance', 'module_ids' => ['payment-programs', 'expenses', 'bank-accounts', 'daily-ledger', 'balance-entries', 'cr', 'dr', 'utility-bills', 'utility-accounts']],
-            ['id' => 'hr', 'name' => 'HR & Payroll', 'module_ids' => ['employees', 'employee-payments', 'attendances']],
-            ['id' => 'reports', 'name' => 'Reports', 'module_ids' => ['reports', 'statement']],
-            ['id' => 'administration', 'name' => 'Administration', 'module_ids' => ['users']],
+            ['id' => 'sales', 'name' => 'Sales'],
+            ['id' => 'purchase', 'name' => 'Purchase & Suppliers'],
+            ['id' => 'inventory', 'name' => 'Inventory & Production'],
+            ['id' => 'logistics', 'name' => 'Dispatch & Logistics'],
+            ['id' => 'finance', 'name' => 'Accounts & Finance'],
+            ['id' => 'hr', 'name' => 'HR & Payroll'],
+            ['id' => 'reports', 'name' => 'Reports'],
+            ['id' => 'administration', 'name' => 'Administration'],
         ];
     }
 
@@ -33,49 +45,109 @@ class MenuCategoryService
 
     public function moduleIds(): array
     {
-        return array_keys($this->defaultAssignments());
+        return array_keys($this->baseAssignments());
     }
 
     public function defaultAssignments(): array
     {
-        $assignments = [];
-
-        foreach ($this->categories() as $category) {
-            foreach ($category['module_ids'] as $moduleId) {
-                $assignments[$moduleId] = $category['id'];
-            }
-        }
-
-        return $assignments;
+        return $this->sanitizeAssignments($this->baseAssignments(), $this->categories());
     }
 
     public function assignments(): array
     {
         $saved = $this->settings->get(self::SETTING_KEY, [], 'installation');
 
-        return $this->sanitizeAssignments(is_array($saved) ? $saved : []);
+        $assignments = is_array($saved) ? $saved : $this->baseAssignments();
+
+        return $this->sanitizeAssignments($assignments, $this->categories());
     }
 
-    public function saveAssignments(array $assignments): array
+    public function saveConfiguration(array $categories, array $assignments): array
     {
-        $sanitized = $this->sanitizeAssignments($assignments);
+        $sanitizedCategories = $this->sanitizeCategories($categories);
+        $sanitizedAssignments = $this->sanitizeAssignments($assignments, $sanitizedCategories);
 
-        $this->settings->set(self::SETTING_KEY, $sanitized, 'json', 'installation');
+        $this->settings->set(self::CATEGORIES_SETTING_KEY, $sanitizedCategories, 'json', 'installation');
+        $this->settings->set(self::SETTING_KEY, $sanitizedAssignments, 'json', 'installation');
+
+        return [
+            'categories' => $sanitizedCategories,
+            'assignments' => $sanitizedAssignments,
+        ];
+    }
+
+    private function sanitizeCategories(array $categories): array
+    {
+        $sanitized = [];
+        $seenIds = [];
+
+        foreach ($categories as $category) {
+            $id = trim((string) ($category['id'] ?? ''));
+            $name = trim((string) ($category['name'] ?? ''));
+
+            if ($id === '' || $name === '' || isset($seenIds[$id])) {
+                continue;
+            }
+
+            $seenIds[$id] = true;
+            $sanitized[] = ['id' => $id, 'name' => $name];
+        }
 
         return $sanitized;
     }
 
-    private function sanitizeAssignments(array $assignments): array
+    private function sanitizeAssignments(array $assignments, array $categories): array
     {
-        $sanitized = $this->defaultAssignments();
-        $categoryIds = $this->categoryIds();
+        $categoryIds = array_column($categories, 'id');
+        $sanitized = array_fill_keys($this->moduleIdsFromBase(), null);
 
         foreach ($assignments as $moduleId => $categoryId) {
-            if (array_key_exists($moduleId, $sanitized) && in_array($categoryId, $categoryIds, true)) {
+            if (array_key_exists($moduleId, $sanitized) && ($categoryId === null || in_array($categoryId, $categoryIds, true))) {
                 $sanitized[$moduleId] = $categoryId;
             }
         }
 
         return $sanitized;
+    }
+
+    private function moduleIdsFromBase(): array
+    {
+        return array_keys($this->baseAssignments());
+    }
+
+    private function baseAssignments(): array
+    {
+        return [
+            'customers' => 'sales',
+            'orders' => 'sales',
+            'invoices' => 'sales',
+            'sales-returns' => 'sales',
+            'customer-payments' => 'sales',
+            'suppliers' => 'purchase',
+            'vouchers' => 'purchase',
+            'articles' => 'inventory',
+            'physical-quantities' => 'inventory',
+            'inventory' => 'inventory',
+            'fabrics' => 'inventory',
+            'productions' => 'inventory',
+            'shipments' => 'logistics',
+            'cargos' => 'logistics',
+            'bilties' => 'logistics',
+            'payment-programs' => 'finance',
+            'expenses' => 'finance',
+            'bank-accounts' => 'finance',
+            'daily-ledger' => 'finance',
+            'balance-entries' => 'finance',
+            'cr' => 'finance',
+            'dr' => 'finance',
+            'utility-bills' => 'finance',
+            'utility-accounts' => 'finance',
+            'employees' => 'hr',
+            'employee-payments' => 'hr',
+            'attendances' => 'hr',
+            'reports' => 'reports',
+            'statement' => 'reports',
+            'users' => 'administration',
+        ];
     }
 }
