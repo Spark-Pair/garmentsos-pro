@@ -441,11 +441,27 @@ class SalesReturnController extends Controller
 
         app(ModuleBranchService::class)->assertRecordInAllowedBranch($lines->first(), 'sales_returns');
 
+        $formattedLines = $lines->map->toFormattedArray();
+        $previewData = $formattedLines->first()['data'] ?? [];
+        $previewData['return_no'] = $returnNo;
+        $previewData['articles'] = $formattedLines
+            ->flatMap(fn ($line) => $line['data']['articles'] ?? [])
+            ->values()
+            ->all();
+        $customers = $formattedLines->pluck('data.customer.customer_name')->filter()->unique()->values();
+        if ($customers->count() > 1) {
+            $previewData['customer'] = [
+                'customer_name' => 'Multiple Customers',
+                'urdu_title' => '',
+                'address' => '',
+                'phone_number' => '',
+                'city' => null,
+            ];
+        }
+
         return view('sales-return.print', [
             'returnNo' => $returnNo,
-            'lines' => $lines,
-            'customer' => $lines->first()->invoice?->customer,
-            'branding' => app(ModuleBranchService::class)->documentBranding('sales_returns', $lines->first()),
+            'previewData' => $previewData,
         ]);
     }
 

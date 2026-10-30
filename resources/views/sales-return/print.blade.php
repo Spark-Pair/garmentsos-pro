@@ -1,64 +1,63 @@
-@php
-    $customerName = trim(($customer?->customer_name ?? '-') . ' | ' . ($customer?->city?->title ?? '-'), ' |');
-    $totalQuantity = $lines->sum('quantity');
-    $totalAmount = $lines->sum('amount');
-@endphp
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>Sales Return {{ $returnNo }}</title>
-    <style>
-        body { font-family: Arial, sans-serif; color: #111; margin: 0; padding: 24px; }
-        .document { max-width: 820px; margin: 0 auto; }
-        .header { display: flex; justify-content: space-between; gap: 24px; border-bottom: 2px solid #111; padding-bottom: 12px; }
-        .header h1 { margin: 0 0 6px; font-size: 24px; }
-        .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; margin: 18px 0; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #999; padding: 8px; text-align: left; }
-        th { background: #eee; }
-        .number { text-align: right; }
-        .totals { margin-top: 14px; margin-left: auto; width: 280px; }
-        .totals div { display: flex; justify-content: space-between; padding: 5px 0; }
-        @media print { body { padding: 0; } .no-print { display: none; } }
-    </style>
-</head>
-<body onload="window.print()">
-    <div class="document">
-        <div class="header">
-            <div>
-                <h1>{{ $branding['name'] ?? $client_company->name }}</h1>
-                @if (!empty($branding['address'])) <div>{{ $branding['address'] }}</div> @endif
-                @if (!empty($branding['phone'])) <div>{{ $branding['phone'] }}</div> @endif
-            </div>
-            <div><h1>Sales Return</h1><div><strong>{{ $returnNo }}</strong></div></div>
-        </div>
-        <div class="meta">
-            <div><strong>Customer:</strong> {{ $customerName }}</div>
-            <div><strong>Date:</strong> {{ optional($lines->first()->date)->format('d-M-Y') }}</div>
-            <div><strong>Type:</strong> {{ $lines->first()->type === 'adjustment' ? 'Adjustment' : 'Return' }}</div>
-            <div><strong>Invoice(s):</strong> {{ $lines->pluck('invoice.invoice_no')->filter()->unique()->implode(', ') }}</div>
-        </div>
-        <table>
-            <thead><tr><th>#</th><th>Article</th><th>Description</th><th>Invoice</th><th class="number">Quantity</th><th class="number">Rate</th><th class="number">Amount</th></tr></thead>
-            <tbody>
-                @foreach ($lines as $index => $line)
-                    <tr>
-                        <td>{{ $index + 1 }}</td>
-                        <td>{{ $line->article?->article_no ?? '-' }}</td>
-                        <td>{{ $line->article?->description ?? '-' }}</td>
-                        <td>{{ $line->invoice?->invoice_no ?? '-' }}</td>
-                        <td class="number">{{ number_format($line->quantity) }}</td>
-                        <td class="number">{{ number_format((float) ($line->article?->sales_rate ?? 0), 1) }}</td>
-                        <td class="number">{{ number_format((float) $line->amount, 1) }}</td>
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
-        <div class="totals">
-            <div><strong>Total Quantity</strong><span>{{ number_format($totalQuantity) }} Pcs</span></div>
-            <div><strong>Total Amount</strong><span>Rs. {{ number_format($totalAmount, 1) }}</span></div>
-        </div>
-    </div>
-</body>
-</html>
+@extends('app')
+
+@section('title', 'Sales Return ' . $returnNo)
+
+@section('content')
+    <div id="sales-return-print-preview" class="flex justify-center p-4"></div>
+@endsection
+
+@push('page-styles')
+<style>
+    body.sales-return-print-only,
+    body.sales-return-print-only main {
+        background: #fff !important;
+    }
+
+    #sales-return-print-preview {
+        color: #111;
+    }
+
+    @media print {
+        body { background: #fff !important; }
+        aside, #logoutModal, #page-loader, #messageBox, #notificationBox, .left_actions { display: none !important; }
+        main { padding: 0 !important; background: #fff !important; border-radius: 0 !important; overflow: visible !important; }
+    }
+</style>
+@endpush
+
+@push('page-scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.body.classList.add('sales-return-print-only');
+
+        const preview = document.getElementById('sales-return-print-preview');
+        if (!preview || !window.DocumentPreview || !window.DocumentPrint) return;
+
+        window.DocumentPreview.renderInto(preview, {
+            type: 'sales_return',
+            size: 'A5',
+            document: 'Sales Return',
+            data: @json($previewData),
+        });
+
+        window.DocumentPrint.printPreview({
+            title: 'Print Sales Return',
+            preview,
+            delay: 500,
+            afterPrint: function () {
+                const indexUrl = @json(route('sales-returns.index'));
+                const referrerIsSalesReturns = document.referrer
+                    && new URL(document.referrer).origin === window.location.origin
+                    && new URL(document.referrer).pathname.replace(/\/$/, '') === indexUrl.replace(window.location.origin, '').replace(/\/$/, '');
+
+                if (referrerIsSalesReturns && window.history.length > 1) {
+                    window.history.back();
+                    return;
+                }
+
+                window.location.assign(indexUrl);
+            },
+        });
+    });
+</script>
+@endpush
